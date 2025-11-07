@@ -1,4 +1,4 @@
-import { query } from '../../db-connector.js';
+import { query } from '../../lib/db-connector.js';
 
 
 export default async function handler(req, res) {
