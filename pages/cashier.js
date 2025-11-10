@@ -28,6 +28,7 @@ export default function CashierPage() {
   }, []);
 
   const filteredMenu = menuItems.filter((item) => {
+    if (!item || !item.menuName) return false;
     const matchCat = filter === 'all' || item.category === filter;
     const matchQuery = item.menuName.toLowerCase().includes(query.toLowerCase());
     return matchCat && matchQuery;
