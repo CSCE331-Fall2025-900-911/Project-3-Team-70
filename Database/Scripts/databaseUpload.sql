@@ -68,8 +68,10 @@ CREATE TABLE IF NOT EXISTS ordertest (
     FOREIGN KEY (employeeID) REFERENCES employee(employeeID),
     orderLocation VARCHAR,
     orderDate TIMESTAMP,
-    orderTotal DECIMAL
+    orderTotal DECIMAL,
+    orderComplete BOOLEAN DEFAULT false
 );
+
 
 DROP TABLE IF EXISTS staging_order;
 
