@@ -14,6 +14,9 @@ export default function KioskPage() {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [language, setLanguage] = useState("en");
+  const [translatedText, setTranslatedText] = useState({});
+
 
   // === Fetch menu data from database ===
   useEffect(() => {
@@ -41,6 +44,50 @@ export default function KioskPage() {
     }
     fetchMenu();
   }, []);
+
+  // === Run when language changes === 
+useEffect(() => {
+  const addGoogleTranslateScript = () => {
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src =
+      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    document.body.appendChild(script);
+  };
+
+  window.googleTranslateElementInit = () => {
+    new window.google.translate.TranslateElement(
+      {
+        pageLanguage: "en",
+        layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+      },
+      "google_translate_element"
+    );
+  };
+
+  addGoogleTranslateScript();
+}, []);
+
+useEffect(() => {
+  const script = document.createElement("script");
+  script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+  document.body.appendChild(script);
+
+  window.googleTranslateElementInit = () => {
+    new window.google.translate.TranslateElement(
+      { pageLanguage: "en" },
+      "google_translate_element"
+    );
+  };
+}, []);
+
+function handleLanguageChange(langCode) {
+  if (!langCode) return;
+  document.cookie = `googtrans=/en/${langCode};path=/`;
+  window.location.reload();
+}
+
+
 
   // === Handle tap on a menu item ===
   const handlePress = (item) => {
@@ -103,6 +150,44 @@ export default function KioskPage() {
       >
         🔊
       </button>
+
+      {/*Language Selector */}
+      <div id="google_translate_element" style={{ display: "none" }}></div>
+      <div
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "20px",
+          zIndex: 1000,
+        }}
+      >
+        <select
+          defaultValue=""
+          onChange={(e) => handleLanguageChange(e.target.value)}
+          style={{
+            padding: "10px",
+            fontSize: "16px",
+            borderRadius: "8px",
+            backgroundColor: "#fff",
+            color: "#000",
+            border: "1px solid #ccc",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+          }}
+        >
+          <option value="">Select Language</option>
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="zh-CN">Chinese (Simplified)</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="ja">Japanese</option>
+          <option value="ru">Russian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ar">Arabic</option>
+          <option value="hi">Hindi</option>
+        </select>
+      </div>
+
 
       {/* === Header === */}
       <h1
