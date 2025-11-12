@@ -30,7 +30,8 @@ export default function CashierPage() {
   const filteredMenu = menuItems.filter((item) => {
     if (!item || !item.menuName) return false;
     const matchCat = filter === 'all' || item.category === filter;
-    const matchQuery = item.menuName.toLowerCase().includes(query.toLowerCase());
+    const name = item?.menuName ?? '';
+    const matchQuery = name.toLowerCase().includes(query.toLowerCase());
     return matchCat && matchQuery;
   });
 
@@ -94,7 +95,7 @@ export default function CashierPage() {
                     <div className="title">{item.menuName}</div>
                     <div className="desc">{item.menuDescription}</div>
                     <div className="row">
-                      <div className="price">${item.price.toFixed(2)}</div>
+                      <div className="price">${Number(item.price || 0).toFixed(2)}</div>
                       <button className="btn primary" onClick={() => addToOrder(item)}>Add</button>
                     </div>
                   </div>
