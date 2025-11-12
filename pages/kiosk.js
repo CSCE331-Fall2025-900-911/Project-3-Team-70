@@ -81,7 +81,7 @@ export default function KioskPage() {
         aria-label="Toggle narration mode"
         style={{
           position: "fixed",
-          top: "50%",
+          top: "30%",
           left: "20px",
           transform: "translateY(-50%)",
           backgroundColor: narrationOn
@@ -103,6 +103,36 @@ export default function KioskPage() {
       >
         🔊
       </button>
+
+      {/* === Left-Side Translation  Button === */}
+      <button
+        onClick={toggleNarration}
+        aria-label="Toggle narration mode"
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "20px",
+          transform: "translateY(-50%)",
+          backgroundColor: narrationOn
+            ? "#FFD700"
+            : accessibilityMode
+            ? "#555"
+            : "#500000",
+          color: narrationOn ? "#000" : "#fff",
+          border: "none",
+          borderRadius: "50%",
+          width: accessibilityMode ? "90px" : "70px",
+          height: accessibilityMode ? "90px" : "70px",
+          fontSize: accessibilityMode ? "36px" : "28px",
+          cursor: "pointer",
+          boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+          zIndex: 10,
+          transition: "all 0.25s ease",
+        }}
+      >
+        Para Espanol
+      </button>
+
 
       {/* === Header === */}
       <h1
