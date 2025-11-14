@@ -1,3 +1,7 @@
 node_modules
 .next
 .env
+
+# in case someone incorrectly adds a .env file
+env
+ENV
