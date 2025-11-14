@@ -271,8 +271,12 @@ export default function KioskPage() {
           transition: "all 0.2s ease",
         }}
       >
-        <span id="accessibility-label">
-          Accessibility Mode: {accessibilityMode ? "ON" : "OFF"}
+        <span id="label-off" style={{ display: accessibilityMode ? "none" : "inline" }}>
+          Accessibility Mode: OFF
+        </span>
+
+        <span id="label-on" style={{ display: accessibilityMode ? "inline" : "none" }}>
+          Accessibility Mode: ON
         </span>
       </button>
 
