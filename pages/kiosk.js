@@ -1,11 +1,42 @@
 import { useState, useEffect } from "react";
 
-// === Narration helper ===
-const speak = (text) => {
+// === Narration helper with language support ===
+const narrationVoices = {
+  en: "en-US",
+  es: "es-ES",
+  "zh-CN": "zh-CN",
+  fr: "fr-FR",
+  de: "de-DE",
+  ja: "ja-JP",
+  ru: "ru-RU",
+  pt: "pt-PT",
+  ar: "ar-SA",
+  hi: "hi-IN",
+};
+
+const speak = (text, lang = "en") => {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = 1;
+  utterance.lang = narrationVoices[lang] || "en-US";
+  speechSynthesis.cancel();
   speechSynthesis.speak(utterance);
 };
+
+// === Translation helper ===
+async function translateText(text, targetLang) {
+  try {
+    const response = await fetch(
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURI(
+        text
+      )}`
+    );
+    const result = await response.json();
+    return result[0][0][0];
+  } catch (err) {
+    console.error("Translation error:", err);
+    return text;
+  }
+}
 
 export default function KioskPage() {
   const [accessibilityMode, setAccessibilityMode] = useState(false);
@@ -15,8 +46,12 @@ export default function KioskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState("en");
-  const [translatedText, setTranslatedText] = useState({});
 
+  // ⭐ NEW — translated accessibility labels
+  const [accessibilityLabel, setAccessibilityLabel] = useState({
+    on: "Accessibility Mode: ON",
+    off: "Accessibility Mode: OFF",
+  });
 
   // === Fetch menu data from database ===
   useEffect(() => {
@@ -25,7 +60,6 @@ export default function KioskPage() {
         const response = await fetch("/api/menu");
         const data = await response.json();
 
-        // Normalize field names so UI always works
         const formatted = data.map((item) => ({
           id: item.menuid ?? item.id,
           name: item.menuname ?? item.name,
@@ -45,55 +79,63 @@ export default function KioskPage() {
     fetchMenu();
   }, []);
 
-  // === Run when language changes === 
-useEffect(() => {
-  const addGoogleTranslateScript = () => {
+  // === Google Translate widget ===
+  useEffect(() => {
+    const addGoogleTranslateScript = () => {
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src =
+        "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+      document.body.appendChild(script);
+    };
+
+    window.googleTranslateElementInit = () => {
+      new window.google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+        },
+        "google_translate_element"
+      );
+    };
+
+    addGoogleTranslateScript();
+  }, []);
+
+  useEffect(() => {
     const script = document.createElement("script");
-    script.type = "text/javascript";
     script.src =
       "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     document.body.appendChild(script);
-  };
+  }, []);
 
-  window.googleTranslateElementInit = () => {
-    new window.google.translate.TranslateElement(
-      {
-        pageLanguage: "en",
-        layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
-      },
-      "google_translate_element"
-    );
-  };
+  // === Language selection ===
+  async function handleLanguageChange(langCode) {
+    if (!langCode) return;
 
-  addGoogleTranslateScript();
-}, []);
+    setLanguage(langCode);
 
-useEffect(() => {
-  const script = document.createElement("script");
-  script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-  document.body.appendChild(script);
+    // ⭐ Translate accessibility label text
+    const labelOn = await translateText("Accessibility Mode: ON", langCode);
+    const labelOff = await translateText("Accessibility Mode: OFF", langCode);
 
-  window.googleTranslateElementInit = () => {
-    new window.google.translate.TranslateElement(
-      { pageLanguage: "en" },
-      "google_translate_element"
-    );
-  };
-}, []);
+    setAccessibilityLabel({
+      on: labelOn,
+      off: labelOff,
+    });
 
-function handleLanguageChange(langCode) {
-  if (!langCode) return;
-  document.cookie = `googtrans=/en/${langCode};path=/`;
-  window.location.reload();
-}
-
-
+    document.cookie = `googtrans=/en/${langCode};path=/`;
+    window.location.reload();
+  }
 
   // === Handle tap on a menu item ===
   const handlePress = (item) => {
     setSelectedItem(item.id);
     if (narrationOn) {
-      speak(`${item.name}. Price ${item.price} dollars. ${item.description || ""}`);
+      speak(
+        `${item.name}. Price ${item.price} dollars. ${item.description || ""}`,
+        language
+      );
     }
     setTimeout(() => setSelectedItem(null), 300);
   };
@@ -103,9 +145,12 @@ function handleLanguageChange(langCode) {
     const newState = !narrationOn;
     setNarrationOn(newState);
     if (newState) {
-      speak("Narration enabled. Tap a drink to hear its description.");
+      speak(
+        "Narration enabled. Tap a drink to hear its description.",
+        language
+      );
     } else {
-      speak("Narration disabled.");
+      speak("Narration disabled.", language);
     }
   };
 
@@ -188,7 +233,6 @@ function handleLanguageChange(langCode) {
         </select>
       </div>
 
-
       {/* === Header === */}
       <h1
         tabIndex="0"
@@ -200,6 +244,7 @@ function handleLanguageChange(langCode) {
       >
         Sharetea Self-Order Kiosk
       </h1>
+
       <p
         style={{
           fontSize: accessibilityMode ? "24px" : "18px",
@@ -226,9 +271,9 @@ function handleLanguageChange(langCode) {
           transition: "all 0.2s ease",
         }}
       >
-        {accessibilityMode
-          ? "Accessibility Mode: ON"
-          : "Accessibility Mode: OFF"}
+        <span id="accessibility-label">
+          Accessibility Mode: {accessibilityMode ? "ON" : "OFF"}
+        </span>
       </button>
 
       {/* === Loading or Error === */}
@@ -285,6 +330,7 @@ function handleLanguageChange(langCode) {
                 >
                   {item.name ?? item.menuname}
                 </h2>
+
                 <p
                   style={{
                     fontSize: accessibilityMode ? "22px" : "18px",
@@ -293,6 +339,7 @@ function handleLanguageChange(langCode) {
                 >
                   ${Number(item.price).toFixed(2)}
                 </p>
+
                 {(item.description ?? item.menudescription) && (
                   <p
                     style={{
