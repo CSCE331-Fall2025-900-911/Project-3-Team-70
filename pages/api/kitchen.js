@@ -1,5 +1,5 @@
 // pages/api/kitchen.js
-import { query } from '../../lib/db-connector.js'; // ✅ use the named export from your connector
+import { query } from '../../lib/db-connector.js'; //  use the named export from your connector
 
 export default async function handler(req, res) {
   try {
