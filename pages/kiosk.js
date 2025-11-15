@@ -7,6 +7,94 @@ const speak = (text) => {
   speechSynthesis.speak(utterance);
 };
 
+// === Weather Widget ===
+function WeatherWidget({ accessibilityMode }) {
+  const [weather, setWeather] = useState({
+    emoji: "☀️",
+    temp: "--",
+    feels_like: "--",
+    wind: "--",
+  });
+
+  useEffect(() => {
+    let intervalId;
+
+    async function fetchWeather() {
+      try {
+        const res = await fetch("/api/weather");
+        const data = await res.json();
+
+        const kelvinToF = (k) => Math.round((k - 273.15) * 9/5 + 32);
+
+        const iconMap = {
+          "01d": "☀️",
+          "01n": "🌙",
+          "02d": "🌤️",
+          "02n": "🌤️",
+          "03d": "☁️",
+          "03n": "☁️",
+          "04d": "☁️",
+          "04n": "☁️",
+          "09d": "🌧️",
+          "09n": "🌧️",
+          "10d": "🌦️",
+          "10n": "🌦️",
+          "11d": "⛈️",
+          "11n": "⛈️",
+          "13d": "❄️",
+          "13n": "❄️",
+          "50d": "🌫️",
+          "50n": "🌫️",
+        };
+
+        setWeather({
+          emoji: iconMap[data.weather[0].icon] || "☀️",
+          temp: kelvinToF(data.main.temp),
+          feels_like: kelvinToF(data.main.feels_like),
+          wind: data.wind.speed,
+        });
+      } catch (err) {
+        console.error("Failed to fetch weather:", err);
+      }
+    }
+
+    fetchWeather();
+
+    // Auto-refresh every 10 minutes
+    intervalId = setInterval(fetchWeather, 600000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        backgroundColor: accessibilityMode ? "#222" : "#fff",
+        color: accessibilityMode ? "#fff" : "#000",
+        borderRadius: "12px",
+        padding: "10px 15px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        textAlign: "center",
+        fontSize: accessibilityMode ? "20px" : "16px",
+        zIndex: 10,
+        lineHeight: "1.4",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}
+    >
+      <div style={{ fontSize: accessibilityMode ? "28px" : "24px" }}>{weather.emoji}</div>
+      <div style={{ fontWeight: "bold", marginTop: "2px" }}>{weather.temp}°F</div>
+      <div>Feels like: {weather.feels_like}°F</div>
+      <div>Wind: {weather.wind} mph</div>
+    </div>
+  );
+}
+
+// === Main Page ===
 export default function KioskPage() {
   const [accessibilityMode, setAccessibilityMode] = useState(false);
   const [narrationOn, setNarrationOn] = useState(false);
@@ -15,14 +103,12 @@ export default function KioskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // === Fetch menu data from database ===
   useEffect(() => {
     async function fetchMenu() {
       try {
         const response = await fetch("/api/menu");
         const data = await response.json();
 
-        // Normalize field names so UI always works
         const formatted = data.map((item) => ({
           id: item.menuid ?? item.id,
           name: item.menuname ?? item.name,
@@ -42,7 +128,6 @@ export default function KioskPage() {
     fetchMenu();
   }, []);
 
-  // === Handle tap on a menu item ===
   const handlePress = (item) => {
     setSelectedItem(item.id);
     if (narrationOn) {
@@ -51,7 +136,6 @@ export default function KioskPage() {
     setTimeout(() => setSelectedItem(null), 300);
   };
 
-  // === Toggle narration ===
   const toggleNarration = () => {
     const newState = !narrationOn;
     setNarrationOn(newState);
@@ -75,6 +159,9 @@ export default function KioskPage() {
         transition: "all 0.3s ease",
       }}
     >
+      {/* === Weather Widget === */}
+      <WeatherWidget accessibilityMode={accessibilityMode} />
+
       {/* === Left-Side Narration Button === */}
       <button
         onClick={toggleNarration}
@@ -104,7 +191,7 @@ export default function KioskPage() {
         🔊
       </button>
 
-      {/* === Left-Side Translation  Button === */}
+      {/* === Left-Side Translation Button === */}
       <button
         onClick={toggleNarration}
         aria-label="Toggle narration mode"
@@ -132,7 +219,6 @@ export default function KioskPage() {
       >
         Para Espanol
       </button>
-
 
       {/* === Header === */}
       <h1
