@@ -103,30 +103,35 @@ export default function KioskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    async function fetchMenu() {
-      try {
-        const response = await fetch("/api/menu");
-        const data = await response.json();
+useEffect(() => {
+  async function fetchMenu() {
+    try {
+      const response = await fetch("/api/menu");
+      const data = await response.json();
 
-        const formatted = data.map((item) => ({
-          id: item.menuid ?? item.id,
+      const formatted = data.map((item) => {
+        const id = item.menuid ?? item.id;
+        return {
+          id,
           name: item.menuname ?? item.name,
           price: item.price,
           description: item.menudescription ?? item.description,
           category: item.category,
-        }));
+          image: `/Images/${id}.png`, // lowercase, matches public/images
+        };
+      });
 
-        setMenuItems(formatted);
-      } catch (err) {
-        console.error("Error fetching menu:", err);
-        setError("Failed to load menu items.");
-      } finally {
-        setLoading(false);
-      }
+      setMenuItems(formatted);
+    } catch (err) {
+      console.error("Error fetching menu:", err);
+      setError("Failed to load menu items.");
+    } finally {
+      setLoading(false);
     }
-    fetchMenu();
-  }, []);
+  }
+  fetchMenu();
+}, []);
+
 
   const handlePress = (item) => {
     setSelectedItem(item.id);
@@ -308,6 +313,18 @@ export default function KioskPage() {
                   userSelect: "none",
                 }}
               >
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  onError={(e) => { e.target.src = "/Images/default.png"; }}
+                  style={{
+                    width: "100%",
+                    height: "200px",
+                    objectFit: "cover",
+                    borderRadius: "15px",
+                    marginBottom: "15px",
+                  }}
+                />
                 <h2
                   style={{
                     fontSize: accessibilityMode ? "28px" : "22px",
