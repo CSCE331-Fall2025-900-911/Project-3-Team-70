@@ -1,11 +1,42 @@
 import { useState, useEffect } from "react";
 
-// === Narration helper ===
-const speak = (text) => {
+// === Narration helper with language support ===
+const narrationVoices = {
+  en: "en-US",
+  es: "es-ES",
+  "zh-CN": "zh-CN",
+  fr: "fr-FR",
+  de: "de-DE",
+  ja: "ja-JP",
+  ru: "ru-RU",
+  pt: "pt-PT",
+  ar: "ar-SA",
+  hi: "hi-IN",
+};
+
+const speak = (text, lang = "en") => {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = 1;
+  utterance.lang = narrationVoices[lang] || "en-US";
+  speechSynthesis.cancel();
   speechSynthesis.speak(utterance);
 };
+
+// === Translation helper ===
+async function translateText(text, targetLang) {
+  try {
+    const response = await fetch(
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURI(
+        text
+      )}`
+    );
+    const result = await response.json();
+    return result[0][0][0];
+  } catch (err) {
+    console.error("Translation error:", err);
+    return text;
+  }
+}
 
 // === Weather Widget ===
 function WeatherWidget({ accessibilityMode }) {
@@ -102,6 +133,13 @@ export default function KioskPage() {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [language, setLanguage] = useState("en");
+
+  // ⭐ NEW — translated accessibility labels
+  const [accessibilityLabel, setAccessibilityLabel] = useState({
+    on: "Accessibility Mode: ON",
+    off: "Accessibility Mode: OFF",
+  });
 
   useEffect(() => {
     async function fetchMenu() {
@@ -128,10 +166,62 @@ export default function KioskPage() {
     fetchMenu();
   }, []);
 
+  // === Google Translate widget ===
+  useEffect(() => {
+    const addGoogleTranslateScript = () => {
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src =
+        "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+      document.body.appendChild(script);
+    };
+
+    window.googleTranslateElementInit = () => {
+      new window.google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+        },
+        "google_translate_element"
+      );
+    };
+
+    addGoogleTranslateScript();
+  }, []);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src =
+      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    document.body.appendChild(script);
+  }, []);
+
+  // === Language selection ===
+  async function handleLanguageChange(langCode) {
+    if (!langCode) return;
+
+    setLanguage(langCode);
+
+    // ⭐ Translate accessibility label text
+    const labelOn = await translateText("Accessibility Mode: ON", langCode);
+    const labelOff = await translateText("Accessibility Mode: OFF", langCode);
+
+    setAccessibilityLabel({
+      on: labelOn,
+      off: labelOff,
+    });
+
+    document.cookie = `googtrans=/en/${langCode};path=/`;
+    window.location.reload();
+  }
+
   const handlePress = (item) => {
     setSelectedItem(item.id);
     if (narrationOn) {
-      speak(`${item.name}. Price ${item.price} dollars. ${item.description || ""}`);
+      speak(
+        `${item.name}. Price ${item.price} dollars. ${item.description || ""}`,
+        language
+      );
     }
     setTimeout(() => setSelectedItem(null), 300);
   };
@@ -140,9 +230,12 @@ export default function KioskPage() {
     const newState = !narrationOn;
     setNarrationOn(newState);
     if (newState) {
-      speak("Narration enabled. Tap a drink to hear its description.");
+      speak(
+        "Narration enabled. Tap a drink to hear its description.",
+        language
+      );
     } else {
-      speak("Narration disabled.");
+      speak("Narration disabled.", language);
     }
   };
 
@@ -191,6 +284,43 @@ export default function KioskPage() {
         🔊
       </button>
 
+      {/*Language Selector */}
+      <div id="google_translate_element" style={{ display: "none" }}></div>
+      <div
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "20px",
+          zIndex: 1000,
+        }}
+      >
+        <select
+          defaultValue=""
+          onChange={(e) => handleLanguageChange(e.target.value)}
+          style={{
+            padding: "10px",
+            fontSize: "16px",
+            borderRadius: "8px",
+            backgroundColor: "#fff",
+            color: "#000",
+            border: "1px solid #ccc",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+          }}
+        >
+          <option value="">Select Language</option>
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="zh-CN">Chinese (Simplified)</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="ja">Japanese</option>
+          <option value="ru">Russian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ar">Arabic</option>
+          <option value="hi">Hindi</option>
+        </select>
+      </div>
+
       {/* === Left-Side Translation Button === */}
       <button
         onClick={toggleNarration}
@@ -231,6 +361,7 @@ export default function KioskPage() {
       >
         Sharetea Self-Order Kiosk
       </h1>
+
       <p
         style={{
           fontSize: accessibilityMode ? "24px" : "18px",
@@ -257,9 +388,13 @@ export default function KioskPage() {
           transition: "all 0.2s ease",
         }}
       >
-        {accessibilityMode
-          ? "Accessibility Mode: ON"
-          : "Accessibility Mode: OFF"}
+        <span id="label-off" style={{ display: accessibilityMode ? "none" : "inline" }}>
+          Accessibility Mode: OFF
+        </span>
+
+        <span id="label-on" style={{ display: accessibilityMode ? "inline" : "none" }}>
+          Accessibility Mode: ON
+        </span>
       </button>
 
       {/* === Loading or Error === */}
@@ -316,6 +451,7 @@ export default function KioskPage() {
                 >
                   {item.name ?? item.menuname}
                 </h2>
+
                 <p
                   style={{
                     fontSize: accessibilityMode ? "22px" : "18px",
@@ -324,6 +460,7 @@ export default function KioskPage() {
                 >
                   ${Number(item.price).toFixed(2)}
                 </p>
+
                 {(item.description ?? item.menudescription) && (
                   <p
                     style={{
