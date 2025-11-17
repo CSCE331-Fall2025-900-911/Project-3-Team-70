@@ -80,18 +80,20 @@ CREATE TEMP TABLE staging_order (
     employeeID INT,
     orderLocation VARCHAR,
     orderDate TIMESTAMP,
-    orderTotal DECIMAL
+    orderTotal DECIMAL,
+    orderComplete BOOLEAN
 );
 
 \copy staging_order FROM 'Database/DatabaseSeed/order.csv' CSV HEADER
 
-INSERT INTO ordertest (orderID, employeeID, orderLocation, orderDate, orderTotal)
-SELECT orderID, employeeID, orderLocation, orderDate, orderTotal FROM staging_order
+INSERT INTO ordertest (orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete)
+SELECT orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete FROM staging_order
 ON CONFLICT (orderID) DO UPDATE
 SET employeeID = EXCLUDED.employeeID,
     orderLocation = EXCLUDED.orderLocation,
     orderDate = EXCLUDED.orderDate,
-    orderTotal = EXCLUDED.orderTotal;
+    orderTotal = EXCLUDED.orderTotal,
+    orderComplete = EXCLUDED.orderComplete;
 
 --OrderItemID,MenuID,Price,QuantityPurchased,OrderID,Size
 CREATE TABLE IF NOT EXISTS orderItem (
