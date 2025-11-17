@@ -1,3 +1,9 @@
 node_modules
 .next
+.vscode
+.idea
 .env
+
+# in case someone incorrectly adds a .env file
+env
+ENV
