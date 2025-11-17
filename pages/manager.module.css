@@ -73,7 +73,7 @@
   font-weight: 600;
 }
 
-.tab.active {
+.active {
   background: var(--brand);
   border-color: transparent;
   color: white;
@@ -92,7 +92,7 @@
   gap: 12px;
 }
 
-.panel-header {
+.panelHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -115,13 +115,13 @@
   cursor: pointer;
 }
 
-.btn.primary {
+.primary {
   background: var(--brand);
   color: #fff;
   border-color: transparent;
 }
 
-.btn.success {
+.success {
   background: var(--brand-2);
   color: #fff;
   border-color: transparent;
@@ -135,7 +135,7 @@
   outline: none;
 }
 
-.table-wrap {
+.tableWrap {
   overflow-x: auto;
 }
 
@@ -157,7 +157,7 @@
   font-weight: 800;
 }
 
-.restock-list {
+.restockList {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -166,7 +166,7 @@
   gap: 8px;
 }
 
-.restock-item {
+.restockItem {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
@@ -176,17 +176,17 @@
   background: white;
 }
 
-.restock-main {
+.restockMain {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.restock-name {
+.restockName {
   font-weight: 800;
 }
 
-.restock-meta {
+.restockMeta {
   color: var(--muted);
   font-size: 12px;
 }

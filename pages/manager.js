@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import "./manager.css";  // <-- IMPORTANT: loads the external stylesheet
+import styles from "./manager.module.css";  // CSS MODULE
 
 export default function ManagerPage() {
   const [activeTab, setActiveTab] = useState("sales");
   const [query, setQuery] = useState("");
 
+  // Dummy Data ======================================================
   const [sales] = useState([
     { id: 1, date: "2025-11-01", item: "Brown Sugar Milk Tea", qty: 32, total: 192.0 },
     { id: 2, date: "2025-11-02", item: "Taro Milk Tea", qty: 21, total: 126.0 },
@@ -24,6 +25,7 @@ export default function ManagerPage() {
     { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
   ]);
 
+  // Filtering =========================================================
   const filteredMenu = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return menuItems;
@@ -44,27 +46,29 @@ export default function ManagerPage() {
     );
   }, [query, inventory]);
 
-  function handleAddMenuItem() { console.log("Add Menu Item"); }
-  function handleUpdateMenuItem() { console.log("Update Menu Item"); }
-  function handleAddInventory() { console.log("Add Inventory Item"); }
-  function handleUpdateInventory() { console.log("Update Inventory Item"); }
-  function handleOrderRestock(item) { console.log("Restock ordered for:", item.name); }
+  // Event Handlers ===================================================
+  function handleAddMenuItem() { console.log("Add menu item"); }
+  function handleUpdateMenuItem() { console.log("Update menu item"); }
+  function handleAddInventory() { console.log("Add inventory"); }
+  function handleUpdateInventory() { console.log("Update inventory"); }
+  function handleOrderRestock(item) { console.log("Restock ordered:", item.name); }
 
+  // TAB COMPONENTS ===================================================
   const SalesTab = (
-    <section className="panel">
-      <div className="panel-header">
+    <section className={styles.panel}>
+      <div className={styles.panelHeader}>
         <h2>Sales</h2>
         <input
           type="search"
           placeholder="Search (item/date)…"
-          className="search"
+          className={styles.search}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
 
-      <div className="table-wrap">
-        <table className="table">
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
           <thead>
             <tr><th>Date</th><th>Item</th><th>Qty</th><th>Total ($)</th></tr>
           </thead>
@@ -93,25 +97,25 @@ export default function ManagerPage() {
   );
 
   const MenuTab = (
-    <section className="panel">
-      <div className="panel-header">
+    <section className={styles.panel}>
+      <div className={styles.panelHeader}>
         <h2>Menu Items</h2>
-        <div className="actions">
-          <button className="btn primary" onClick={handleAddMenuItem}>Add</button>
-          <button className="btn" onClick={handleUpdateMenuItem}>Update</button>
+        <div className={styles.actions}>
+          <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
+          <button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
         </div>
       </div>
 
       <input
         type="search"
         placeholder="Search menu…"
-        className="search"
+        className={styles.search}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
 
-      <div className="table-wrap">
-        <table className="table">
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
           <thead>
             <tr>
               <th>Name</th><th>Category</th><th>Price</th><th>Seasonal</th>
@@ -133,25 +137,25 @@ export default function ManagerPage() {
   );
 
   const InventoryTab = (
-    <section className="panel">
-      <div className="panel-header">
+    <section className={styles.panel}>
+      <div className={styles.panelHeader}>
         <h2>Inventory</h2>
-        <div className="actions">
-          <button className="btn primary" onClick={handleAddInventory}>Add</button>
-          <button className="btn" onClick={handleUpdateInventory}>Update</button>
+        <div className={styles.actions}>
+          <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddInventory}>Add</button>
+          <button className={styles.btn} onClick={handleUpdateInventory}>Update</button>
         </div>
       </div>
 
       <input
         type="search"
         placeholder="Search inventory…"
-        className="search"
+        className={styles.search}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
 
-      <div className="table-wrap">
-        <table className="table">
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
           <thead>
             <tr><th>Item</th><th>Qty</th><th>Min</th></tr>
           </thead>
@@ -170,19 +174,22 @@ export default function ManagerPage() {
   );
 
   const RestockTab = (
-    <section className="panel">
-      <div className="panel-header">
+    <section className={styles.panel}>
+      <div className={styles.panelHeader}>
         <h2>Order Restocks</h2>
       </div>
 
-      <ul className="restock-list">
+      <ul className={styles.restockList}>
         {inventory.map((i) => (
-          <li key={i.id} className="restock-item">
-            <div className="restock-main">
-              <span className="restock-name">{i.name}</span>
-              <span className="restock-meta">Current: {i.quantity} • Min: {i.restockMin}</span>
+          <li key={i.id} className={styles.restockItem}>
+            <div className={styles.restockMain}>
+              <span className={styles.restockName}>{i.name}</span>
+              <span className={styles.restockMeta}>
+                Current: {i.quantity} • Min: {i.restockMin}
+              </span>
             </div>
-            <button className="btn success" onClick={() => handleOrderRestock(i)}>
+            <button className={`${styles.btn} ${styles.success}`}
+              onClick={() => handleOrderRestock(i)}>
               Order
             </button>
           </li>
@@ -191,34 +198,50 @@ export default function ManagerPage() {
     </section>
   );
 
+  // MAIN RENDER ======================================================
   return (
-    <div className="wrap">
-      <header className="topbar">
-        <h1 className="title">Manager Dashboard</h1>
+    <div className={styles.wrap}>
+      <header className={styles.topbar}>
+        <h1 className={styles.title}>Manager Dashboard</h1>
 
-        <nav className="links">
-          <Link className="link" href="/cashier">Cashier</Link>
-          <Link className="link" href="/kiosk">Kiosk</Link>
+        <nav className={styles.links}>
+          <Link className={styles.link} href="/cashier">Cashier</Link>
+          <Link className={styles.link} href="/kiosk">Kiosk</Link>
         </nav>
       </header>
 
-      <main className="layout">
-        <aside className="sidebar">
-          <button className={`tab ${activeTab === "sales" ? "active" : ""}`} onClick={() => setActiveTab("sales")}>
+      <main className={styles.layout}>
+        <aside className={styles.sidebar}>
+          <button
+            className={`${styles.tab} ${activeTab === "sales" ? styles.active : ""}`}
+            onClick={() => setActiveTab("sales")}
+          >
             Sales
           </button>
-          <button className={`tab ${activeTab === "menu" ? "active" : ""}`} onClick={() => setActiveTab("menu")}>
+
+          <button
+            className={`${styles.tab} ${activeTab === "menu" ? styles.active : ""}`}
+            onClick={() => setActiveTab("menu")}
+          >
             Menu Items
           </button>
-          <button className={`tab ${activeTab === "inventory" ? "active" : ""}`} onClick={() => setActiveTab("inventory")}>
+
+          <button
+            className={`${styles.tab} ${activeTab === "inventory" ? styles.active : ""}`}
+            onClick={() => setActiveTab("inventory")}
+          >
             Inventory
           </button>
-          <button className={`tab ${activeTab === "restock" ? "active" : ""}`} onClick={() => setActiveTab("restock")}>
+
+          <button
+            className={`${styles.tab} ${activeTab === "restock" ? styles.active : ""}`}
+            onClick={() => setActiveTab("restock")}
+          >
             Restocks
           </button>
         </aside>
 
-        <section className="content">
+        <section className={styles.content}>
           {activeTab === "sales" && SalesTab}
           {activeTab === "menu" && MenuTab}
           {activeTab === "inventory" && InventoryTab}
