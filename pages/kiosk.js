@@ -100,7 +100,7 @@ function WeatherWidget({ accessibilityMode }) {
   return (
     <div
       style={{
-        position: "fixed",
+        position: "absolute",
         top: "20px",
         right: "20px",
         backgroundColor: accessibilityMode ? "#222" : "#fff",
@@ -134,6 +134,16 @@ export default function KioskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState("en");
+  const [activeCategory, setActiveCategory] = useState(null);
+
+  const categories = [
+  "Ice-Blended",
+  "Fruity Beverage",
+  "Fresh Brew",
+  "Milky Series",
+  "Non-Caffeinated",
+];
+
 
   // ⭐ NEW — translated accessibility labels
   const [accessibilityLabel, setAccessibilityLabel] = useState({
@@ -141,30 +151,35 @@ export default function KioskPage() {
     off: "Accessibility Mode: OFF",
   });
 
-  useEffect(() => {
-    async function fetchMenu() {
-      try {
-        const response = await fetch("/api/menu");
-        const data = await response.json();
+useEffect(() => {
+  async function fetchMenu() {
+    try {
+      const response = await fetch("/api/menu");
+      const data = await response.json();
 
-        const formatted = data.map((item) => ({
-          id: item.menuid ?? item.id,
+      const formatted = data.map((item) => {
+        const id = item.menuid ?? item.id;
+        return {
+          id,
           name: item.menuname ?? item.name,
           price: item.price,
           description: item.menudescription ?? item.description,
           category: item.category,
-        }));
+          image: `/Images/${id}.png`, 
+        };
+      });
 
-        setMenuItems(formatted);
-      } catch (err) {
-        console.error("Error fetching menu:", err);
-        setError("Failed to load menu items.");
-      } finally {
-        setLoading(false);
-      }
+      setMenuItems(formatted);
+    } catch (err) {
+      console.error("Error fetching menu:", err);
+      setError("Failed to load menu items.");
+    } finally {
+      setLoading(false);
     }
-    fetchMenu();
-  }, []);
+  }
+  fetchMenu();
+}, []);
+
 
   // === Google Translate widget ===
   useEffect(() => {
@@ -240,10 +255,11 @@ export default function KioskPage() {
   };
 
   return (
+    
     <div
       style={{
         textAlign: "center",
-        backgroundColor: accessibilityMode ? "#000" : "#f4f4f4",
+        backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
         color: accessibilityMode ? "#fff" : "#000",
         minHeight: "100vh",
         padding: accessibilityMode ? "40px" : "20px",
@@ -251,6 +267,8 @@ export default function KioskPage() {
         touchAction: "manipulation",
         transition: "all 0.3s ease",
       }}
+
+    
     >
       {/* === Weather Widget === */}
       <WeatherWidget accessibilityMode={accessibilityMode} />
@@ -260,8 +278,8 @@ export default function KioskPage() {
         onClick={toggleNarration}
         aria-label="Toggle narration mode"
         style={{
-          position: "fixed",
-          top: "30%",
+          position: "absolute",
+          top: "10%",
           left: "20px",
           transform: "translateY(-50%)",
           backgroundColor: narrationOn
@@ -321,35 +339,6 @@ export default function KioskPage() {
         </select>
       </div>
 
-      {/* === Left-Side Translation Button === */}
-      <button
-        onClick={toggleNarration}
-        aria-label="Toggle narration mode"
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "20px",
-          transform: "translateY(-50%)",
-          backgroundColor: narrationOn
-            ? "#FFD700"
-            : accessibilityMode
-            ? "#555"
-            : "#500000",
-          color: narrationOn ? "#000" : "#fff",
-          border: "none",
-          borderRadius: "50%",
-          width: accessibilityMode ? "90px" : "70px",
-          height: accessibilityMode ? "90px" : "70px",
-          fontSize: accessibilityMode ? "36px" : "28px",
-          cursor: "pointer",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-          zIndex: 10,
-          transition: "all 0.25s ease",
-        }}
-      >
-        Para Espanol
-      </button>
-
       {/* === Header === */}
       <h1
         tabIndex="0"
@@ -370,6 +359,28 @@ export default function KioskPage() {
       >
         Welcome! Tap a drink to start your order.
       </p>
+
+      {/* === Category Buttons === */}
+      <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "30px" }}>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            style={{
+              padding: "12px 20px",
+              borderRadius: "8px",
+              backgroundColor: activeCategory === cat ? "#FFD700" : "#500000",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "16px",
+              transition: "all 0.2s ease",
+            }}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
 
       {/* === Accessibility toggle === */}
       <button
@@ -400,76 +411,143 @@ export default function KioskPage() {
       {/* === Loading or Error === */}
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* === Menu Grid === */}
+      
+      {/* === Category Buttons with Expandable Grids === */}
       {!loading && !error && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: accessibilityMode
-              ? "repeat(auto-fit, minmax(300px, 1fr))"
-              : "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: accessibilityMode ? "40px" : "25px",
-            maxWidth: accessibilityMode ? "1100px" : "900px",
-            margin: "0 auto",
-            transition: "all 0.3s ease",
-          }}
-        >
-          {menuItems.map((item) => {
-            const isPressed = selectedItem === item.id;
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {categories.map((cat) => {
+            const sampleItem = menuItems.find((item) => item.category === cat);
+
             return (
-              <div
-                key={item.id}
-                onClick={() => handlePress(item)}
-                role="button"
-                aria-label={`Select ${item.name}`}
-                tabIndex="0"
-                style={{
-                  borderRadius: "20px",
-                  padding: accessibilityMode ? "35px" : "25px",
-                  backgroundColor: isPressed
-                    ? "#ffe680"
-                    : accessibilityMode
-                    ? "#222"
-                    : "#fff",
-                  color: accessibilityMode ? "#fff" : "#000",
-                  boxShadow: isPressed
-                    ? "0 0 0 4px #FFD700"
-                    : "0 4px 12px rgba(0,0,0,0.1)",
-                  textAlign: "left",
-                  transform: isPressed ? "scale(0.97)" : "scale(1)",
-                  transition: "all 0.2s ease",
-                  cursor: "pointer",
-                  userSelect: "none",
-                }}
-              >
-                <h2
+              <div key={cat}>
+                {/* Category Button */}
+                <button
+                  onClick={() =>
+                    setActiveCategory(activeCategory === cat ? null : cat)
+                  }
                   style={{
-                    fontSize: accessibilityMode ? "28px" : "22px",
-                    marginBottom: "10px",
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    backgroundColor:
+                      activeCategory === cat ? "#FFD700" : "#500000",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: accessibilityMode ? "28px" : "24px",
+                    textAlign: "left",
+                    transition: "all 0.2s ease",
                   }}
                 >
-                  {item.name ?? item.menuname}
-                </h2>
+                  {/* Left side image */}
+                  {sampleItem && (
+                    <img
+                      src={sampleItem.image}
+                      alt={cat}
+                      onError={(e) => {
+                        e.target.src = "/images/default.png";
+                      }}
+                      style={{
+                        width: "120px",
+                        height: "120px",
+                        objectFit: "cover",
+                        borderRadius: "10px",
+                        marginRight: "20px",
+                      }}
+                    />
+                  )}
+                  {/* Right side category name */}
+                  <span>{cat}</span>
+                </button>
 
-                <p
-                  style={{
-                    fontSize: accessibilityMode ? "22px" : "18px",
-                    margin: "5px 0",
-                  }}
-                >
-                  ${Number(item.price).toFixed(2)}
-                </p>
-
-                {(item.description ?? item.menudescription) && (
-                  <p
+                {/* Expanded drinks grid */}
+                {activeCategory === cat && (
+                  <div
                     style={{
-                      fontSize: accessibilityMode ? "18px" : "14px",
-                      opacity: "0.8",
+                      display: "grid",
+                      gridTemplateColumns: accessibilityMode
+                        ? "repeat(auto-fit, minmax(300px, 1fr))"
+                        : "repeat(auto-fit, minmax(220px, 1fr))",
+                      gap: accessibilityMode ? "40px" : "25px",
+                      marginTop: "20px",
+                      marginBottom: "30px",
                     }}
                   >
-                    {item.description ?? item.menudescription}
-                  </p>
+                    {menuItems
+                      .filter((item) => item.category === cat)
+                      .map((item) => {
+                        const isPressed = selectedItem === item.id;
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => handlePress(item)}
+                            role="button"
+                            aria-label={`Select ${item.name}`}
+                            tabIndex="0"
+                            style={{
+                              borderRadius: "20px",
+                              padding: accessibilityMode ? "35px" : "25px",
+                              backgroundColor: isPressed
+                             ? "#ffe680"
+                                : accessibilityMode
+                                ? "#222"
+                                : "#fff",
+                              color: accessibilityMode ? "#fff" : "#000",
+                              boxShadow: isPressed
+                                ? "0 0 0 4px #FFD700"
+                                : "0 4px 12px rgba(0,0,0,0.1)",
+                              textAlign: "left",
+                              transform: isPressed ? "scale(0.97)" : "scale(1)",
+                              transition: "all 0.2s ease",
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                          >
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              onError={(e) => {
+                                e.target.src = "/Images/default.png";
+                              }}
+                              style={{
+                                width: "100%",
+                                height: "200px",
+                                objectFit: "cover",
+                                borderRadius: "15px",
+                                marginBottom: "15px",
+                              }}
+                            />
+                            <h3
+                              style={{
+                                fontSize: accessibilityMode ? "28px" : "22px",
+                                marginBottom: "10px",
+                              }}
+                            >
+                              {item.name}
+                            </h3>
+                            <p
+                              style={{
+                                fontSize: accessibilityMode ? "22px" : "18px",
+                              }}
+                            >
+                              ${Number(item.price).toFixed(2)}
+                            </p>
+                            {item.description && (
+                              <p
+                                style={{
+                                  fontSize: accessibilityMode ? "18px" : "14px",
+                                  opacity: 0.8,
+                                }}
+                              >
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
                 )}
               </div>
             );
