@@ -6,3 +6,4 @@ DROP TABLE menu;
 DROP TABLE orderTest;
 DROP TABLE employee;
 DROP TABLE inventory;
+DROP TABLE app_users;
