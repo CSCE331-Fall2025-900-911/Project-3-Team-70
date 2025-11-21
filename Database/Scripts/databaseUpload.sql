@@ -251,6 +251,9 @@ SET inventoryID = EXCLUDED.inventoryID,
     menuID = EXCLUDED.menuID,
     menuInfoQuantity = EXCLUDED.menuInfoQuantity;
 
+CREATE TABLE IF NOT EXISTS user
+DROP TABLE IF EXISTS 
+
 DROP TABLE IF EXISTS staging_menu;
 DROP TABLE IF EXISTS staging_menuInfo;
 DROP TABLE IF EXISTS staging_order;
