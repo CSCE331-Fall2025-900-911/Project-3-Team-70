@@ -32,8 +32,8 @@ export async function getServerSideProps(context) {
     return {redirect: {destination: "/kiosk", permanent: false } };
   }
 
-  // Default = kiosk/customer
-  //return { redirect: { destination: "/kiosk", permanent: false } };
+  // Default = home
+  return { props: {} };
 }
 
 export default function HomePage() {
