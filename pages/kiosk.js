@@ -448,52 +448,144 @@ export default function KioskPage() {
     );
   };
 
-  // === PAYMENT SCREEN ===
-  const PaymentScreen = () => (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ fontSize: "36px" }}>Payment</h2>
-
-      <p style={{ fontSize: "22px" }}>
-        Choose a payment method:
-      </p>
-
-      {["Card", "Tap to Pay", "Mobile Wallet", "Cash"].map(
-        (method) => (
+  // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
+  const PaymentScreen = () => {
+    const [confirmMethod, setConfirmMethod] = useState(null);
+  
+    const paymentMethods = [
+      "Card",
+      "Tap to Pay",
+      "Mobile Wallet",
+      "Cash",
+    ];
+  
+    // NORMAL MODE (simple one-tap buttons)
+    if (!accessibilityMode) {
+      return (
+        <div style={{ padding: "20px" }}>
+          <h2 style={{ fontSize: "36px" }}>Payment</h2>
+      
+          <p style={{ fontSize: "22px" }}>
+            Choose a payment method:
+          </p>
+      
+          {paymentMethods.map((method) => (
+            <button
+              key={method}
+              onClick={() => setScreen("success")}
+              style={{
+                display: "block",
+                width: "80%",
+                padding: "20px",
+                margin: "10px auto",
+                backgroundColor: "#500000",
+                color: "#fff",
+                border: "none",
+                borderRadius: "10px",
+                fontSize: "24px",
+              }}
+            >
+              {method}
+            </button>
+          ))}
+  
+          <button
+            onClick={() => setScreen("checkout")}
+            style={{
+              padding: "15px 30px",
+              backgroundColor: "#ccc",
+              borderRadius: "10px",
+              border: "none",
+              fontSize: "20px",
+              marginTop: "20px",
+            }}
+          >
+            Back
+          </button>
+        </div>
+      );
+    }
+  
+    // ACCESSIBILITY MODE (double-tap confirm, larger buttons)
+    return (
+      <div
+        style={{
+          padding: "20px",
+          textAlign: "center",
+          backgroundColor: "#000",
+          color: "#fff",
+          minHeight: "100vh",
+        }}
+      >
+        <h2 style={{ fontSize: "44px" }}>Payment</h2>
+      
+        <p
+          style={{
+            fontSize: "28px",
+            marginBottom: "30px",
+          }}
+        >
+          Choose a method:
+        </p>
+        
+        {paymentMethods.map((method) => (
           <button
             key={method}
-            onClick={() => setScreen("success")}
+            onClick={() => {
+              if (narrationOn) speak(method, language);
+            
+              // First tap highlights
+              if (confirmMethod !== method) {
+                setConfirmMethod(method);
+                return;
+              }
+            
+              // Second tap confirms
+              setScreen("success");
+            }}
             style={{
+              width: "90%",
+              padding: "30px",
+              margin: "20px auto",
               display: "block",
-              width: "80%",
-              padding: "20px",
-              margin: "10px auto",
-              backgroundColor: "#500000",
-              color: "#fff",
+              backgroundColor:
+                confirmMethod === method ? "#FFD700" : "#500000",
+              color: confirmMethod === method ? "#000" : "#fff",
               border: "none",
-              borderRadius: "10px",
-              fontSize: "24px",
+              borderRadius: "14px",
+              fontSize: "32px",
+              cursor: "pointer",
             }}
           >
             {method}
+          
+            {confirmMethod === method && (
+              <div style={{ fontSize: "16px", marginTop: "6px", opacity: 0.8 }}>
+                Tap again to confirm
+              </div>
+            )}
           </button>
-        )
-      )}
+        ))}
+  
+        <button
+          onClick={() => setScreen("checkout")}
+          style={{
+            marginTop: "25px",
+            padding: "22px 40px",
+            backgroundColor: "#ccc",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: "24px",
+            width: "70%",
+            color: "#000",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
 
-      <button
-        onClick={() => setScreen("checkout")}
-        style={{
-          padding: "15px 30px",
-          backgroundColor: "#ccc",
-          borderRadius: "10px",
-          border: "none",
-          fontSize: "20px",
-          marginTop: "20px",
-        }}
-      >
-        Back
-      </button>
-    </div>
-  );
 
   // === SUCCESS SCREEN ===
   const SuccessScreen = () => (
