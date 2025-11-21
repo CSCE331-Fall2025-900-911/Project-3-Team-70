@@ -251,8 +251,22 @@ SET inventoryID = EXCLUDED.inventoryID,
     menuID = EXCLUDED.menuID,
     menuInfoQuantity = EXCLUDED.menuInfoQuantity;
 
-CREATE TABLE IF NOT EXISTS user
-DROP TABLE IF EXISTS 
+CREATE TABLE IF NOT EXISTS appUsers (
+    userID SERIAL PRIMARY KEY,
+    userEmail VARCHAR UNIQUE NOT NULL,
+    userName VARCHAR,
+    userRole VARCHAR DEFAULT 'customer',
+    userCreationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TABLE IF EXISTS staging_appUsers;
+CREATE TEMP TABLE staging_appUsers (
+    userID SERIAL,
+    userEmail VARCHAR UNIQUE NOT NULL,
+    userName VARCHAR,
+    userRole VARCHAR DEFAULT 'customer',
+    userCreationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 DROP TABLE IF EXISTS staging_menu;
 DROP TABLE IF EXISTS staging_menuInfo;
@@ -262,3 +276,4 @@ DROP TABLE IF EXISTS staging_inventory;
 DROP TABLE IF EXISTS staging_location;
 DROP TABLE IF EXISTS staging_modification;
 DROP TABLE IF EXISTS staging_employee;
+DROP TABLE IF EXISTS staging_appUsers;

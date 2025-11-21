@@ -1,3 +1,32 @@
+import { getSession } from "next-auth/react";
+
+export async function getServerSideProps(context) {
+  const session = await getSession(context);
+
+  // If logged in, redirect based on role
+  if (session) {
+    const role = session.user.role;
+
+    if (role === "manager") {
+      return { redirect: { destination: "/manager", permanent: false } };
+    }
+
+    if (role === "employee") {
+      return { redirect: { destination: "/cashier", permanent: false } };
+    }
+
+    if (role === "kitchen") {
+      return { redirect: { destination: "/kitchen", permanent: false } };
+    }
+
+    // Default = customer/kiosk
+    return { redirect: { destination: "/kiosk", permanent: false } };
+  }
+
+  // If user is NOT logged in, show your homepage normally
+  return { props: {} };
+}
+
 export default function HomePage() {
   // Shared button style
   const buttonStyle = {
