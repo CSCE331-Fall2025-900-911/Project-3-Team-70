@@ -35,14 +35,15 @@ export default function ManagerPage() {
     const rows = [];
 
     todaysOrders.forEach(order => {
-      const time = new Date(order.time).toLocaleTimeString([], {
+      const dateTime = new Date(order.time);
+      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit"
-      });
+      })}`;
 
       order.items.forEach(item => {
         rows.push({
-          time,
+          time: formatted,
           item: item.name,
           price: Number(item.price),
           totalRow: false
@@ -86,34 +87,19 @@ export default function ManagerPage() {
 
     const todaysOrders = orders.filter(o => o.time.startsWith(today));
 
-    const rows = [];
+    // Calculate grand total for the day
+    const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
 
-    todaysOrders.forEach(order => {
-      const time = new Date(order.time).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
+    setXReportRows([]);
 
-      order.items.forEach(item => {
-        rows.push({
-          time,
-          item: item.name,
-          price: Number(item.price),
-          totalRow: false
-        });
-      });
-
-      rows.push({
-        time: "",
-        item: "Order Total",
-        price: order.total,
-        totalRow: true
-      });
-    });
-
-    setXReportRows([]);      // allow clean switching
-    setZReportRows(rows);    // update table
-  }
+    // Store one row containing only the total
+    setZReportRows([
+      {
+        label: "Total Revenue",
+        total: grandTotal
+      }
+    ]);
+  } 
 
 
   // Filtering =========================================================
@@ -315,7 +301,10 @@ export default function ManagerPage() {
       {/* X REPORT TABLE */}
       {xReportRows.length > 0 && (
         <div className={styles.tableWrap}>
-          <h3>X-Report</h3>
+          <h3>
+            X-Report — {new Date().toLocaleDateString()}
+          </h3>
+      
           <table className={styles.table}>
             <thead>
               <tr>
@@ -343,24 +332,22 @@ export default function ManagerPage() {
       {/* Z REPORT TABLE */}
       {zReportRows.length > 0 && (
         <div className={styles.tableWrap} style={{ marginTop: "30px" }}>
-          <h3 style={{ color: "red" }}>Z-Report</h3>
+          <h3>
+            Z-Report — {new Date().toLocaleDateString()}
+          </h3>
+      
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Price ($)</th>
+                <th>Description</th>
+                <th>Total ($)</th>
               </tr>
             </thead>
             <tbody>
-              {zReportRows.map((row, index) => (
-                <tr
-                  key={index}
-                  style={row.totalRow ? { fontWeight: "bold", background: "#ffe5e5" } : {}}
-                >
-                  <td>{row.item}</td>
-                  <td>{row.price.toFixed(2)}</td>
-                </tr>
-              ))}
+              <tr style={{ fontWeight: "bold"}}>
+                <td>{zReportRows[0].label}</td>
+                <td>{zReportRows[0].total.toFixed(2)}</td>
+              </tr>
             </tbody>
           </table>
         </div>
