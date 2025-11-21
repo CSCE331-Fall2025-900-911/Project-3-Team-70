@@ -28,8 +28,12 @@ export async function getServerSideProps(context) {
     return { redirect: { destination: "/kitchen", permanent: false } };
   }
 
+  if (role == "customer") {
+    return {redirect: {destination: "/kiosk", permanent: false } };
+  }
+
   // Default = kiosk/customer
-  return { redirect: { destination: "/kiosk", permanent: false } };
+  //return { redirect: { destination: "/kiosk", permanent: false } };
 }
 
 export default function HomePage() {
