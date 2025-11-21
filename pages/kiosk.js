@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
 
+// === SEND ORDERS ===
+function sendOrderToSystem(order) {
+  // Load existing orders
+  const existing = JSON.parse(localStorage.getItem("orders") || "[]");
+
+  // Push new order
+  existing.push(order);
+
+  // Save back to localStorage
+  localStorage.setItem("orders", JSON.stringify(existing));
+}
+
 // === Narration helper with language support ===
 const narrationVoices = {
   en: "en-US",
@@ -55,7 +67,8 @@ function WeatherWidget({ accessibilityMode }) {
         const res = await fetch("/api/weather");
         const data = await res.json();
 
-        const kelvinToF = (k) => Math.round((k - 273.15) * 9/5 + 32);
+        const kelvinToF = (k) =>
+          Math.round((k - 273.15) * 9 / 5 + 32);
 
         const iconMap = {
           "01d": "☀️",
@@ -90,8 +103,6 @@ function WeatherWidget({ accessibilityMode }) {
     }
 
     fetchWeather();
-
-    // Auto-refresh every 10 minutes
     intervalId = setInterval(fetchWeather, 600000);
 
     return () => clearInterval(intervalId);
@@ -117,8 +128,12 @@ function WeatherWidget({ accessibilityMode }) {
         alignItems: "center",
       }}
     >
-      <div style={{ fontSize: accessibilityMode ? "28px" : "24px" }}>{weather.emoji}</div>
-      <div style={{ fontWeight: "bold", marginTop: "2px" }}>{weather.temp}°F</div>
+      <div style={{ fontSize: accessibilityMode ? "28px" : "24px" }}>
+        {weather.emoji}
+      </div>
+      <div style={{ fontWeight: "bold", marginTop: "2px" }}>
+        {weather.temp}°F
+      </div>
       <div>Feels like: {weather.feels_like}°F</div>
       <div>Wind: {weather.wind} mph</div>
     </div>
@@ -136,60 +151,59 @@ export default function KioskPage() {
   const [language, setLanguage] = useState("en");
   const [activeCategory, setActiveCategory] = useState(null);
 
+  // NEW — screens + cart
+  const [screen, setScreen] = useState("menu"); 
+  const [detailsItem, setDetailsItem] = useState(null);
+  const [cart, setCart] = useState([]);
+
   const categories = [
-  "Ice-Blended",
-  "Fruity Beverage",
-  "Fresh Brew",
-  "Milky Series",
-  "Non-Caffeinated",
-];
+    "Ice-Blended",
+    "Fruity Beverage",
+    "Fresh Brew",
+    "Milky Series",
+    "Non-Caffeinated",
+  ];
 
-
-  // ⭐ NEW — translated accessibility labels
   const [accessibilityLabel, setAccessibilityLabel] = useState({
     on: "Accessibility Mode: ON",
     off: "Accessibility Mode: OFF",
   });
 
-useEffect(() => {
-  async function fetchMenu() {
-    try {
-      const response = await fetch("/api/menu");
-      const data = await response.json();
-
-      const formatted = data.map((item) => {
-        const id = item.menuid ?? item.id;
-        return {
-          id,
-          name: item.menuname ?? item.name,
-          price: item.price,
-          description: item.menudescription ?? item.description,
-          category: item.category,
-          image: `/Images/${id}.png`, 
-        };
-      });
-
-      setMenuItems(formatted);
-    } catch (err) {
-      console.error("Error fetching menu:", err);
-      setError("Failed to load menu items.");
-    } finally {
-      setLoading(false);
-    }
-  }
-  fetchMenu();
-}, []);
-
-
-  // === Google Translate widget ===
   useEffect(() => {
-    const addGoogleTranslateScript = () => {
-      const script = document.createElement("script");
-      script.type = "text/javascript";
-      script.src =
-        "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-      document.body.appendChild(script);
-    };
+    async function fetchMenu() {
+      try {
+        const response = await fetch("/api/menu");
+        const data = await response.json();
+
+        const formatted = data.map((item) => {
+          const id = item.menuid ?? item.id;
+          return {
+            id,
+            name: item.menuname ?? item.name,
+            price: item.price,
+            description: item.menudescription ?? item.description,
+            category: item.category,
+            image: `/Images/${id}.png`,
+          };
+        });
+
+        setMenuItems(formatted);
+      } catch (err) {
+        console.error("Error fetching menu:", err);
+        setError("Failed to load menu items.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMenu();
+  }, []);
+
+  // === language widget ===
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src =
+      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    document.body.appendChild(script);
 
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
@@ -200,24 +214,12 @@ useEffect(() => {
         "google_translate_element"
       );
     };
-
-    addGoogleTranslateScript();
   }, []);
 
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-    document.body.appendChild(script);
-  }, []);
-
-  // === Language selection ===
   async function handleLanguageChange(langCode) {
     if (!langCode) return;
-
     setLanguage(langCode);
 
-    // ⭐ Translate accessibility label text
     const labelOn = await translateText("Accessibility Mode: ON", langCode);
     const labelOff = await translateText("Accessibility Mode: OFF", langCode);
 
@@ -232,18 +234,21 @@ useEffect(() => {
 
   const handlePress = (item) => {
     setSelectedItem(item.id);
+
     if (narrationOn) {
       speak(
         `${item.name}. Price ${item.price} dollars. ${item.description || ""}`,
         language
       );
     }
+
     setTimeout(() => setSelectedItem(null), 300);
   };
 
   const toggleNarration = () => {
     const newState = !narrationOn;
     setNarrationOn(newState);
+
     if (newState) {
       speak(
         "Narration enabled. Tap a drink to hear its description.",
@@ -254,8 +259,288 @@ useEffect(() => {
     }
   };
 
+  // === Add to Cart ===
+  const addToCart = (item) => {
+    setCart((prev) => [...prev, item]);
+    if (narrationOn) {
+      speak(`${item.name} added to cart.`, language);
+    }
+  };
+
+  // === DRINK DETAILS PAGE ===
+  const DrinkDetailsPage = () => {
+    if (!detailsItem) return null;
+
+    return (
+      <div
+        style={{
+          width: "100%",
+          minHeight: "100vh",
+          backgroundColor: accessibilityMode ? "#000" : "#fff",
+          color: accessibilityMode ? "#fff" : "#000",
+          padding: "20px",
+          textAlign: "center",
+        }}
+      >
+        <button
+          onClick={() => setScreen("menu")}
+          style={{
+            position: "absolute",
+            top: "20px",
+            left: "20px",
+            padding: "10px 20px",
+            backgroundColor: "#500000",
+            color: "#fff",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "18px",
+            cursor: "pointer",
+          }}
+        >
+          ← Back
+        </button>
+
+        <img
+          src={detailsItem.image}
+          alt={detailsItem.name}
+          style={{
+            width: "60%",
+            maxWidth: "400px",
+            borderRadius: "20px",
+            marginTop: "60px",
+            marginBottom: "20px",
+          }}
+        />
+
+        <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
+
+        <p style={{ fontSize: "24px", opacity: 0.9 }}>
+          ${Number(detailsItem.price).toFixed(2)}
+        </p>
+
+        <p
+          style={{
+            fontSize: "20px",
+            width: "80%",
+            margin: "0 auto",
+            marginBottom: "40px",
+          }}
+        >
+          {detailsItem.description}
+        </p>
+
+        <button
+          onClick={() => {
+            addToCart(detailsItem);
+            setScreen("menu");
+          }}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            color: "#000",
+            border: "none",
+            borderRadius: "15px",
+            fontSize: "26px",
+            cursor: "pointer",
+          }}
+        >
+          Add to Cart
+        </button>
+      </div>
+    );
+  };
+
+  // === CART SCREEN ===
+  const CartScreen = () => (
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
+
+      {cart.length === 0 ? (
+        <p style={{ fontSize: "22px" }}>Your cart is empty.</p>
+      ) : (
+        cart.map((item, index) => (
+          <p key={index} style={{ fontSize: "22px" }}>
+            {item.name} — ${item.price}
+          </p>
+        ))
+      )}
+
+      <button
+        onClick={() => setScreen("checkout")}
+        disabled={cart.length === 0}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "24px",
+          marginTop: "20px",
+        }}
+      >
+        Proceed to Checkout
+      </button>
+
+      <button
+        onClick={() => setScreen("menu")}
+        style={{
+          padding: "15px 30px",
+          backgroundColor: "#ccc",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "20px",
+          marginLeft: "20px",
+        }}
+      >
+        Back
+      </button>
+    </div>
+  );
+
+  // === CHECKOUT SCREEN ===
+  const CheckoutScreen = () => {
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.price),
+      0
+    );
+
+    return (
+      <div style={{ padding: "20px" }}>
+        <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+
+        {cart.map((item, index) => (
+          <p key={index} style={{ fontSize: "22px" }}>
+            {item.name} — ${item.price}
+          </p>
+        ))}
+
+        <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
+          Total: ${total.toFixed(2)}
+        </h3>
+
+        <button
+          onClick={() => setScreen("payment")}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "24px",
+            marginTop: "20px",
+          }}
+        >
+          Continue to Payment
+        </button>
+
+        <button
+          onClick={() => setScreen("cart")}
+          style={{
+            padding: "15px 30px",
+            backgroundColor: "#ccc",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: "20px",
+            marginLeft: "20px",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
+
+  // === PAYMENT SCREEN ===
+  const PaymentScreen = () => (
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ fontSize: "36px" }}>Payment</h2>
+
+      <p style={{ fontSize: "22px" }}>
+        Choose a payment method:
+      </p>
+
+      {["Card", "Tap to Pay", "Mobile Wallet", "Cash"].map(
+        (method) => (
+          <button
+            key={method}
+            onClick={() => setScreen("success")}
+            style={{
+              display: "block",
+              width: "80%",
+              padding: "20px",
+              margin: "10px auto",
+              backgroundColor: "#500000",
+              color: "#fff",
+              border: "none",
+              borderRadius: "10px",
+              fontSize: "24px",
+            }}
+          >
+            {method}
+          </button>
+        )
+      )}
+
+      <button
+        onClick={() => setScreen("checkout")}
+        style={{
+          padding: "15px 30px",
+          backgroundColor: "#ccc",
+          borderRadius: "10px",
+          border: "none",
+          fontSize: "20px",
+          marginTop: "20px",
+        }}
+      >
+        Back
+      </button>
+    </div>
+  );
+
+  // === SUCCESS SCREEN ===
+  const SuccessScreen = () => (
+    <div style={{ padding: "40px", textAlign: "center" }}>
+      <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
+      <p style={{ fontSize: "24px", marginTop: "20px" }}>
+        Thank you for your order.
+      </p>
+
+      <button
+        onClick={() => {
+          const order = {
+            id: Date.now(),
+            items: cart,
+            total: cart.reduce((sum, i) => sum + Number(i.price), 0),
+            time: new Date().toISOString(),
+            status: "pending"
+          };
+        
+          // Send order
+          sendOrderToSystem(order);
+        
+          setCart([]);
+          setScreen("menu");
+        }}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "26px",
+          marginTop: "40px",
+        }}
+      >
+        Return to Menu
+      </button>
+    </div>
+  );
+
+  // === MAIN RENDER SWITCH ===
+  if (screen === "details") return <DrinkDetailsPage />;
+  if (screen === "cart") return <CartScreen />;
+  if (screen === "checkout") return <CheckoutScreen />;
+  if (screen === "payment") return <PaymentScreen />;
+  if (screen === "success") return <SuccessScreen />;
+
   return (
-    
     <div
       style={{
         textAlign: "center",
@@ -267,13 +552,9 @@ useEffect(() => {
         touchAction: "manipulation",
         transition: "all 0.3s ease",
       }}
-
-    
     >
-      {/* === Weather Widget === */}
       <WeatherWidget accessibilityMode={accessibilityMode} />
 
-      {/* === Left-Side Narration Button === */}
       <button
         onClick={toggleNarration}
         aria-label="Toggle narration mode"
@@ -302,8 +583,8 @@ useEffect(() => {
         🔊
       </button>
 
-      {/*Language Selector */}
       <div id="google_translate_element" style={{ display: "none" }}></div>
+
       <div
         style={{
           position: "absolute",
@@ -339,7 +620,6 @@ useEffect(() => {
         </select>
       </div>
 
-      {/* === Header === */}
       <h1
         tabIndex="0"
         aria-label="Welcome to Sharetea Self-Order Kiosk"
@@ -360,8 +640,14 @@ useEffect(() => {
         Welcome! Tap a drink to start your order.
       </p>
 
-      {/* === Category Buttons === */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "30px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "20px",
+          marginBottom: "30px",
+        }}
+      >
         {categories.map((cat) => (
           <button
             key={cat}
@@ -382,7 +668,6 @@ useEffect(() => {
         ))}
       </div>
 
-      {/* === Accessibility toggle === */}
       <button
         onClick={() => setAccessibilityMode(!accessibilityMode)}
         aria-pressed={accessibilityMode}
@@ -399,31 +684,38 @@ useEffect(() => {
           transition: "all 0.2s ease",
         }}
       >
-        <span id="label-off" style={{ display: accessibilityMode ? "none" : "inline" }}>
+        <span
+          id="label-off"
+          style={{ display: accessibilityMode ? "none" : "inline" }}
+        >
           Accessibility Mode: OFF
         </span>
 
-        <span id="label-on" style={{ display: accessibilityMode ? "inline" : "none" }}>
+        <span
+          id="label-on"
+          style={{ display: accessibilityMode ? "inline" : "none" }}
+        >
           Accessibility Mode: ON
         </span>
       </button>
 
-      {/* === Loading or Error === */}
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
-      
-      {/* === Category Buttons with Expandable Grids === */}
-      {!loading && !error && (
+
+      {!loading && !error && screen === "menu" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {categories.map((cat) => {
-            const sampleItem = menuItems.find((item) => item.category === cat);
+            const sampleItem = menuItems.find(
+              (item) => item.category === cat
+            );
 
             return (
               <div key={cat}>
-                {/* Category Button */}
                 <button
                   onClick={() =>
-                    setActiveCategory(activeCategory === cat ? null : cat)
+                    setActiveCategory(
+                      activeCategory === cat ? null : cat
+                    )
                   }
                   style={{
                     display: "flex",
@@ -441,7 +733,6 @@ useEffect(() => {
                     transition: "all 0.2s ease",
                   }}
                 >
-                  {/* Left side image */}
                   {sampleItem && (
                     <img
                       src={sampleItem.image}
@@ -458,11 +749,9 @@ useEffect(() => {
                       }}
                     />
                   )}
-                  {/* Right side category name */}
                   <span>{cat}</span>
                 </button>
 
-                {/* Expanded drinks grid */}
                 {activeCategory === cat && (
                   <div
                     style={{
@@ -478,19 +767,26 @@ useEffect(() => {
                     {menuItems
                       .filter((item) => item.category === cat)
                       .map((item) => {
-                        const isPressed = selectedItem === item.id;
+                        const isPressed =
+                          selectedItem === item.id;
                         return (
                           <div
                             key={item.id}
-                            onClick={() => handlePress(item)}
+                            onClick={() => {
+                              handlePress(item);
+                              setDetailsItem(item);
+                              setScreen("details");
+                            }}
                             role="button"
                             aria-label={`Select ${item.name}`}
                             tabIndex="0"
                             style={{
                               borderRadius: "20px",
-                              padding: accessibilityMode ? "35px" : "25px",
+                              padding: accessibilityMode
+                                ? "35px"
+                                : "25px",
                               backgroundColor: isPressed
-                             ? "#ffe680"
+                                ? "#ffe680"
                                 : accessibilityMode
                                 ? "#222"
                                 : "#fff",
@@ -499,7 +795,9 @@ useEffect(() => {
                                 ? "0 0 0 4px #FFD700"
                                 : "0 4px 12px rgba(0,0,0,0.1)",
                               textAlign: "left",
-                              transform: isPressed ? "scale(0.97)" : "scale(1)",
+                              transform: isPressed
+                                ? "scale(0.97)"
+                                : "scale(1)",
                               transition: "all 0.2s ease",
                               cursor: "pointer",
                               userSelect: "none",
@@ -521,7 +819,9 @@ useEffect(() => {
                             />
                             <h3
                               style={{
-                                fontSize: accessibilityMode ? "28px" : "22px",
+                                fontSize: accessibilityMode
+                                  ? "28px"
+                                  : "22px",
                                 marginBottom: "10px",
                               }}
                             >
@@ -529,7 +829,9 @@ useEffect(() => {
                             </h3>
                             <p
                               style={{
-                                fontSize: accessibilityMode ? "22px" : "18px",
+                                fontSize: accessibilityMode
+                                  ? "22px"
+                                  : "18px",
                               }}
                             >
                               ${Number(item.price).toFixed(2)}
@@ -537,7 +839,9 @@ useEffect(() => {
                             {item.description && (
                               <p
                                 style={{
-                                  fontSize: accessibilityMode ? "18px" : "14px",
+                                  fontSize: accessibilityMode
+                                    ? "18px"
+                                    : "14px",
                                   opacity: 0.8,
                                 }}
                               >
@@ -553,6 +857,30 @@ useEffect(() => {
             );
           })}
         </div>
+      )}
+
+      {/* FLOATING CART BUTTON */}
+      {screen === "menu" && cart.length > 0 && (
+        <button
+          onClick={() => setScreen("cart")}
+          style={{
+            position: "fixed",
+            bottom: "30px",
+            right: "30px",
+            backgroundColor: "#FFD700",
+            color: "#fff",
+            borderRadius: "50%",
+            width: "90px",
+            height: "90px",
+            fontSize: "32px",
+            border: "none",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            cursor: "pointer",
+            zIndex: 2000,
+          }}
+        >
+          🛒 {cart.length}
+        </button>
       )}
     </div>
   );

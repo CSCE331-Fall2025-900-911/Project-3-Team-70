@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import styles from "./manager.module.css";  // CSS MODULE
 
@@ -7,11 +7,7 @@ export default function ManagerPage() {
   const [query, setQuery] = useState("");
 
   // Dummy Data ======================================================
-  const [sales] = useState([
-    { id: 1, date: "2025-11-01", item: "Brown Sugar Milk Tea", qty: 32, total: 192.0 },
-    { id: 2, date: "2025-11-02", item: "Taro Milk Tea", qty: 21, total: 126.0 },
-    { id: 3, date: "2025-11-03", item: "Oolong Tea", qty: 14, total: 70.0 },
-  ]);
+  const [sales, setSales] = useState([]);
 
   const [menuItems, setMenuItems] = useState([
     { id: 1, name: "Brown Sugar Milk Tea", category: "Milk Tea", price: 6.0, seasonal: false },
@@ -24,6 +20,93 @@ export default function ManagerPage() {
     { id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
     { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
   ]);
+
+  // NEW — Report State =======================================
+  const [xReportText, setXReportText] = useState("");
+  const [zReportText, setZReportText] = useState("");
+
+  // NEW — X REPORT ============================================
+  function generateXReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const today = new Date().toISOString().slice(0, 10);
+
+    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+
+    if (todaysOrders.length === 0) {
+      setXReportText("No orders recorded today.");
+      return;
+    }
+
+    let report = `X-REPORT\nDate: ${today}\n\nOrders:\n`;
+
+    todaysOrders.forEach(order => {
+      // format readable time
+      const time = new Date(order.time).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+
+      report += `Order Time: ${time}\n`;
+
+      order.items.forEach(item => {
+        report += `• ${item.name} — $${item.price}\n`;
+      });
+
+      report += `   Total Order: $${order.total}\n\n`;
+    });
+
+    setXReportText(report);
+  }
+
+  // === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
+  useEffect(() => {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+
+    // Convert kiosk order objects → rows for Sales table
+    const transformed = orders.flatMap(order =>
+      order.items.map(item => ({
+        id: `${order.id}-${item.name}`,
+        date: order.time.slice(0, 10),
+        item: item.name,
+        qty: 1,
+        total: Number(item.price)
+      }))
+    );
+
+    setSales(transformed);
+  }, []);
+
+  // NEW — Z REPORT (End of Day Reset) =========================
+  function generateZReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const today = new Date().toISOString().slice(0, 10);
+
+    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+
+    if (todaysOrders.length === 0) {
+      setZReportText("No orders recorded today.");
+      return;
+    }
+
+    let report = `Z-REPORT (End of Day)\nDate: ${today}\n\nDaily Totals:\n`;
+
+    todaysOrders.forEach(order => {
+      order.items.forEach(item => {
+        report += `• ${item.name} — $${item.price}\n`;
+      });
+      report += `   Total Order: $${order.total}\n\n`;
+    });
+
+    setZReportText(report);
+
+    // RESET FOR NEXT DAY (clear only today's orders)
+    const remaining = orders.filter(o => !o.time.startsWith(today));
+    localStorage.setItem("orders", JSON.stringify(remaining));
+
+    // Clear X-report box
+    setXReportText("");
+  }
+
 
   // Filtering =========================================================
   const filteredMenu = useMemo(() => {
@@ -198,6 +281,40 @@ export default function ManagerPage() {
     </section>
   );
 
+  // NEW — REPORTS TAB ============================================
+  const ReportsTab = (
+    <section className={styles.panel}>
+      <h2>Reports</h2>
+
+      <div style={{ marginTop: "20px", marginBottom: "20px" }}>
+        <button className={styles.btn} 
+        style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+        onClick={generateXReport}
+        >
+          Run X Report
+        </button>
+
+        <button
+          className={styles.btn}
+          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          onClick={generateZReport}
+        >
+          Run Z Report
+        </button>
+      </div>
+
+      {xReportText && (
+        <pre className={styles.reportBox}>{xReportText}</pre>
+      )}
+
+      {zReportText && (
+        <pre className={styles.reportBox} style={{ borderColor: "red" }}>
+          {zReportText}
+        </pre>
+      )}
+    </section>
+  );
+
   // MAIN RENDER ======================================================
   return (
     <div className={styles.wrap}>
@@ -239,6 +356,14 @@ export default function ManagerPage() {
           >
             Restocks
           </button>
+
+          {/*REPORTS TAB */}
+          <button
+            className={`${styles.tab} ${activeTab === "reports" ? styles.active : ""}`}
+            onClick={() => setActiveTab("reports")}
+          >
+            Reports
+          </button>
         </aside>
 
         <section className={styles.content}>
@@ -246,6 +371,7 @@ export default function ManagerPage() {
           {activeTab === "menu" && MenuTab}
           {activeTab === "inventory" && InventoryTab}
           {activeTab === "restock" && RestockTab}
+          {activeTab === "reports" && ReportsTab}
         </section>
       </main>
     </div>
