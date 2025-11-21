@@ -268,6 +268,7 @@ CREATE TEMP TABLE staging_appUsers (
     userCreationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
 DROP TABLE IF EXISTS staging_menu;
 DROP TABLE IF EXISTS staging_menuInfo;
 DROP TABLE IF EXISTS staging_order;
