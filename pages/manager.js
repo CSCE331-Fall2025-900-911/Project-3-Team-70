@@ -22,8 +22,8 @@ export default function ManagerPage() {
   ]);
 
   // NEW — Report State =======================================
-  const [xReportText, setXReportText] = useState("");
-  const [zReportText, setZReportText] = useState("");
+  const [xReportRows, setXReportRows] = useState([]);
+  const [zReportRows, setZReportRows] = useState([]);
 
   // NEW — X REPORT ============================================
   function generateXReport() {
@@ -32,30 +32,33 @@ export default function ManagerPage() {
 
     const todaysOrders = orders.filter(o => o.time.startsWith(today));
 
-    if (todaysOrders.length === 0) {
-      setXReportText("No orders recorded today.");
-      return;
-    }
-
-    let report = `X-REPORT\nDate: ${today}\n\nOrders:\n`;
+    const rows = [];
 
     todaysOrders.forEach(order => {
-      // format readable time
       const time = new Date(order.time).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit"
       });
 
-      report += `Order Time: ${time}\n`;
-
       order.items.forEach(item => {
-        report += `• ${item.name} — $${item.price}\n`;
+        rows.push({
+          time,
+          item: item.name,
+          price: Number(item.price),
+          totalRow: false
+        });
       });
 
-      report += `   Total Order: $${order.total}\n\n`;
+      rows.push({
+        time: "",
+        item: "Order Total",
+        price: order.total,
+        totalRow: true
+      });
     });
 
-    setXReportText(report);
+    setZReportRows([]);      // allow clean switching
+    setXReportRows(rows);    // update table
   }
 
   // === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
@@ -83,28 +86,33 @@ export default function ManagerPage() {
 
     const todaysOrders = orders.filter(o => o.time.startsWith(today));
 
-    if (todaysOrders.length === 0) {
-      setZReportText("No orders recorded today.");
-      return;
-    }
-
-    let report = `Z-REPORT (End of Day)\nDate: ${today}\n\nDaily Totals:\n`;
+    const rows = [];
 
     todaysOrders.forEach(order => {
-      order.items.forEach(item => {
-        report += `• ${item.name} — $${item.price}\n`;
+      const time = new Date(order.time).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
       });
-      report += `   Total Order: $${order.total}\n\n`;
+
+      order.items.forEach(item => {
+        rows.push({
+          time,
+          item: item.name,
+          price: Number(item.price),
+          totalRow: false
+        });
+      });
+
+      rows.push({
+        time: "",
+        item: "Order Total",
+        price: order.total,
+        totalRow: true
+      });
     });
 
-    setZReportText(report);
-
-    // RESET FOR NEXT DAY (clear only today's orders)
-    const remaining = orders.filter(o => !o.time.startsWith(today));
-    localStorage.setItem("orders", JSON.stringify(remaining));
-
-    // Clear X-report box
-    setXReportText("");
+    setXReportRows([]);      // allow clean switching
+    setZReportRows(rows);    // update table
   }
 
 
@@ -287,9 +295,10 @@ export default function ManagerPage() {
       <h2>Reports</h2>
 
       <div style={{ marginTop: "20px", marginBottom: "20px" }}>
-        <button className={styles.btn} 
-        style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
-        onClick={generateXReport}
+        <button
+          className={styles.btn}
+          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          onClick={generateXReport}
         >
           Run X Report
         </button>
@@ -303,14 +312,58 @@ export default function ManagerPage() {
         </button>
       </div>
 
-      {xReportText && (
-        <pre className={styles.reportBox}>{xReportText}</pre>
+      {/* X REPORT TABLE */}
+      {xReportRows.length > 0 && (
+        <div className={styles.tableWrap}>
+          <h3>X-Report</h3>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Item</th>
+                <th>Price ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {xReportRows.map((row, index) => (
+                <tr
+                  key={index}
+                  style={row.totalRow ? { fontWeight: "bold", background: "#eee" } : {}}
+                >
+                  <td>{row.time}</td>
+                  <td>{row.item}</td>
+                  <td>{row.price.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {zReportText && (
-        <pre className={styles.reportBox} style={{ borderColor: "red" }}>
-          {zReportText}
-        </pre>
+      {/* Z REPORT TABLE */}
+      {zReportRows.length > 0 && (
+        <div className={styles.tableWrap} style={{ marginTop: "30px" }}>
+          <h3 style={{ color: "red" }}>Z-Report</h3>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Price ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {zReportRows.map((row, index) => (
+                <tr
+                  key={index}
+                  style={row.totalRow ? { fontWeight: "bold", background: "#ffe5e5" } : {}}
+                >
+                  <td>{row.item}</td>
+                  <td>{row.price.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );
