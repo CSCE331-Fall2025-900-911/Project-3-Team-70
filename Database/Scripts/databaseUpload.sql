@@ -251,7 +251,7 @@ SET inventoryID = EXCLUDED.inventoryID,
     menuID = EXCLUDED.menuID,
     menuInfoQuantity = EXCLUDED.menuInfoQuantity;
 
-CREATE TABLE IF NOT EXISTS appUsers (
+CREATE TABLE IF NOT EXISTS app_users (
     userID SERIAL PRIMARY KEY,
     userEmail VARCHAR UNIQUE NOT NULL,
     userName VARCHAR,
