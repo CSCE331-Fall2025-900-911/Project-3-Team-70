@@ -7,11 +7,7 @@ export default function ManagerPage() {
   const [query, setQuery] = useState("");
 
   // Dummy Data ======================================================
-  const [sales] = useState([
-    { id: 1, date: "2025-11-01", item: "Brown Sugar Milk Tea", qty: 32, total: 192.0 },
-    { id: 2, date: "2025-11-02", item: "Taro Milk Tea", qty: 21, total: 126.0 },
-    { id: 3, date: "2025-11-03", item: "Oolong Tea", qty: 14, total: 70.0 },
-  ]);
+  const [sales, setSales] = useState([]);
 
   const [menuItems, setMenuItems] = useState([
     { id: 1, name: "Brown Sugar Milk Tea", category: "Milk Tea", price: 6.0, seasonal: false },
@@ -24,6 +20,87 @@ export default function ManagerPage() {
     { id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
     { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
   ]);
+
+  // NEW — Report State =======================================
+  const [xReportRows, setXReportRows] = useState([]);
+  const [zReportRows, setZReportRows] = useState([]);
+
+  // NEW — X REPORT ============================================
+  function generateXReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const today = new Date().toISOString().slice(0, 10);
+
+    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+
+    const rows = [];
+
+    todaysOrders.forEach(order => {
+      const dateTime = new Date(order.time);
+      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      })}`;
+
+      order.items.forEach(item => {
+        rows.push({
+          time: formatted,
+          item: item.name,
+          price: Number(item.price),
+          totalRow: false
+        });
+      });
+
+      rows.push({
+        time: "",
+        item: "Order Total",
+        price: order.total,
+        totalRow: true
+      });
+    });
+
+    setZReportRows([]);      // allow clean switching
+    setXReportRows(rows);    // update table
+  }
+
+  // === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
+  useEffect(() => {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+
+    // Convert kiosk order objects → rows for Sales table
+    const transformed = orders.flatMap(order =>
+      order.items.map(item => ({
+        id: `${order.id}-${item.name}`,
+        date: order.time.slice(0, 10),
+        item: item.name,
+        qty: 1,
+        total: Number(item.price)
+      }))
+    );
+
+    setSales(transformed);
+  }, []);
+
+  // NEW — Z REPORT (End of Day Reset) =========================
+  function generateZReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const today = new Date().toISOString().slice(0, 10);
+
+    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+
+    // Calculate grand total for the day
+    const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
+
+    setXReportRows([]);
+
+    // Store one row containing only the total
+    setZReportRows([
+      {
+        label: "Total Revenue",
+        total: grandTotal
+      }
+    ]);
+  } 
+
 
   // Filtering =========================================================
   const filteredMenu = useMemo(() => {
@@ -287,6 +364,86 @@ const SalesTab = (
     </section>
   );
 
+  // NEW — REPORTS TAB ============================================
+  const ReportsTab = (
+    <section className={styles.panel}>
+      <h2>Reports</h2>
+
+      <div style={{ marginTop: "20px", marginBottom: "20px" }}>
+        <button
+          className={styles.btn}
+          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          onClick={generateXReport}
+        >
+          Run X Report
+        </button>
+
+        <button
+          className={styles.btn}
+          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          onClick={generateZReport}
+        >
+          Run Z Report
+        </button>
+      </div>
+
+      {/* X REPORT TABLE */}
+      {xReportRows.length > 0 && (
+        <div className={styles.tableWrap}>
+          <h3>
+            X-Report — {new Date().toLocaleDateString()}
+          </h3>
+      
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Item</th>
+                <th>Price ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {xReportRows.map((row, index) => (
+                <tr
+                  key={index}
+                  style={row.totalRow ? { fontWeight: "bold", background: "#eee" } : {}}
+                >
+                  <td>{row.time}</td>
+                  <td>{row.item}</td>
+                  <td>{row.price.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Z REPORT TABLE */}
+      {zReportRows.length > 0 && (
+        <div className={styles.tableWrap} style={{ marginTop: "30px" }}>
+          <h3>
+            Z-Report — {new Date().toLocaleDateString()}
+          </h3>
+      
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Total ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ fontWeight: "bold"}}>
+                <td>{zReportRows[0].label}</td>
+                <td>{zReportRows[0].total.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+
   // MAIN RENDER ======================================================
   return (
     <div className={styles.wrap}>
@@ -328,6 +485,14 @@ const SalesTab = (
           >
             Restocks
           </button>
+
+          {/*REPORTS TAB */}
+          <button
+            className={`${styles.tab} ${activeTab === "reports" ? styles.active : ""}`}
+            onClick={() => setActiveTab("reports")}
+          >
+            Reports
+          </button>
         </aside>
 
         <section className={styles.content}>
@@ -335,6 +500,7 @@ const SalesTab = (
           {activeTab === "menu" && MenuTab}
           {activeTab === "inventory" && InventoryTab}
           {activeTab === "restock" && RestockTab}
+          {activeTab === "reports" && ReportsTab}
         </section>
       </main>
     </div>

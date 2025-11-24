@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
 
+// === SEND ORDERS ===
+function sendOrderToSystem(order) {
+  // Load existing orders
+  const existing = JSON.parse(localStorage.getItem("orders") || "[]");
+
+  // Push new order
+  existing.push(order);
+
+  // Save back to localStorage
+  localStorage.setItem("orders", JSON.stringify(existing));
+}
+
 // === Narration helper with language support ===
 const narrationVoices = {
   en: "en-US",
@@ -55,7 +67,8 @@ function WeatherWidget({ accessibilityMode }) {
         const res = await fetch("/api/weather");
         const data = await res.json();
 
-        const kelvinToF = (k) => Math.round((k - 273.15) * 9/5 + 32);
+        const kelvinToF = (k) =>
+          Math.round((k - 273.15) * 9 / 5 + 32);
 
         const iconMap = {
           "01d": "☀️",
@@ -90,8 +103,6 @@ function WeatherWidget({ accessibilityMode }) {
     }
 
     fetchWeather();
-
-    // Auto-refresh every 10 minutes
     intervalId = setInterval(fetchWeather, 600000);
 
     return () => clearInterval(intervalId);
@@ -100,7 +111,7 @@ function WeatherWidget({ accessibilityMode }) {
   return (
     <div
       style={{
-        position: "fixed",
+        position: "absolute",
         top: "20px",
         right: "20px",
         backgroundColor: accessibilityMode ? "#222" : "#fff",
@@ -117,8 +128,12 @@ function WeatherWidget({ accessibilityMode }) {
         alignItems: "center",
       }}
     >
-      <div style={{ fontSize: accessibilityMode ? "28px" : "24px" }}>{weather.emoji}</div>
-      <div style={{ fontWeight: "bold", marginTop: "2px" }}>{weather.temp}°F</div>
+      <div style={{ fontSize: accessibilityMode ? "28px" : "24px" }}>
+        {weather.emoji}
+      </div>
+      <div style={{ fontWeight: "bold", marginTop: "2px" }}>
+        {weather.temp}°F
+      </div>
       <div>Feels like: {weather.feels_like}°F</div>
       <div>Wind: {weather.wind} mph</div>
     </div>
@@ -134,8 +149,21 @@ export default function KioskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState("en");
+  const [activeCategory, setActiveCategory] = useState(null);
 
-  // ⭐ NEW — translated accessibility labels
+  // NEW — screens + cart
+  const [screen, setScreen] = useState("menu"); 
+  const [detailsItem, setDetailsItem] = useState(null);
+  const [cart, setCart] = useState([]);
+
+  const categories = [
+    "Ice-Blended",
+    "Fruity Beverage",
+    "Fresh Brew",
+    "Milky Series",
+    "Non-Caffeinated",
+  ];
+
   const [accessibilityLabel, setAccessibilityLabel] = useState({
     on: "Accessibility Mode: ON",
     off: "Accessibility Mode: OFF",
@@ -147,13 +175,17 @@ export default function KioskPage() {
         const response = await fetch("/api/menu");
         const data = await response.json();
 
-        const formatted = data.map((item) => ({
-          id: item.menuid ?? item.id,
-          name: item.menuname ?? item.name,
-          price: item.price,
-          description: item.menudescription ?? item.description,
-          category: item.category,
-        }));
+        const formatted = data.map((item) => {
+          const id = item.menuid ?? item.id;
+          return {
+            id,
+            name: item.menuname ?? item.name,
+            price: item.price,
+            description: item.menudescription ?? item.description,
+            category: item.category,
+            image: `/Images/${id}.png`,
+          };
+        });
 
         setMenuItems(formatted);
       } catch (err) {
@@ -166,15 +198,12 @@ export default function KioskPage() {
     fetchMenu();
   }, []);
 
-  // === Google Translate widget ===
+  // === language widget ===
   useEffect(() => {
-    const addGoogleTranslateScript = () => {
-      const script = document.createElement("script");
-      script.type = "text/javascript";
-      script.src =
-        "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-      document.body.appendChild(script);
-    };
+    const script = document.createElement("script");
+    script.src =
+      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    document.body.appendChild(script);
 
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
@@ -185,24 +214,12 @@ export default function KioskPage() {
         "google_translate_element"
       );
     };
-
-    addGoogleTranslateScript();
   }, []);
 
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-    document.body.appendChild(script);
-  }, []);
-
-  // === Language selection ===
   async function handleLanguageChange(langCode) {
     if (!langCode) return;
-
     setLanguage(langCode);
 
-    // ⭐ Translate accessibility label text
     const labelOn = await translateText("Accessibility Mode: ON", langCode);
     const labelOff = await translateText("Accessibility Mode: OFF", langCode);
 
@@ -217,18 +234,21 @@ export default function KioskPage() {
 
   const handlePress = (item) => {
     setSelectedItem(item.id);
+
     if (narrationOn) {
       speak(
         `${item.name}. Price ${item.price} dollars. ${item.description || ""}`,
         language
       );
     }
+
     setTimeout(() => setSelectedItem(null), 300);
   };
 
   const toggleNarration = () => {
     const newState = !narrationOn;
     setNarrationOn(newState);
+
     if (newState) {
       speak(
         "Narration enabled. Tap a drink to hear its description.",
@@ -239,11 +259,384 @@ export default function KioskPage() {
     }
   };
 
+  // === Add to Cart ===
+  const addToCart = (item) => {
+    setCart((prev) => [...prev, item]);
+    if (narrationOn) {
+      speak(`${item.name} added to cart.`, language);
+    }
+  };
+
+  // === DRINK DETAILS PAGE ===
+  const DrinkDetailsPage = () => {
+    if (!detailsItem) return null;
+
+    return (
+      <div
+        style={{
+          width: "100%",
+          minHeight: "100vh",
+          backgroundColor: accessibilityMode ? "#000" : "#fff",
+          color: accessibilityMode ? "#fff" : "#000",
+          padding: "20px",
+          textAlign: "center",
+        }}
+      >
+        <button
+          onClick={() => setScreen("menu")}
+          style={{
+            position: "absolute",
+            top: "20px",
+            left: "20px",
+            padding: "10px 20px",
+            backgroundColor: "#500000",
+            color: "#fff",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "18px",
+            cursor: "pointer",
+          }}
+        >
+          ← Back
+        </button>
+
+        <img
+          src={detailsItem.image}
+          alt={detailsItem.name}
+          style={{
+            width: "60%",
+            maxWidth: "400px",
+            borderRadius: "20px",
+            marginTop: "60px",
+            marginBottom: "20px",
+          }}
+        />
+
+        <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
+
+        <p style={{ fontSize: "24px", opacity: 0.9 }}>
+          ${Number(detailsItem.price).toFixed(2)}
+        </p>
+
+        <p
+          style={{
+            fontSize: "20px",
+            width: "80%",
+            margin: "0 auto",
+            marginBottom: "40px",
+          }}
+        >
+          {detailsItem.description}
+        </p>
+
+        <button
+          onClick={() => {
+            addToCart(detailsItem);
+            setScreen("menu");
+          }}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            color: "#000",
+            border: "none",
+            borderRadius: "15px",
+            fontSize: "26px",
+            cursor: "pointer",
+          }}
+        >
+          Add to Cart
+        </button>
+      </div>
+    );
+  };
+
+  // === CART SCREEN ===
+  const CartScreen = () => (
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
+
+      {cart.length === 0 ? (
+        <p style={{ fontSize: "22px" }}>Your cart is empty.</p>
+      ) : (
+        cart.map((item, index) => (
+          <p key={index} style={{ fontSize: "22px" }}>
+            {item.name} — ${item.price}
+          </p>
+        ))
+      )}
+
+      <button
+        onClick={() => setScreen("checkout")}
+        disabled={cart.length === 0}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "24px",
+          marginTop: "20px",
+        }}
+      >
+        Proceed to Checkout
+      </button>
+
+      <button
+        onClick={() => setScreen("menu")}
+        style={{
+          padding: "15px 30px",
+          backgroundColor: "#ccc",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "20px",
+          marginLeft: "20px",
+        }}
+      >
+        Back
+      </button>
+    </div>
+  );
+
+  // === CHECKOUT SCREEN ===
+  const CheckoutScreen = () => {
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.price),
+      0
+    );
+
+    return (
+      <div style={{ padding: "20px" }}>
+        <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+
+        {cart.map((item, index) => (
+          <p key={index} style={{ fontSize: "22px" }}>
+            {item.name} — ${item.price}
+          </p>
+        ))}
+
+        <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
+          Total: ${total.toFixed(2)}
+        </h3>
+
+        <button
+          onClick={() => setScreen("payment")}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "24px",
+            marginTop: "20px",
+          }}
+        >
+          Continue to Payment
+        </button>
+
+        <button
+          onClick={() => setScreen("cart")}
+          style={{
+            padding: "15px 30px",
+            backgroundColor: "#ccc",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: "20px",
+            marginLeft: "20px",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
+
+  // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
+  const PaymentScreen = () => {
+    const [confirmMethod, setConfirmMethod] = useState(null);
+  
+    const paymentMethods = [
+      "Card",
+      "Tap to Pay",
+      "Mobile Wallet",
+      "Cash",
+    ];
+  
+    // NORMAL MODE (simple one-tap buttons)
+    if (!accessibilityMode) {
+      return (
+        <div style={{ padding: "20px" }}>
+          <h2 style={{ fontSize: "36px" }}>Payment</h2>
+      
+          <p style={{ fontSize: "22px" }}>
+            Choose a payment method:
+          </p>
+      
+          {paymentMethods.map((method) => (
+            <button
+              key={method}
+              onClick={() => setScreen("success")}
+              style={{
+                display: "block",
+                width: "80%",
+                padding: "20px",
+                margin: "10px auto",
+                backgroundColor: "#500000",
+                color: "#fff",
+                border: "none",
+                borderRadius: "10px",
+                fontSize: "24px",
+              }}
+            >
+              {method}
+            </button>
+          ))}
+  
+          <button
+            onClick={() => setScreen("checkout")}
+            style={{
+              padding: "15px 30px",
+              backgroundColor: "#ccc",
+              borderRadius: "10px",
+              border: "none",
+              fontSize: "20px",
+              marginTop: "20px",
+            }}
+          >
+            Back
+          </button>
+        </div>
+      );
+    }
+  
+    // ACCESSIBILITY MODE (double-tap confirm, larger buttons)
+    return (
+      <div
+        style={{
+          padding: "20px",
+          textAlign: "center",
+          backgroundColor: "#000",
+          color: "#fff",
+          minHeight: "100vh",
+        }}
+      >
+        <h2 style={{ fontSize: "44px" }}>Payment</h2>
+      
+        <p
+          style={{
+            fontSize: "28px",
+            marginBottom: "30px",
+          }}
+        >
+          Choose a method:
+        </p>
+        
+        {paymentMethods.map((method) => (
+          <button
+            key={method}
+            onClick={() => {
+              if (narrationOn) speak(method, language);
+            
+              // First tap highlights
+              if (confirmMethod !== method) {
+                setConfirmMethod(method);
+                return;
+              }
+            
+              // Second tap confirms
+              setScreen("success");
+            }}
+            style={{
+              width: "90%",
+              padding: "30px",
+              margin: "20px auto",
+              display: "block",
+              backgroundColor:
+                confirmMethod === method ? "#FFD700" : "#500000",
+              color: confirmMethod === method ? "#000" : "#fff",
+              border: "none",
+              borderRadius: "14px",
+              fontSize: "32px",
+              cursor: "pointer",
+            }}
+          >
+            {method}
+          
+            {confirmMethod === method && (
+              <div style={{ fontSize: "16px", marginTop: "6px", opacity: 0.8 }}>
+                Tap again to confirm
+              </div>
+            )}
+          </button>
+        ))}
+  
+        <button
+          onClick={() => setScreen("checkout")}
+          style={{
+            marginTop: "25px",
+            padding: "22px 40px",
+            backgroundColor: "#ccc",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: "24px",
+            width: "70%",
+            color: "#000",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
+
+
+  // === SUCCESS SCREEN ===
+  const SuccessScreen = () => (
+    <div style={{ padding: "40px", textAlign: "center" }}>
+      <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
+      <p style={{ fontSize: "24px", marginTop: "20px" }}>
+        Thank you for your order.
+      </p>
+
+      <button
+        onClick={() => {
+          const order = {
+            id: Date.now(),
+            items: cart,
+            total: cart.reduce((sum, i) => sum + Number(i.price), 0),
+            time: new Date().toISOString(),
+            status: "pending"
+          };
+        
+          // Send order
+          sendOrderToSystem(order);
+        
+          setCart([]);
+          setScreen("menu");
+        }}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "26px",
+          marginTop: "40px",
+        }}
+      >
+        Return to Menu
+      </button>
+    </div>
+  );
+
+  // === MAIN RENDER SWITCH ===
+  if (screen === "details") return <DrinkDetailsPage />;
+  if (screen === "cart") return <CartScreen />;
+  if (screen === "checkout") return <CheckoutScreen />;
+  if (screen === "payment") return <PaymentScreen />;
+  if (screen === "success") return <SuccessScreen />;
+
   return (
     <div
       style={{
         textAlign: "center",
-        backgroundColor: accessibilityMode ? "#000" : "#f4f4f4",
+        backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
         color: accessibilityMode ? "#fff" : "#000",
         minHeight: "100vh",
         padding: accessibilityMode ? "40px" : "20px",
@@ -252,16 +645,14 @@ export default function KioskPage() {
         transition: "all 0.3s ease",
       }}
     >
-      {/* === Weather Widget === */}
       <WeatherWidget accessibilityMode={accessibilityMode} />
 
-      {/* === Left-Side Narration Button === */}
       <button
         onClick={toggleNarration}
         aria-label="Toggle narration mode"
         style={{
-          position: "fixed",
-          top: "30%",
+          position: "absolute",
+          top: "10%",
           left: "20px",
           transform: "translateY(-50%)",
           backgroundColor: narrationOn
@@ -284,8 +675,8 @@ export default function KioskPage() {
         🔊
       </button>
 
-      {/*Language Selector */}
       <div id="google_translate_element" style={{ display: "none" }}></div>
+
       <div
         style={{
           position: "absolute",
@@ -321,36 +712,6 @@ export default function KioskPage() {
         </select>
       </div>
 
-      {/* === Left-Side Translation Button === */}
-      <button
-        onClick={toggleNarration}
-        aria-label="Toggle narration mode"
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "20px",
-          transform: "translateY(-50%)",
-          backgroundColor: narrationOn
-            ? "#FFD700"
-            : accessibilityMode
-            ? "#555"
-            : "#500000",
-          color: narrationOn ? "#000" : "#fff",
-          border: "none",
-          borderRadius: "50%",
-          width: accessibilityMode ? "90px" : "70px",
-          height: accessibilityMode ? "90px" : "70px",
-          fontSize: accessibilityMode ? "36px" : "28px",
-          cursor: "pointer",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-          zIndex: 10,
-          transition: "all 0.25s ease",
-        }}
-      >
-        Para Espanol
-      </button>
-
-      {/* === Header === */}
       <h1
         tabIndex="0"
         aria-label="Welcome to Sharetea Self-Order Kiosk"
@@ -371,7 +732,34 @@ export default function KioskPage() {
         Welcome! Tap a drink to start your order.
       </p>
 
-      {/* === Accessibility toggle === */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "20px",
+          marginBottom: "30px",
+        }}
+      >
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            style={{
+              padding: "12px 20px",
+              borderRadius: "8px",
+              backgroundColor: activeCategory === cat ? "#FFD700" : "#500000",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "16px",
+              transition: "all 0.2s ease",
+            }}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       <button
         onClick={() => setAccessibilityMode(!accessibilityMode)}
         aria-pressed={accessibilityMode}
@@ -388,93 +776,203 @@ export default function KioskPage() {
           transition: "all 0.2s ease",
         }}
       >
-        <span id="label-off" style={{ display: accessibilityMode ? "none" : "inline" }}>
+        <span
+          id="label-off"
+          style={{ display: accessibilityMode ? "none" : "inline" }}
+        >
           Accessibility Mode: OFF
         </span>
 
-        <span id="label-on" style={{ display: accessibilityMode ? "inline" : "none" }}>
+        <span
+          id="label-on"
+          style={{ display: accessibilityMode ? "inline" : "none" }}
+        >
           Accessibility Mode: ON
         </span>
       </button>
 
-      {/* === Loading or Error === */}
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {/* === Menu Grid === */}
-      {!loading && !error && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: accessibilityMode
-              ? "repeat(auto-fit, minmax(300px, 1fr))"
-              : "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: accessibilityMode ? "40px" : "25px",
-            maxWidth: accessibilityMode ? "1100px" : "900px",
-            margin: "0 auto",
-            transition: "all 0.3s ease",
-          }}
-        >
-          {menuItems.map((item) => {
-            const isPressed = selectedItem === item.id;
+      {!loading && !error && screen === "menu" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {categories.map((cat) => {
+            const sampleItem = menuItems.find(
+              (item) => item.category === cat
+            );
+
             return (
-              <div
-                key={item.id}
-                onClick={() => handlePress(item)}
-                role="button"
-                aria-label={`Select ${item.name}`}
-                tabIndex="0"
-                style={{
-                  borderRadius: "20px",
-                  padding: accessibilityMode ? "35px" : "25px",
-                  backgroundColor: isPressed
-                    ? "#ffe680"
-                    : accessibilityMode
-                    ? "#222"
-                    : "#fff",
-                  color: accessibilityMode ? "#fff" : "#000",
-                  boxShadow: isPressed
-                    ? "0 0 0 4px #FFD700"
-                    : "0 4px 12px rgba(0,0,0,0.1)",
-                  textAlign: "left",
-                  transform: isPressed ? "scale(0.97)" : "scale(1)",
-                  transition: "all 0.2s ease",
-                  cursor: "pointer",
-                  userSelect: "none",
-                }}
-              >
-                <h2
+              <div key={cat}>
+                <button
+                  onClick={() =>
+                    setActiveCategory(
+                      activeCategory === cat ? null : cat
+                    )
+                  }
                   style={{
-                    fontSize: accessibilityMode ? "28px" : "22px",
-                    marginBottom: "10px",
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    backgroundColor:
+                      activeCategory === cat ? "#FFD700" : "#500000",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: accessibilityMode ? "28px" : "24px",
+                    textAlign: "left",
+                    transition: "all 0.2s ease",
                   }}
                 >
-                  {item.name ?? item.menuname}
-                </h2>
+                  {sampleItem && (
+                    <img
+                      src={sampleItem.image}
+                      alt={cat}
+                      onError={(e) => {
+                        e.target.src = "/images/default.png";
+                      }}
+                      style={{
+                        width: "120px",
+                        height: "120px",
+                        objectFit: "cover",
+                        borderRadius: "10px",
+                        marginRight: "20px",
+                      }}
+                    />
+                  )}
+                  <span>{cat}</span>
+                </button>
 
-                <p
-                  style={{
-                    fontSize: accessibilityMode ? "22px" : "18px",
-                    margin: "5px 0",
-                  }}
-                >
-                  ${Number(item.price).toFixed(2)}
-                </p>
-
-                {(item.description ?? item.menudescription) && (
-                  <p
+                {activeCategory === cat && (
+                  <div
                     style={{
-                      fontSize: accessibilityMode ? "18px" : "14px",
-                      opacity: "0.8",
+                      display: "grid",
+                      gridTemplateColumns: accessibilityMode
+                        ? "repeat(auto-fit, minmax(300px, 1fr))"
+                        : "repeat(auto-fit, minmax(220px, 1fr))",
+                      gap: accessibilityMode ? "40px" : "25px",
+                      marginTop: "20px",
+                      marginBottom: "30px",
                     }}
                   >
-                    {item.description ?? item.menudescription}
-                  </p>
+                    {menuItems
+                      .filter((item) => item.category === cat)
+                      .map((item) => {
+                        const isPressed =
+                          selectedItem === item.id;
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              handlePress(item);
+                              setDetailsItem(item);
+                              setScreen("details");
+                            }}
+                            role="button"
+                            aria-label={`Select ${item.name}`}
+                            tabIndex="0"
+                            style={{
+                              borderRadius: "20px",
+                              padding: accessibilityMode
+                                ? "35px"
+                                : "25px",
+                              backgroundColor: isPressed
+                                ? "#ffe680"
+                                : accessibilityMode
+                                ? "#222"
+                                : "#fff",
+                              color: accessibilityMode ? "#fff" : "#000",
+                              boxShadow: isPressed
+                                ? "0 0 0 4px #FFD700"
+                                : "0 4px 12px rgba(0,0,0,0.1)",
+                              textAlign: "left",
+                              transform: isPressed
+                                ? "scale(0.97)"
+                                : "scale(1)",
+                              transition: "all 0.2s ease",
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                          >
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              onError={(e) => {
+                                e.target.src = "/Images/default.png";
+                              }}
+                              style={{
+                                width: "100%",
+                                height: "200px",
+                                objectFit: "cover",
+                                borderRadius: "15px",
+                                marginBottom: "15px",
+                              }}
+                            />
+                            <h3
+                              style={{
+                                fontSize: accessibilityMode
+                                  ? "28px"
+                                  : "22px",
+                                marginBottom: "10px",
+                              }}
+                            >
+                              {item.name}
+                            </h3>
+                            <p
+                              style={{
+                                fontSize: accessibilityMode
+                                  ? "22px"
+                                  : "18px",
+                              }}
+                            >
+                              ${Number(item.price).toFixed(2)}
+                            </p>
+                            {item.description && (
+                              <p
+                                style={{
+                                  fontSize: accessibilityMode
+                                    ? "18px"
+                                    : "14px",
+                                  opacity: 0.8,
+                                }}
+                              >
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
+      )}
+
+      {/* FLOATING CART BUTTON */}
+      {screen === "menu" && cart.length > 0 && (
+        <button
+          onClick={() => setScreen("cart")}
+          style={{
+            position: "fixed",
+            bottom: "30px",
+            right: "30px",
+            backgroundColor: "#FFD700",
+            color: "#fff",
+            borderRadius: "50%",
+            width: "90px",
+            height: "90px",
+            fontSize: "32px",
+            border: "none",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            cursor: "pointer",
+            zIndex: 2000,
+          }}
+        >
+          🛒 {cart.length}
+        </button>
       )}
     </div>
   );
