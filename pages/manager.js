@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import styles from "./manager.module.css";  // CSS MODULE
 
@@ -54,47 +54,136 @@ export default function ManagerPage() {
   function handleOrderRestock(item) { console.log("Restock ordered:", item.name); }
 
   // TAB COMPONENTS ===================================================
-  const SalesTab = (
-    <section className={styles.panel}>
-      <div className={styles.panelHeader}>
-        <h2>Sales</h2>
+// ===== SALES TAB =====
+const [salesSummary, setSalesSummary] = useState(null);
+const [salesHourly, setSalesHourly] = useState([]);
+const [salesOrders, setSalesOrders] = useState([]);
+const [salesLoading, setSalesLoading] = useState(false);
+const [salesError, setSalesError] = useState(null);
+
+const [startDate, setStartDate] = useState("");
+const [endDate, setEndDate] = useState("");
+
+// Fetch sales data (with range or all-time)
+async function fetchSales() {
+  try {
+    setSalesLoading(true);
+    setSalesError(null);
+
+    let url = "/api/sales";
+
+    if (startDate && endDate) {
+      url += `?start=${startDate} 00:00:00&end=${endDate} 23:59:59`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
+    const data = await res.json();
+    setSalesSummary(data.summary || null);
+    setSalesHourly(data.hourly || []);
+    setSalesOrders(data.orders || []);
+  } catch (err) {
+    console.error("Failed to fetch sales:", err);
+    setSalesError("Failed to load sales data.");
+  } finally {
+    setSalesLoading(false);
+  }
+}
+
+// Run once on initial load
+useEffect(() => {
+  fetchSales();
+}, []);
+
+// Render Sales tab
+const SalesTab = (
+  <section className={styles.panel}>
+    <h2>Sales</h2>
+
+    {/* Date Range Controls */}
+    <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+      <div>
+        <label>Start Date</label>
         <input
-          type="search"
-          placeholder="Search (item/date)…"
-          className={styles.search}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
         />
       </div>
 
+      <div>
+        <label>End Date</label>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+        />
+      </div>
+
+      <button onClick={fetchSales}>Generate</button>
+    </div>
+
+    {/* Loading & Errors */}
+    {salesLoading && <p>Loading sales...</p>}
+    {salesError && <p style={{ color: "red" }}>{salesError}</p>}
+
+    {/* Summary */}
+    {salesSummary && !salesLoading && (
+      <div className={styles.summaryBox}>
+        <p><strong>Total Sales:</strong> ${Number(salesSummary.totalsales).toFixed(2)}</p>
+        <p><strong>Total Orders:</strong> {salesSummary.totalorders}</p>
+        <p><strong>First Order:</strong> {salesSummary.firstorder ? new Date(salesSummary.firstorder).toLocaleString() : "—"}</p>
+        <p><strong>Last Order:</strong> {salesSummary.lastorder ? new Date(salesSummary.lastorder).toLocaleString() : "—"}</p>
+      </div>
+    )}
+
+    {/* Orders Table */}
+    {salesOrders.length > 0 && (
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
-            <tr><th>Date</th><th>Item</th><th>Qty</th><th>Total ($)</th></tr>
+            <tr>
+              <th>Order ID</th>
+              <th>Employee ID</th>
+              <th>Location</th>
+              <th>Date</th>
+              <th>Total ($)</th>
+            </tr>
           </thead>
           <tbody>
-            {sales
-              .filter((s) => {
+            {salesOrders
+              .filter((row) => {
                 const q = query.trim().toLowerCase();
                 if (!q) return true;
+
                 return (
-                  s.item.toLowerCase().includes(q) ||
-                  s.date.includes(q)
+                  String(row.orderid).includes(q) ||
+                  String(row.employeeid).includes(q) ||
+                  (row.orderlocation || "").toLowerCase().includes(q) ||
+                  (row.orderdate || "").toString().includes(q)
                 );
               })
-              .map((s) => (
-                <tr key={s.id}>
-                  <td>{s.date}</td>
-                  <td>{s.item}</td>
-                  <td>{s.qty}</td>
-                  <td>{s.total.toFixed(2)}</td>
+              .map((row) => (
+                <tr key={row.orderid}>
+                  <td>{row.orderid}</td>
+                  <td>{row.employeeid}</td>
+                  <td>{row.orderlocation}</td>
+                  <td>
+                    {row.orderdate
+                      ? new Date(row.orderdate).toLocaleString()
+                      : ""}
+                  </td>
+                  <td>{Number(row.ordertotal).toFixed(2)}</td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
-    </section>
-  );
+    )}
+  </section>
+);
+
 
   const MenuTab = (
     <section className={styles.panel}>
