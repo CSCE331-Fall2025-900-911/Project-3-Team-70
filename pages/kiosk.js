@@ -140,6 +140,8 @@ function WeatherWidget({ accessibilityMode }) {
   );
 }
 
+
+
 // === Main Page ===
 export default function KioskPage() {
   const [accessibilityMode, setAccessibilityMode] = useState(false);
@@ -267,9 +269,62 @@ export default function KioskPage() {
     }
   };
 
-  // === DRINK DETAILS PAGE ===
+  // === INVENTORY DATA (temporary local version) ===
+  const inventoryData = [
+    { id: 1, name: "Sugar", price: 1, allergy: "None" },
+    { id: 2, name: "Whole Milk", price: 1, allergy: "Dairy" },
+    { id: 3, name: "Skim Milk", price: 1, allergy: "Dairy" },
+    { id: 4, name: "Oat Milk", price: 1, allergy: "None" },
+    { id: 5, name: "Soy Milk", price: 1, allergy: "None" },
+    { id: 6, name: "Condensed Milk", price: 1, allergy: "Dairy" },
+    { id: 7, name: "Coconut Milk", price: 1, allergy: "None" },
+    { id: 8, name: "Non-dairy Creamer", price: 1, allergy: "None" },
+    { id: 9, name: "Ice Cream", price: 1.5, allergy: "Dairy" },
+    { id: 10, name: "Black Tea", price: 1, allergy: "None" },
+    { id: 11, name: "Green Tea", price: 1, allergy: "None" },
+    { id: 12, name: "Oolong Tea", price: 1, allergy: "None" },
+    { id: 14, name: "Honey", price: 1, allergy: "None" },
+    { id: 15, name: "Honey Jelly", price: 1, allergy: "None" },
+    { id: 16, name: "Lychee Jelly", price: 1, allergy: "None" },
+    { id: 22, name: "Coffee Jelly", price: 1, allergy: "None" },
+    { id: 23, name: "Tapioca Pearls", price: 1, allergy: "None" },
+    { id: 24, name: "Crystal Boba", price: 1, allergy: "None" },
+    { id: 25, name: "Strawberry Popping Boba", price: 1, allergy: "None" },
+    { id: 26, name: "Mango Popping Boba", price: 1, allergy: "None" }
+  ];
+
+  // === CUSTOMIZATION UI ===
   const DrinkDetailsPage = () => {
+    const [selectedToppings, setSelectedToppings] = useState([]);
+    const [sweetness, setSweetness] = useState("100%");
+    const [iceLevel, setIceLevel] = useState("Regular Ice");
+
     if (!detailsItem) return null;
+
+    // Match by ID, not object reference
+    const toggleTopping = (topping) => {
+      setSelectedToppings((prev) =>
+        prev.some((t) => t.id === topping.id)
+          ? prev.filter((t) => t.id !== topping.id)
+          : [...prev, topping]
+      );
+    };
+
+    const totalPrice =
+      Number(detailsItem.price) +
+      selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
+
+    const finalize = () => {
+      addToCart({
+        ...detailsItem,
+        toppings: selectedToppings,
+        sweetness,
+        iceLevel,
+        finalPrice: totalPrice
+      });
+
+      setScreen("menu");
+    };
 
     return (
       <div
@@ -315,25 +370,103 @@ export default function KioskPage() {
         <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
 
         <p style={{ fontSize: "24px", opacity: 0.9 }}>
-          ${Number(detailsItem.price).toFixed(2)}
+          Base Price: ${Number(detailsItem.price).toFixed(2)}
         </p>
 
-        <p
+        {/* TOPPINGS */}
+        <h2 style={{ fontSize: "30px", marginTop: "20px" }}>Toppings</h2>
+
+        <div
           style={{
-            fontSize: "20px",
             width: "80%",
             margin: "0 auto",
-            marginBottom: "40px",
+            maxHeight: "300px",
+            overflowY: "scroll",
+            border: "1px solid #ccc",
+            borderRadius: "15px",
+            padding: "10px",
           }}
         >
-          {detailsItem.description}
-        </p>
+          {inventoryData.map((topping) => {
+            const checked = selectedToppings.some((t) => t.id === topping.id);
+            return (
+              <div
+                key={topping.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  margin: "8px 0",
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    fontSize: "20px",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleTopping(topping)}
+                    style={{ width: "25px", height: "25px" }}
+                  />
+                  {topping.name}
+                </label>
+
+                <span style={{ fontSize: "18px" }}>
+                  + ${Number(topping.price).toFixed(2)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* SWEETNESS */}
+        <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
+        <select
+          value={sweetness}
+          onChange={(e) => setSweetness(e.target.value)}
+          style={{
+            padding: "10px",
+            fontSize: "20px",
+            borderRadius: "10px",
+            marginBottom: "20px",
+          }}
+        >
+          <option>0%</option>
+          <option>25%</option>
+          <option>50%</option>
+          <option>75%</option>
+          <option>100%</option>
+        </select>
+
+        {/* ICE LEVEL */}
+        <h2>Ice Level</h2>
+        <select
+          value={iceLevel}
+          onChange={(e) => setIceLevel(e.target.value)}
+          style={{
+            padding: "10px",
+            fontSize: "20px",
+            borderRadius: "10px",
+            marginBottom: "20px",
+          }}
+        >
+          <option>Regular Ice</option>
+          <option>Less Ice</option>
+          <option>No Ice</option>
+          <option>Extra Ice</option>
+        </select>
+
+        {/* FINAL TOTAL */}
+        <h2 style={{ marginTop: "30px", fontSize: "30px" }}>
+          Total: ${totalPrice.toFixed(2)}
+        </h2>
 
         <button
-          onClick={() => {
-            addToCart(detailsItem);
-            setScreen("menu");
-          }}
+          onClick={finalize}
           style={{
             padding: "20px 40px",
             backgroundColor: "#FFD700",
@@ -342,6 +475,7 @@ export default function KioskPage() {
             borderRadius: "15px",
             fontSize: "26px",
             cursor: "pointer",
+            marginTop: "20px",
           }}
         >
           Add to Cart
@@ -359,12 +493,54 @@ export default function KioskPage() {
         <p style={{ fontSize: "22px" }}>Your cart is empty.</p>
       ) : (
         cart.map((item, index) => (
-          <p key={index} style={{ fontSize: "22px" }}>
-            {item.name} — ${item.price}
-          </p>
+          <div
+            key={index}
+            style={{
+              padding: "15px",
+              margin: "15px 0",
+              border: "1px solid #ccc",
+              borderRadius: "12px",
+              fontSize: "20px",
+              backgroundColor: "#fafafa",
+            }}
+          >
+            {/* NAME + FINAL PRICE */}
+            <p style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "10px" }}>
+              {item.name} — ${item.finalPrice || item.price}
+            </p>
+
+            {/* SWEETNESS */}
+            {item.sweetness && (
+              <p style={{ margin: "5px 0" }}>
+                <strong>Sweetness:</strong> {item.sweetness}
+              </p>
+            )}
+
+            {/* ICE LEVEL */}
+            {item.iceLevel && (
+              <p style={{ margin: "5px 0" }}>
+                <strong>Ice:</strong> {item.iceLevel}
+              </p>
+            )}
+
+            {/* TOPPINGS LIST */}
+            {item.toppings && item.toppings.length > 0 && (
+              <div style={{ marginTop: "10px" }}>
+                <strong>Toppings:</strong>
+                <ul style={{ marginLeft: "20px", marginTop: "5px" }}>
+                  {item.toppings.map((t, idx) => (
+                    <li key={idx}>
+                      {t.name} (+${t.price.toFixed(2)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         ))
       )}
 
+      {/* PROCEED BUTTON */}
       <button
         onClick={() => setScreen("checkout")}
         disabled={cart.length === 0}
@@ -380,6 +556,7 @@ export default function KioskPage() {
         Proceed to Checkout
       </button>
 
+      {/* BACK BUTTON */}
       <button
         onClick={() => setScreen("menu")}
         style={{
@@ -395,6 +572,7 @@ export default function KioskPage() {
       </button>
     </div>
   );
+
 
   // === CHECKOUT SCREEN ===
   const CheckoutScreen = () => {
