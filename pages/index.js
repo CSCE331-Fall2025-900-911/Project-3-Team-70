@@ -52,11 +52,11 @@ export default function HomePage() {
         <a href="/auth/employee-access" style={buttonStyle}>
           CASHIER
         </a>
-        <a href="/auth/employee-access" style={buttonStyle}>
-          KITCHEN
-        </a>
         <a href="/auth/manager-access" style={buttonStyle}>
           MANAGER
+        </a>
+        <a href="/kitchen" style={buttonStyle}>
+          KITCHEN
         </a>
       </div>
     </div>

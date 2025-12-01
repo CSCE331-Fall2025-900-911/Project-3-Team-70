@@ -13,15 +13,19 @@ export default function ManagerAccess() {
     const res = await fetch("/api/staff/verify-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
+      body: JSON.stringify({
+        password: pw,
+        requestedRole: "manager",
+      }),
     });
 
     if (!res.ok) {
-      setErr("Incorrect password.");
+      const data = await res.json().catch(() => ({}));
+      setErr(data.error || "Incorrect password.");
       return;
     }
 
-    // After Google login, we’ll handle role assignment in /staff/after-login
+    // Verified → Google login
     signIn("google", {
       callbackUrl: "/staff/after-login?role=manager",
     });
@@ -30,16 +34,24 @@ export default function ManagerAccess() {
   return (
     <div style={{ padding: 40 }}>
       <h1>Manager Access</h1>
-      <form onSubmit={submit}>
+      <form
+        onSubmit={submit}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          maxWidth: 300,
+        }}
+      >
         <input
           type="password"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
-          placeholder="Enter staff password"
+          placeholder="Manager Password"
         />
         <button type="submit">Continue with Google</button>
       </form>
-      {err && <p style={{ color: "red" }}>{err}</p>}
+      {err && <p style={{ color: "red", marginTop: 10 }}>{err}</p>}
     </div>
   );
 }

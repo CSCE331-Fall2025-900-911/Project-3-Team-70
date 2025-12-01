@@ -27,14 +27,36 @@ export default function CashierPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch menu data from API
+  // Fetch and normalize menu data from API
   useEffect(() => {
     async function fetchMenu() {
       try {
         const res = await fetch("/api/menu");
         if (!res.ok) throw new Error("Network response was not ok");
         const data = await res.json();
-        setMenuItems(data);
+
+        const normalized = data.map((row) => {
+          const id = row.menuid ?? row.menuID ?? row.id;
+          return {
+            id,
+            name:
+              row.menuname ??
+              row.menuName ??
+              row.name ??
+              "Unnamed item",
+            description:
+              row.menudescription ??
+              row.menuDescription ??
+              row.description ??
+              "",
+            category: row.category ?? "Uncategorized",
+            price: Number(row.price ?? 0),
+            // 🔧 Images under /public/images/<id>.png
+            image: id ? `/images/${id}.png` : "/images/default.png",
+          };
+        });
+
+        setMenuItems(normalized);
       } catch (err) {
         console.error("Error fetching menu:", err);
         setError("Failed to load menu.");
@@ -45,20 +67,28 @@ export default function CashierPage() {
     fetchMenu();
   }, []);
 
+  // Filtering logic (case-safe)
   const filteredMenu = menuItems.filter((item) => {
-    const matchCat = filter === "all" || item.category === filter;
-    const matchQuery = item.menuName
-      .toLowerCase()
-      .includes(query.toLowerCase());
+    const name = (item.name || "").toLowerCase();
+    const cat = (item.category || "").toLowerCase();
+    const q = (query || "").toLowerCase();
+    const filterLower = (filter || "").toLowerCase();
+
+    const matchCat =
+      filter === "all" ||
+      cat === filterLower ||
+      cat.includes(filterLower);
+    const matchQuery = !q || name.includes(q);
+
     return matchCat && matchQuery;
   });
 
   const addToOrder = (item) => {
     setOrder((prev) => {
-      const existing = prev.find((x) => x.menuID === item.menuID);
+      const existing = prev.find((x) => x.id === item.id);
       if (existing) {
         return prev.map((x) =>
-          x.menuID === item.menuID ? { ...x, qty: x.qty + 1 } : x
+          x.id === item.id ? { ...x, qty: x.qty + 1 } : x
         );
       }
       return [...prev, { ...item, qty: 1 }];
@@ -66,8 +96,9 @@ export default function CashierPage() {
   };
 
   const removeItem = () => setOrder((prev) => prev.slice(0, -1));
+
   const total = order
-    .reduce((acc, i) => acc + i.price * i.qty, 0)
+    .reduce((acc, i) => acc + Number(i.price || 0) * i.qty, 0)
     .toFixed(2);
 
   return (
@@ -82,6 +113,7 @@ export default function CashierPage() {
       </header>
 
       <main className="cashier-wrap">
+        {/* LEFT: MENU */}
         <section className="panel">
           <div className="menu-header">
             <input
@@ -92,13 +124,22 @@ export default function CashierPage() {
               className="search"
             />
             <div className="category-tabs">
-              {["all", "drinks", "toppings", "snacks"].map((cat) => (
+              {[
+                "all",
+                "Ice-Blended",
+                "Fruity Beverage",
+                "Fresh Brew",
+                "Milky Series",
+                "Non-Caffeinated",
+              ].map((cat) => (
                 <button
                   key={cat}
-                  className={`tab ${filter === cat ? "active" : ""}`}
+                  className={`tab ${
+                    filter === cat ? "active" : ""
+                  }`}
                   onClick={() => setFilter(cat)}
                 >
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  {cat}
                 </button>
               ))}
             </div>
@@ -112,16 +153,19 @@ export default function CashierPage() {
             ) : (
               <div className="menu-grid">
                 {filteredMenu.map((item) => (
-                  <div key={item.menuID} className="menu-card">
+                  <div key={item.id} className="menu-card">
                     <img
-                      src={item.menuImage || "https://picsum.photos/200"}
-                      alt={item.menuName}
+                      src={item.image}
+                      alt={item.name}
+                      onError={(e) => {
+                        e.target.src = "/images/default.png";
+                      }}
                     />
-                    <div className="title">{item.menuName}</div>
-                    <div className="desc">{item.menuDescription}</div>
+                    <div className="title">{item.name}</div>
+                    <div className="desc">{item.description}</div>
                     <div className="row">
                       <div className="price">
-                        ${item.price.toFixed(2)}
+                        ${Number(item.price || 0).toFixed(2)}
                       </div>
                       <button
                         className="btn primary"
@@ -137,6 +181,7 @@ export default function CashierPage() {
           </div>
         </section>
 
+        {/* RIGHT: ORDER */}
         <aside className="panel">
           <div className="order-header">
             <h2>Current Order</h2>
@@ -145,22 +190,29 @@ export default function CashierPage() {
             </button>
           </div>
           <div className="order-list">
-            {order.map((line) => (
-              <div key={line.menuID} className="order-item">
-                <div className="name">{line.menuName}</div>
-                <div className="qty">x{line.qty}</div>
-                <div className="subtotal">
-                  ${(line.price * line.qty).toFixed(2)}
+            {order.length === 0 ? (
+              <p style={{ padding: "8px 0" }}>No items yet.</p>
+            ) : (
+              order.map((line) => (
+                <div key={line.id} className="order-item">
+                  <div className="name">{line.name}</div>
+                  <div className="qty">x{line.qty}</div>
+                  <div className="subtotal">
+                    $
+                    {(
+                      Number(line.price || 0) * line.qty
+                    ).toFixed(2)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
           <div className="order-footer">
             <div className="total">Total: ${total}</div>
             <button
               className="btn success"
               onClick={() =>
-                alert("Order submitted (placeholder)")
+                alert("Order submitted (placeholder — hook to DB later)")
               }
             >
               Submit Order
@@ -233,6 +285,7 @@ export default function CashierPage() {
         .category-tabs {
           display: flex;
           gap: 8px;
+          flex-wrap: wrap;
         }
         .tab {
           padding: 6px 10px;
@@ -240,6 +293,7 @@ export default function CashierPage() {
           background: #f3f4f6;
           border: 1px solid var(--border);
           cursor: pointer;
+          font-size: 13px;
         }
         .tab.active {
           background: #eef2ff;
@@ -273,6 +327,20 @@ export default function CashierPage() {
           object-fit: cover;
           border-radius: 8px;
           border: 1px solid var(--border);
+        }
+        .menu-card .title {
+          font-weight: 600;
+          font-size: 15px;
+        }
+        .menu-card .desc {
+          font-size: 13px;
+          color: var(--muted);
+        }
+        .menu-card .row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: auto;
         }
         .btn {
           border: 1px solid var(--border);
@@ -328,6 +396,17 @@ export default function CashierPage() {
           gap: 8px;
           align-items: center;
           background: #fff;
+        }
+        .order-item .name {
+          font-size: 14px;
+        }
+        .order-item .qty {
+          font-size: 14px;
+          color: var(--muted);
+        }
+        .order-item .subtotal {
+          font-weight: 600;
+          font-size: 14px;
         }
         .total {
           font-weight: 800;

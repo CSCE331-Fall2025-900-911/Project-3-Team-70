@@ -13,11 +13,15 @@ export default function EmployeeAccess() {
     const res = await fetch("/api/staff/verify-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
+      body: JSON.stringify({
+        password: pw,
+        requestedRole: "employee",
+      }),
     });
 
     if (!res.ok) {
-      setErr("Incorrect password.");
+      const data = await res.json().catch(() => ({}));
+      setErr(data.error || "Incorrect password.");
       return;
     }
 
@@ -29,16 +33,24 @@ export default function EmployeeAccess() {
   return (
     <div style={{ padding: 40 }}>
       <h1>Employee Access</h1>
-      <form onSubmit={submit}>
+      <form
+        onSubmit={submit}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          maxWidth: 300,
+        }}
+      >
         <input
           type="password"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
-          placeholder="Enter staff password"
+          placeholder="Employee Password"
         />
         <button type="submit">Continue with Google</button>
       </form>
-      {err && <p style={{ color: "red" }}>{err}</p>}
+      {err && <p style={{ color: "red", marginTop: 10 }}>{err}</p>}
     </div>
   );
 }
