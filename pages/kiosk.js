@@ -2,12 +2,39 @@
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 
-// === SEND ORDERS ===
-function sendOrderToSystem(order) {
-  const existing = JSON.parse(localStorage.getItem("orders") || "[]");
-  existing.push(order);
-  localStorage.setItem("orders", JSON.stringify(existing));
+// === SEND ORDERS TO BACKEND ===
+async function sendOrderToSystem(cart) {
+  try {
+    if (!cart || cart.length === 0) return;
+
+    const items = cart.map((item) => ({
+      menuID: item.id,                 // from formatted menu
+      quantity: 1,                     // kiosk items are 1 each
+      priceAtPurchase: Number(item.price || 0),
+      size: null,
+    }));
+
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "kiosk",
+        orderLocation: "Kiosk",
+        items,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      console.error("Order submission failed:", data.error);
+      alert("Sorry, we couldn't send your order. Please try again.");
+    }
+  } catch (err) {
+    console.error("Error sending order:", err);
+    alert("An error occurred sending your order.");
+  }
 }
+
 
 // === Narration helper with language support ===
 const narrationVoices = {
@@ -166,7 +193,29 @@ export default function KioskPage() {
   });
 
   const { data: session } = useSession();
+  const [loyaltyPoints, setLoyaltyPoints] = useState(null);
+  const [pointsError, setPointsError] = useState(null);
+  
+    // Load rewards points for logged-in customers
+  useEffect(() => {
+    if (!session?.user?.email) return;
 
+    async function loadPoints() {
+      try {
+        const res = await fetch("/api/rewards");
+        if (!res.ok) throw new Error("Failed to fetch rewards");
+        const data = await res.json();
+        setLoyaltyPoints(data.loyaltyPoints ?? 0);
+      } catch (err) {
+        console.error("Error loading rewards:", err);
+        setPointsError("Could not load points");
+      }
+    }
+
+    loadPoints();
+  }, [session]);
+
+  
   useEffect(() => {
     async function fetchMenu() {
       try {
@@ -586,43 +635,33 @@ export default function KioskPage() {
   };
 
   const SuccessScreen = () => (
-    <div style={{ padding: "40px", textAlign: "center" }}>
-      <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
-      <p style={{ fontSize: "24px", marginTop: "20px" }}>
-        Thank you for your order.
-      </p>
+  <div style={{ padding: "40px", textAlign: "center" }}>
+    <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
+    <p style={{ fontSize: "24px", marginTop: "20px" }}>
+      Thank you for your order.
+    </p>
 
-      <button
-        onClick={() => {
-          const order = {
-            id: Date.now(),
-            items: cart,
-            total: cart.reduce(
-              (sum, i) => sum + Number(i.price),
-              0
-            ),
-            time: new Date().toISOString(),
-            status: "pending",
-          };
+    <button
+      onClick={async () => {
+        await sendOrderToSystem(cart);
+        setCart([]);
+        setScreen("menu");
+      }}
+      style={{
+        padding: "20px 40px",
+        backgroundColor: "#FFD700",
+        border: "none",
+        borderRadius: "10px",
+        fontSize: "24px",
+        marginTop: "30px",
+        cursor: "pointer",
+      }}
+    >
+      Done
+    </button>
+  </div>
+);
 
-          sendOrderToSystem(order);
-
-          setCart([]);
-          setScreen("menu");
-        }}
-        style={{
-          padding: "20px 40px",
-          backgroundColor: "#FFD700",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "26px",
-          marginTop: "40px",
-        }}
-      >
-        Return to Menu
-      </button>
-    </div>
-  );
 
   if (screen === "details") return <DrinkDetailsPage />;
   if (screen === "cart") return <CartScreen />;
@@ -681,7 +720,15 @@ export default function KioskPage() {
             </button>
           </>
         ) : (
-          <span>Signed in as {session.user.email}</span>
+          <span>
+            Signed in as {session.user.email}
+            {typeof loyaltyPoints === "number" && (
+              <> · Points: {loyaltyPoints}</>
+            )}
+            {pointsError && (
+              <> · <span style={{ color: "red" }}>Points unavailable</span></>
+            )}
+          </span>
         )}
       </div>
 

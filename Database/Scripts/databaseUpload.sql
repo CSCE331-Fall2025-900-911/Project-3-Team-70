@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS ordertest (
     orderLocation VARCHAR,
     orderDate TIMESTAMP,
     orderTotal DECIMAL,
-    orderComplete BOOLEAN DEFAULT false
+    orderComplete BOOLEAN DEFAULT false,
+    customerEmail VARCHAR,
+    orderSource VARCHAR DEFAULT 'kiosk'
 );
 
 
@@ -80,18 +82,24 @@ CREATE TEMP TABLE staging_order (
     employeeID INT,
     orderLocation VARCHAR,
     orderDate TIMESTAMP,
-    orderTotal DECIMAL
+    orderTotal DECIMAL,
+    orderComplete BOOLEAN DEFAULT false,
+    customerEmail VARCHAR,
+    orderSource VARCHAR DEFAULT 'kiosk'
 );
 
 \copy staging_order FROM 'Database/DatabaseSeed/order.csv' CSV HEADER
 
-INSERT INTO ordertest (orderID, employeeID, orderLocation, orderDate, orderTotal)
-SELECT orderID, employeeID, orderLocation, orderDate, orderTotal FROM staging_order
+INSERT INTO ordertest (orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, customerEmail, orderSource)
+SELECT orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, customerEmail, orderSource FROM staging_order
 ON CONFLICT (orderID) DO UPDATE
 SET employeeID = EXCLUDED.employeeID,
     orderLocation = EXCLUDED.orderLocation,
     orderDate = EXCLUDED.orderDate,
-    orderTotal = EXCLUDED.orderTotal;
+    orderTotal = EXCLUDED.orderTotal,
+    orderComplete = EXCLUDED.orderComplete,
+    customerEmail = EXCLUDED.customerEmail,
+    orderSource = EXCLUDED.orderSource;
 
 --OrderItemID,MenuID,Price,QuantityPurchased,OrderID,Size
 CREATE TABLE IF NOT EXISTS orderItem (
@@ -254,7 +262,9 @@ CREATE TABLE IF NOT EXISTS app_users (
     userEmail VARCHAR UNIQUE NOT NULL,
     userName VARCHAR,
     userRole VARCHAR DEFAULT 'customer',
-    userCreationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    userCreationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    loyaltyPoints INT DEFAULT 0,
+    loyaltyUpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 

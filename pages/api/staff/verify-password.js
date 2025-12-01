@@ -18,8 +18,8 @@ export default function handler(req, res) {
       .json({ error: "Missing password or requestedRole" });
   }
 
-  const employeePw = process.env.EMPLOYEE_ACCESS_PASSWORD;
   const managerPw = process.env.MANAGER_ACCESS_PASSWORD;
+  const employeePw = process.env.EMPLOYEE_ACCESS_PASSWORD;
 
   try {
     if (requestedRole === "manager") {
@@ -33,9 +33,7 @@ export default function handler(req, res) {
       if (password === employeePw) {
         return res.status(200).json({ ok: true });
       }
-      return res
-        .status(401)
-        .json({ error: "Invalid employee password" });
+      return res.status(401).json({ error: "Invalid employee password" });
     }
 
     return res.status(400).json({ error: "Unknown role" });

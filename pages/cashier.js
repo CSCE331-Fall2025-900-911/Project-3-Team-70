@@ -95,6 +95,42 @@ export default function CashierPage() {
     });
   };
 
+  const submitOrder = async () => {
+    if (order.length === 0) {
+      alert("No items in the order.");
+      return;
+    }
+
+    try {
+      const items = order.map((i) => ({
+        menuID: i.id,
+        quantity: i.qty,
+        priceAtPurchase: Number(i.price || 0),
+      }));
+
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "cashier",
+          orderLocation: "Front Counter",
+          items,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to submit order");
+      }
+
+      setOrder([]);
+      alert("Order submitted!");
+    } catch (err) {
+      console.error("Error submitting order:", err);
+      alert("There was a problem submitting the order.");
+    }
+  };
+
   const removeItem = () => setOrder((prev) => prev.slice(0, -1));
 
   const total = order
@@ -209,12 +245,7 @@ export default function CashierPage() {
           </div>
           <div className="order-footer">
             <div className="total">Total: ${total}</div>
-            <button
-              className="btn success"
-              onClick={() =>
-                alert("Order submitted (placeholder — hook to DB later)")
-              }
-            >
+            <button className="btn success" onClick={submitOrder}>
               Submit Order
             </button>
           </div>

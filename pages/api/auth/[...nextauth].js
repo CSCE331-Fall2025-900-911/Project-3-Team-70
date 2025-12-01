@@ -3,7 +3,7 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { query } from "../../../lib/db-connector";
 
-export default NextAuth({
+export const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -12,7 +12,7 @@ export default NextAuth({
   ],
 
   callbacks: {
-    // Ensure user row exists on first sign-in
+    // Ensure user exists on first sign-in
     async signIn({ user }) {
       await query(
         `
@@ -25,28 +25,33 @@ export default NextAuth({
       return true;
     },
 
-    // Load role from DB into JWT
+    // Populate JWT with role + loyalty points
     async jwt({ token }) {
       if (token.email) {
         const { rows } = await query(
-          `SELECT userRole FROM app_users WHERE userEmail = $1`,
+          `SELECT userRole, loyaltyPoints FROM app_users WHERE userEmail = $1`,
           [token.email]
         );
-        token.role = rows[0]?.userrole || "customer";
+        const row = rows[0];
+        token.role = row?.userrole || "customer";
+        token.loyaltyPoints = row?.loyaltypoints ?? 0;
       }
       return token;
     },
 
-    // Expose role to client
+    // Expose role + points to the client session
     async session({ session, token }) {
       session.user.role = token.role || "customer";
+      session.user.loyaltyPoints = token.loyaltyPoints ?? 0;
       return session;
     },
   },
 
   pages: {
-    signIn: "/login", // optional, you can ignore this page if not using it
+    signIn: "/login", // you can ignore this if you don't have a custom /login page
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+export default NextAuth(authOptions);
