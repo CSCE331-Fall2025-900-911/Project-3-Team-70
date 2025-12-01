@@ -485,118 +485,116 @@ export default function KioskPage() {
   };
 
   // === CART SCREEN ===
-  const CartScreen = () => (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
+  const CartScreen = () => {
+    const removeItem = (indexToRemove) => {
+      setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
+    };
 
-      {cart.length === 0 ? (
-        <p style={{ fontSize: "22px" }}>Your cart is empty.</p>
-      ) : (
-        cart.map((item, index) => (
-          <div
-            key={index}
-            style={{
-              padding: "15px",
-              margin: "15px 0",
-              border: "1px solid #ccc",
-              borderRadius: "12px",
-              fontSize: "20px",
-              backgroundColor: "#fafafa",
-            }}
-          >
-            {/* NAME + FINAL PRICE */}
-            <p style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "10px" }}>
-              {item.name} — ${item.finalPrice || item.price}
-            </p>
-
-            {/* SWEETNESS */}
-            {item.sweetness && (
-              <p style={{ margin: "5px 0" }}>
-                <strong>Sweetness:</strong> {item.sweetness}
-              </p>
-            )}
-
-            {/* ICE LEVEL */}
-            {item.iceLevel && (
-              <p style={{ margin: "5px 0" }}>
-                <strong>Ice:</strong> {item.iceLevel}
-              </p>
-            )}
-
-            {/* TOPPINGS LIST */}
-            {item.toppings && item.toppings.length > 0 && (
-              <div style={{ marginTop: "10px" }}>
-                <strong>Toppings:</strong>
-                <ul style={{ marginLeft: "20px", marginTop: "5px" }}>
-                  {item.toppings.map((t, idx) => (
-                    <li key={idx}>
-                      {t.name} (+${t.price.toFixed(2)})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        ))
-      )}
-
-      {/* PROCEED BUTTON */}
-      <button
-        onClick={() => setScreen("checkout")}
-        disabled={cart.length === 0}
-        style={{
-          padding: "20px 40px",
-          backgroundColor: "#FFD700",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "24px",
-          marginTop: "20px",
-        }}
-      >
-        Proceed to Checkout
-      </button>
-
-      {/* BACK BUTTON */}
-      <button
-        onClick={() => setScreen("menu")}
-        style={{
-          padding: "15px 30px",
-          backgroundColor: "#ccc",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "20px",
-          marginLeft: "20px",
-        }}
-      >
-        Back
-      </button>
-    </div>
-  );
-
-
-  // === CHECKOUT SCREEN ===
-  const CheckoutScreen = () => {
-    const total = cart.reduce(
-      (sum, item) => sum + Number(item.price),
+    // Calculate total, using finalPrice if present
+    const cartTotal = cart.reduce(
+      (sum, item) => sum + Number(item.finalPrice || item.price),
       0
     );
 
     return (
       <div style={{ padding: "20px" }}>
-        <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+        <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
 
-        {cart.map((item, index) => (
-          <p key={index} style={{ fontSize: "22px" }}>
-            {item.name} — ${item.price}
-          </p>
-        ))}
+        {cart.length === 0 ? (
+          <p style={{ fontSize: "22px" }}>Your cart is empty.</p>
+        ) : (
+          cart.map((item, index) => (
+            <div
+              key={index}
+              style={{
+                padding: "15px",
+                margin: "15px 0",
+                border: "1px solid #ccc",
+                borderRadius: "12px",
+                fontSize: "20px",
+                backgroundColor: "#fafafa",
+                position: "relative",
+              }}
+            >
+              {/* REMOVE BUTTON */}
+              <button
+                onClick={() => removeItem(index)}
+                style={{
+                  position: "absolute",
+                  top: "10px",
+                  right: "10px",
+                  backgroundColor: "#b00000",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  cursor: "pointer",
+                }}
+              >
+                Remove
+              </button>
 
-        <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
-          Total: ${total.toFixed(2)}
-        </h3>
+              {/* NAME + PRICE */}
+              <p
+                style={{
+                  fontSize: "24px",
+                  fontWeight: "bold",
+                  marginBottom: "10px",
+                }}
+              >
+                {item.name} — ${ (item.finalPrice || item.price).toFixed(2) }
+              </p>
 
+              {/* SWEETNESS */}
+              {item.sweetness && (
+                <p style={{ margin: "5px 0" }}>
+                  <strong>Sweetness:</strong> {item.sweetness}
+                </p>
+              )}
+
+              {/* ICE */}
+              {item.iceLevel && (
+                <p style={{ margin: "5px 0" }}>
+                  <strong>Ice:</strong> {item.iceLevel}
+                </p>
+              )}
+
+              {/* TOPPINGS */}
+              {item.toppings && item.toppings.length > 0 && (
+                <div style={{ marginTop: "10px" }}>
+                  <strong>Toppings:</strong>
+                  <ul style={{ marginLeft: "20px", marginTop: "5px" }}>
+                    {item.toppings.map((t, idx) => (
+                      <li key={idx}>
+                        {t.name} (+${t.price.toFixed(2)})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+
+        {/* CART TOTAL */}
+        {cart.length > 0 && (
+          <h2
+            style={{
+              fontSize: "32px",
+              marginTop: "30px",
+              textAlign: "right",
+              paddingRight: "10px",
+            }}
+          >
+            Cart Total: ${cartTotal.toFixed(2)}
+          </h2>
+        )}
+
+        {/* BUTTONS */}
         <button
-          onClick={() => setScreen("payment")}
+          onClick={() => setScreen("checkout")}
+          disabled={cart.length === 0}
           style={{
             padding: "20px 40px",
             backgroundColor: "#FFD700",
@@ -606,16 +604,16 @@ export default function KioskPage() {
             marginTop: "20px",
           }}
         >
-          Continue to Payment
+          Proceed to Checkout
         </button>
 
         <button
-          onClick={() => setScreen("cart")}
+          onClick={() => setScreen("menu")}
           style={{
             padding: "15px 30px",
             backgroundColor: "#ccc",
-            borderRadius: "10px",
             border: "none",
+            borderRadius: "10px",
             fontSize: "20px",
             marginLeft: "20px",
           }}
@@ -625,6 +623,109 @@ export default function KioskPage() {
       </div>
     );
   };
+
+
+// === CHECKOUT SCREEN ===
+const CheckoutScreen = () => {
+  // Use finalPrice when available, otherwise fallback to base price
+  const total = cart.reduce(
+    (sum, item) => sum + Number(item.finalPrice || item.price),
+    0
+  );
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+
+      {cart.map((item, index) => (
+        <div
+          key={index}
+          style={{
+            padding: "15px",
+            margin: "15px 0",
+            border: "1px solid #ccc",
+            borderRadius: "12px",
+            backgroundColor: "#fafafa",
+            fontSize: "20px",
+          }}
+        >
+          {/* NAME + FINAL PRICE */}
+          <p
+            style={{
+              fontSize: "24px",
+              fontWeight: "bold",
+              marginBottom: "10px",
+            }}
+          >
+            {item.name} — ${ (item.finalPrice || item.price).toFixed(2) }
+          </p>
+
+          {/* SWEETNESS */}
+          {item.sweetness && (
+            <p style={{ margin: "5px 0" }}>
+              <strong>Sweetness:</strong> {item.sweetness}
+            </p>
+          )}
+
+          {/* ICE */}
+          {item.iceLevel && (
+            <p style={{ margin: "5px 0" }}>
+              <strong>Ice:</strong> {item.iceLevel}
+            </p>
+          )}
+
+          {/* TOPPINGS */}
+          {item.toppings && item.toppings.length > 0 && (
+            <div style={{ marginTop: "10px" }}>
+              <strong>Toppings:</strong>
+              <ul style={{ marginLeft: "20px", marginTop: "5px" }}>
+                {item.toppings.map((t, idx) => (
+                  <li key={idx}>
+                    {t.name} (+${t.price.toFixed(2)})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* TOTAL */}
+      <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
+        Total: ${total.toFixed(2)}
+      </h3>
+
+      <button
+        onClick={() => setScreen("payment")}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "24px",
+          marginTop: "20px",
+        }}
+      >
+        Continue to Payment
+      </button>
+
+      <button
+        onClick={() => setScreen("cart")}
+        style={{
+          padding: "15px 30px",
+          backgroundColor: "#ccc",
+          borderRadius: "10px",
+          border: "none",
+          fontSize: "20px",
+          marginLeft: "20px",
+        }}
+      >
+        Back
+      </button>
+    </div>
+  );
+};
+
 
   // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
   const PaymentScreen = () => {
