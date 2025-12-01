@@ -1,5 +1,5 @@
+// pages/index.js
 export default function HomePage() {
-  // Shared button style
   const buttonStyle = {
     padding: "10px 20px",
     fontSize: "18px",
@@ -42,19 +42,21 @@ export default function HomePage() {
         YOU CAN USE THE BUTTONS TO NAVIGATE TO OTHER PAGES DESU （〃｀ 3′〃）
       </h1>
 
-      {/* Navigation Buttons */}
       <div>
+        {/* Public */}
         <a href="/kiosk" style={buttonStyle}>
           KIOSK
         </a>
-        <a href="/cashier" style={buttonStyle}>
+
+        {/* Staff-gated flows */}
+        <a href="/auth/employee-access" style={buttonStyle}>
           CASHIER
         </a>
-        <a href="/manager" style={buttonStyle}>
-          MANAGER
-        </a>
-        <a href="/kitchen" style={buttonStyle}>
+        <a href="/auth/employee-access" style={buttonStyle}>
           KITCHEN
+        </a>
+        <a href="/auth/manager-access" style={buttonStyle}>
+          MANAGER
         </a>
       </div>
     </div>

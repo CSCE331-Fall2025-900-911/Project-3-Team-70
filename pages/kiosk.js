@@ -1,14 +1,11 @@
+// pages/kiosk.js
 import { useState, useEffect } from "react";
+import { useSession, signIn } from "next-auth/react";
 
 // === SEND ORDERS ===
 function sendOrderToSystem(order) {
-  // Load existing orders
   const existing = JSON.parse(localStorage.getItem("orders") || "[]");
-
-  // Push new order
   existing.push(order);
-
-  // Save back to localStorage
   localStorage.setItem("orders", JSON.stringify(existing));
 }
 
@@ -68,7 +65,7 @@ function WeatherWidget({ accessibilityMode }) {
         const data = await res.json();
 
         const kelvinToF = (k) =>
-          Math.round((k - 273.15) * 9 / 5 + 32);
+          Math.round(((k - 273.15) * 9) / 5 + 32);
 
         const iconMap = {
           "01d": "☀️",
@@ -151,8 +148,7 @@ export default function KioskPage() {
   const [language, setLanguage] = useState("en");
   const [activeCategory, setActiveCategory] = useState(null);
 
-  // NEW — screens + cart
-  const [screen, setScreen] = useState("menu"); 
+  const [screen, setScreen] = useState("menu");
   const [detailsItem, setDetailsItem] = useState(null);
   const [cart, setCart] = useState([]);
 
@@ -168,6 +164,8 @@ export default function KioskPage() {
     on: "Accessibility Mode: ON",
     off: "Accessibility Mode: OFF",
   });
+
+  const { data: session } = useSession();
 
   useEffect(() => {
     async function fetchMenu() {
@@ -198,7 +196,7 @@ export default function KioskPage() {
     fetchMenu();
   }, []);
 
-  // === language widget ===
+  // language widget
   useEffect(() => {
     const script = document.createElement("script");
     script.src =
@@ -209,7 +207,8 @@ export default function KioskPage() {
       new window.google.translate.TranslateElement(
         {
           pageLanguage: "en",
-          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+          layout:
+            window.google.translate.TranslateElement.InlineLayout.SIMPLE,
         },
         "google_translate_element"
       );
@@ -220,8 +219,14 @@ export default function KioskPage() {
     if (!langCode) return;
     setLanguage(langCode);
 
-    const labelOn = await translateText("Accessibility Mode: ON", langCode);
-    const labelOff = await translateText("Accessibility Mode: OFF", langCode);
+    const labelOn = await translateText(
+      "Accessibility Mode: ON",
+      langCode
+    );
+    const labelOff = await translateText(
+      "Accessibility Mode: OFF",
+      langCode
+    );
 
     setAccessibilityLabel({
       on: labelOn,
@@ -237,7 +242,9 @@ export default function KioskPage() {
 
     if (narrationOn) {
       speak(
-        `${item.name}. Price ${item.price} dollars. ${item.description || ""}`,
+        `${item.name}. Price ${item.price} dollars. ${
+          item.description || ""
+        }`,
         language
       );
     }
@@ -259,7 +266,6 @@ export default function KioskPage() {
     }
   };
 
-  // === Add to Cart ===
   const addToCart = (item) => {
     setCart((prev) => [...prev, item]);
     if (narrationOn) {
@@ -350,7 +356,6 @@ export default function KioskPage() {
     );
   };
 
-  // === CART SCREEN ===
   const CartScreen = () => (
     <div style={{ padding: "20px" }}>
       <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
@@ -396,7 +401,6 @@ export default function KioskPage() {
     </div>
   );
 
-  // === CHECKOUT SCREEN ===
   const CheckoutScreen = () => {
     const total = cart.reduce(
       (sum, item) => sum + Number(item.price),
@@ -448,27 +452,20 @@ export default function KioskPage() {
     );
   };
 
-  // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
   const PaymentScreen = () => {
     const [confirmMethod, setConfirmMethod] = useState(null);
-  
-    const paymentMethods = [
-      "Card",
-      "Tap to Pay",
-      "Mobile Wallet",
-      "Cash",
-    ];
-  
-    // NORMAL MODE (simple one-tap buttons)
+
+    const paymentMethods = ["Card", "Tap to Pay", "Mobile Wallet", "Cash"];
+
     if (!accessibilityMode) {
       return (
         <div style={{ padding: "20px" }}>
           <h2 style={{ fontSize: "36px" }}>Payment</h2>
-      
+
           <p style={{ fontSize: "22px" }}>
             Choose a payment method:
           </p>
-      
+
           {paymentMethods.map((method) => (
             <button
               key={method}
@@ -488,7 +485,7 @@ export default function KioskPage() {
               {method}
             </button>
           ))}
-  
+
           <button
             onClick={() => setScreen("checkout")}
             style={{
@@ -505,8 +502,7 @@ export default function KioskPage() {
         </div>
       );
     }
-  
-    // ACCESSIBILITY MODE (double-tap confirm, larger buttons)
+
     return (
       <div
         style={{
@@ -518,7 +514,7 @@ export default function KioskPage() {
         }}
       >
         <h2 style={{ fontSize: "44px" }}>Payment</h2>
-      
+
         <p
           style={{
             fontSize: "28px",
@@ -527,20 +523,18 @@ export default function KioskPage() {
         >
           Choose a method:
         </p>
-        
+
         {paymentMethods.map((method) => (
           <button
             key={method}
             onClick={() => {
               if (narrationOn) speak(method, language);
-            
-              // First tap highlights
+
               if (confirmMethod !== method) {
                 setConfirmMethod(method);
                 return;
               }
-            
-              // Second tap confirms
+
               setScreen("success");
             }}
             style={{
@@ -558,15 +552,20 @@ export default function KioskPage() {
             }}
           >
             {method}
-          
             {confirmMethod === method && (
-              <div style={{ fontSize: "16px", marginTop: "6px", opacity: 0.8 }}>
+              <div
+                style={{
+                  fontSize: "16px",
+                  marginTop: "6px",
+                  opacity: 0.8,
+                }}
+              >
                 Tap again to confirm
               </div>
             )}
           </button>
         ))}
-  
+
         <button
           onClick={() => setScreen("checkout")}
           style={{
@@ -586,8 +585,6 @@ export default function KioskPage() {
     );
   };
 
-
-  // === SUCCESS SCREEN ===
   const SuccessScreen = () => (
     <div style={{ padding: "40px", textAlign: "center" }}>
       <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
@@ -600,14 +597,16 @@ export default function KioskPage() {
           const order = {
             id: Date.now(),
             items: cart,
-            total: cart.reduce((sum, i) => sum + Number(i.price), 0),
+            total: cart.reduce(
+              (sum, i) => sum + Number(i.price),
+              0
+            ),
             time: new Date().toISOString(),
-            status: "pending"
+            status: "pending",
           };
-        
-          // Send order
+
           sendOrderToSystem(order);
-        
+
           setCart([]);
           setScreen("menu");
         }}
@@ -625,7 +624,6 @@ export default function KioskPage() {
     </div>
   );
 
-  // === MAIN RENDER SWITCH ===
   if (screen === "details") return <DrinkDetailsPage />;
   if (screen === "cart") return <CartScreen />;
   if (screen === "checkout") return <CheckoutScreen />;
@@ -646,6 +644,46 @@ export default function KioskPage() {
       }}
     >
       <WeatherWidget accessibilityMode={accessibilityMode} />
+
+      {/* NEW: simple sign-in bar for rewards */}
+      <div
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "140px",
+          backgroundColor: "#ffffff",
+          borderRadius: "12px",
+          padding: "8px 12px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+          fontSize: "14px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        {!session ? (
+          <>
+            <span>Sign in for rewards:</span>
+            <button
+              onClick={() =>
+                signIn("google", { callbackUrl: "/kiosk" })
+              }
+              style={{
+                padding: "6px 10px",
+                borderRadius: "8px",
+                border: "none",
+                backgroundColor: "#500000",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Sign in
+            </button>
+          </>
+        ) : (
+          <span>Signed in as {session.user.email}</span>
+        )}
+      </div>
 
       <button
         onClick={toggleNarration}
@@ -675,7 +713,7 @@ export default function KioskPage() {
         🔊
       </button>
 
-      <div id="google_translate_element" style={{ display: "none" }}></div>
+      <div id="google_translate_element" style={{ display: "none" }} />
 
       <div
         style={{
@@ -747,7 +785,8 @@ export default function KioskPage() {
             style={{
               padding: "12px 20px",
               borderRadius: "8px",
-              backgroundColor: activeCategory === cat ? "#FFD700" : "#500000",
+              backgroundColor:
+                activeCategory === cat ? "#FFD700" : "#500000",
               color: "#fff",
               border: "none",
               cursor: "pointer",
@@ -795,7 +834,13 @@ export default function KioskPage() {
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       {!loading && !error && screen === "menu" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+          }}
+        >
           {categories.map((cat) => {
             const sampleItem = menuItems.find(
               (item) => item.category === cat
@@ -882,7 +927,9 @@ export default function KioskPage() {
                                 : accessibilityMode
                                 ? "#222"
                                 : "#fff",
-                              color: accessibilityMode ? "#fff" : "#000",
+                              color: accessibilityMode
+                                ? "#fff"
+                                : "#000",
                               boxShadow: isPressed
                                 ? "0 0 0 4px #FFD700"
                                 : "0 4px 12px rgba(0,0,0,0.1)",
@@ -899,7 +946,8 @@ export default function KioskPage() {
                               src={item.image}
                               alt={item.name}
                               onError={(e) => {
-                                e.target.src = "/Images/default.png";
+                                e.target.src =
+                                  "/Images/default.png";
                               }}
                               style={{
                                 width: "100%",
@@ -951,7 +999,6 @@ export default function KioskPage() {
         </div>
       )}
 
-      {/* FLOATING CART BUTTON */}
       {screen === "menu" && cart.length > 0 && (
         <button
           onClick={() => setScreen("cart")}

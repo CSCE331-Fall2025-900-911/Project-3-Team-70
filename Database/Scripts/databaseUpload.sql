@@ -249,6 +249,15 @@ SET inventoryID = EXCLUDED.inventoryID,
     menuID = EXCLUDED.menuID,
     menuInfoQuantity = EXCLUDED.menuInfoQuantity;
 
+CREATE TABLE IF NOT EXISTS app_users (
+    userID SERIAL PRIMARY KEY,
+    userEmail VARCHAR UNIQUE NOT NULL,
+    userName VARCHAR,
+    userRole VARCHAR DEFAULT 'customer',
+    userCreationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
 DROP TABLE IF EXISTS staging_menu;
 DROP TABLE IF EXISTS staging_menuInfo;
 DROP TABLE IF EXISTS staging_order;

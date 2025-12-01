@@ -1,16 +1,36 @@
-import { useEffect, useState } from 'react';
+// pages/kitchen.js
+import { useEffect, useState } from "react";
+import { getSession } from "next-auth/react";
+
+// 🔐 Protect kitchen: employee OR manager
+export async function getServerSideProps(ctx) {
+  const session = await getSession(ctx);
+
+  if (
+    !session ||
+    (session.user.role !== "employee" && session.user.role !== "manager")
+  ) {
+    return {
+      redirect: { destination: "/unauthorized", permanent: false },
+    };
+  }
+
+  return { props: {} };
+}
 
 export default function KitchenPage() {
   const [inProgress, setInProgress] = useState([]);
   const [completed, setCompleted] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  // Load both lists
   useEffect(() => {
     async function fetchOrders() {
-      const currentRes = await fetch('/api/kitchen?type=current');
-      const completedRes = await fetch('/api/kitchen?type=completed');
-      const [current, done] = await Promise.all([currentRes.json(), completedRes.json()]);
+      const currentRes = await fetch("/api/kitchen?type=current");
+      const completedRes = await fetch("/api/kitchen?type=completed");
+      const [current, done] = await Promise.all([
+        currentRes.json(),
+        completedRes.json(),
+      ]);
       setInProgress(current);
       setCompleted(done);
     }
@@ -18,21 +38,22 @@ export default function KitchenPage() {
   }, []);
 
   async function completeOrder(id) {
-    await fetch(`/api/kitchen?id=${id}`, { method: 'PATCH' });
+    await fetch(`/api/kitchen?id=${id}`, { method: "PATCH" });
 
     setSelectedOrder(null);
 
-    // Refresh data
-    const currentRes = await fetch('/api/kitchen?type=current');
-    const completedRes = await fetch('/api/kitchen?type=completed');
-    const [current, done] = await Promise.all([currentRes.json(), completedRes.json()]);
+    const currentRes = await fetch("/api/kitchen?type=current");
+    const completedRes = await fetch("/api/kitchen?type=completed");
+    const [current, done] = await Promise.all([
+      currentRes.json(),
+      completedRes.json(),
+    ]);
     setInProgress(current);
     setCompleted(done);
   }
 
   return (
     <div className="kitchen-container" style={styles.page}>
-      
       <div style={styles.column}>
         <h2 style={styles.heading}>In Progress</h2>
         <div style={styles.scroll}>
@@ -43,21 +64,27 @@ export default function KitchenPage() {
               style={{
                 ...styles.row,
                 backgroundColor:
-                  selectedOrder === order.orderid ? '#d1ffd1' : '#ffffff',
-                cursor: 'pointer',
+                  selectedOrder === order.orderid
+                    ? "#d1ffd1"
+                    : "#ffffff",
+                cursor: "pointer",
               }}
             >
-              <p><strong>Order #{order.orderid}</strong></p>
+              <p>
+                <strong>Order #{order.orderid}</strong>
+              </p>
               <p>Total: ${order.ordertotal}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Middle Column - Action Button */}
       <div style={styles.centerColumn}>
         {selectedOrder && (
-          <button style={styles.button} onClick={() => completeOrder(selectedOrder)}>
+          <button
+            style={styles.button}
+            onClick={() => completeOrder(selectedOrder)}
+          >
             Complete Order #{selectedOrder}
           </button>
         )}
@@ -68,7 +95,9 @@ export default function KitchenPage() {
         <div style={styles.scroll}>
           {completed.map((order) => (
             <div key={order.orderid} style={styles.row}>
-              <p><strong>Order #{order.orderid}</strong></p>
+              <p>
+                <strong>Order #{order.orderid}</strong>
+              </p>
               <p>${order.ordertotal}</p>
             </div>
           ))}
@@ -127,4 +156,3 @@ const styles = {
     width: "100%",
   },
 };
-

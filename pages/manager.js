@@ -1,18 +1,50 @@
+// pages/manager.js
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import styles from "./manager.module.css";  // CSS MODULE
+import { getSession } from "next-auth/react";
+import styles from "./manager.module.css";
+
+// 🔐 Protect manager: manager only
+export async function getServerSideProps(ctx) {
+  const session = await getSession(ctx);
+
+  if (!session || session.user.role !== "manager") {
+    return {
+      redirect: { destination: "/unauthorized", permanent: false },
+    };
+  }
+
+  return { props: {} };
+}
 
 export default function ManagerPage() {
   const [activeTab, setActiveTab] = useState("sales");
   const [query, setQuery] = useState("");
 
-  // Dummy Data ======================================================
   const [sales, setSales] = useState([]);
 
   const [menuItems, setMenuItems] = useState([
-    { id: 1, name: "Brown Sugar Milk Tea", category: "Milk Tea", price: 6.0, seasonal: false },
-    { id: 2, name: "Taro Milk Tea", category: "Milk Tea", price: 6.0, seasonal: false },
-    { id: 3, name: "Oolong Tea", category: "Tea", price: 5.0, seasonal: true },
+    {
+      id: 1,
+      name: "Brown Sugar Milk Tea",
+      category: "Milk Tea",
+      price: 6.0,
+      seasonal: false,
+    },
+    {
+      id: 2,
+      name: "Taro Milk Tea",
+      category: "Milk Tea",
+      price: 6.0,
+      seasonal: false,
+    },
+    {
+      id: 3,
+      name: "Oolong Tea",
+      category: "Tea",
+      price: 5.0,
+      seasonal: true,
+    },
   ]);
 
   const [inventory, setInventory] = useState([
@@ -21,32 +53,35 @@ export default function ManagerPage() {
     { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
   ]);
 
-  // NEW — Report State =======================================
   const [xReportRows, setXReportRows] = useState([]);
   const [zReportRows, setZReportRows] = useState([]);
 
-  // NEW — X REPORT ============================================
   function generateXReport() {
     const orders = JSON.parse(localStorage.getItem("orders") || "[]");
     const today = new Date().toISOString().slice(0, 10);
 
-    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+    const todaysOrders = orders.filter((o) =>
+      o.time.startsWith(today)
+    );
 
     const rows = [];
 
-    todaysOrders.forEach(order => {
+    todaysOrders.forEach((order) => {
       const dateTime = new Date(order.time);
-      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      })}`;
+      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString(
+        [],
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      )}`;
 
-      order.items.forEach(item => {
+      order.items.forEach((item) => {
         rows.push({
           time: formatted,
           item: item.name,
           price: Number(item.price),
-          totalRow: false
+          totalRow: false,
         });
       });
 
@@ -54,55 +89,53 @@ export default function ManagerPage() {
         time: "",
         item: "Order Total",
         price: order.total,
-        totalRow: true
+        totalRow: true,
       });
     });
 
-    setZReportRows([]);      // allow clean switching
-    setXReportRows(rows);    // update table
+    setZReportRows([]);
+    setXReportRows(rows);
   }
 
-  // === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
   useEffect(() => {
     const orders = JSON.parse(localStorage.getItem("orders") || "[]");
 
-    // Convert kiosk order objects → rows for Sales table
-    const transformed = orders.flatMap(order =>
-      order.items.map(item => ({
+    const transformed = orders.flatMap((order) =>
+      order.items.map((item) => ({
         id: `${order.id}-${item.name}`,
         date: order.time.slice(0, 10),
         item: item.name,
         qty: 1,
-        total: Number(item.price)
+        total: Number(item.price),
       }))
     );
 
     setSales(transformed);
   }, []);
 
-  // NEW — Z REPORT (End of Day Reset) =========================
   function generateZReport() {
     const orders = JSON.parse(localStorage.getItem("orders") || "[]");
     const today = new Date().toISOString().slice(0, 10);
 
-    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+    const todaysOrders = orders.filter((o) =>
+      o.time.startsWith(today)
+    );
 
-    // Calculate grand total for the day
-    const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
+    const grandTotal = todaysOrders.reduce(
+      (acc, order) => acc + order.total,
+      0
+    );
 
     setXReportRows([]);
 
-    // Store one row containing only the total
     setZReportRows([
       {
         label: "Total Revenue",
-        total: grandTotal
-      }
+        total: grandTotal,
+      },
     ]);
-  } 
+  }
 
-
-  // Filtering =========================================================
   const filteredMenu = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return menuItems;
@@ -123,14 +156,22 @@ export default function ManagerPage() {
     );
   }, [query, inventory]);
 
-  // Event Handlers ===================================================
-  function handleAddMenuItem() { console.log("Add menu item"); }
-  function handleUpdateMenuItem() { console.log("Update menu item"); }
-  function handleAddInventory() { console.log("Add inventory"); }
-  function handleUpdateInventory() { console.log("Update inventory"); }
-  function handleOrderRestock(item) { console.log("Restock ordered:", item.name); }
+  function handleAddMenuItem() {
+    console.log("Add menu item");
+  }
+  function handleUpdateMenuItem() {
+    console.log("Update menu item");
+  }
+  function handleAddInventory() {
+    console.log("Add inventory");
+  }
+  function handleUpdateInventory() {
+    console.log("Update inventory");
+  }
+  function handleOrderRestock(item) {
+    console.log("Restock ordered:", item.name);
+  }
 
-  // TAB COMPONENTS ===================================================
   const SalesTab = (
     <section className={styles.panel}>
       <div className={styles.panelHeader}>
@@ -147,7 +188,12 @@ export default function ManagerPage() {
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
-            <tr><th>Date</th><th>Item</th><th>Qty</th><th>Total ($)</th></tr>
+            <tr>
+              <th>Date</th>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Total ($)</th>
+            </tr>
           </thead>
           <tbody>
             {sales
@@ -178,8 +224,18 @@ export default function ManagerPage() {
       <div className={styles.panelHeader}>
         <h2>Menu Items</h2>
         <div className={styles.actions}>
-          <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
-          <button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
+          <button
+            className={`${styles.btn} ${styles.primary}`}
+            onClick={handleAddMenuItem}
+          >
+            Add
+          </button>
+          <button
+            className={styles.btn}
+            onClick={handleUpdateMenuItem}
+          >
+            Update
+          </button>
         </div>
       </div>
 
@@ -195,7 +251,10 @@ export default function ManagerPage() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Name</th><th>Category</th><th>Price</th><th>Seasonal</th>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th>Seasonal</th>
             </tr>
           </thead>
           <tbody>
@@ -218,8 +277,18 @@ export default function ManagerPage() {
       <div className={styles.panelHeader}>
         <h2>Inventory</h2>
         <div className={styles.actions}>
-          <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddInventory}>Add</button>
-          <button className={styles.btn} onClick={handleUpdateInventory}>Update</button>
+          <button
+            className={`${styles.btn} ${styles.primary}`}
+            onClick={handleAddInventory}
+          >
+            Add
+          </button>
+          <button
+            className={styles.btn}
+            onClick={handleUpdateInventory}
+          >
+            Update
+          </button>
         </div>
       </div>
 
@@ -234,7 +303,11 @@ export default function ManagerPage() {
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
-            <tr><th>Item</th><th>Qty</th><th>Min</th></tr>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Min</th>
+            </tr>
           </thead>
           <tbody>
             {filteredInventory.map((i) => (
@@ -265,8 +338,10 @@ export default function ManagerPage() {
                 Current: {i.quantity} • Min: {i.restockMin}
               </span>
             </div>
-            <button className={`${styles.btn} ${styles.success}`}
-              onClick={() => handleOrderRestock(i)}>
+            <button
+              className={`${styles.btn} ${styles.success}`}
+              onClick={() => handleOrderRestock(i)}
+            >
               Order
             </button>
           </li>
@@ -275,7 +350,6 @@ export default function ManagerPage() {
     </section>
   );
 
-  // NEW — REPORTS TAB ============================================
   const ReportsTab = (
     <section className={styles.panel}>
       <h2>Reports</h2>
@@ -283,7 +357,11 @@ export default function ManagerPage() {
       <div style={{ marginTop: "20px", marginBottom: "20px" }}>
         <button
           className={styles.btn}
-          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          style={{
+            backgroundColor: "#900",
+            color: "#fff",
+            marginLeft: "10px",
+          }}
           onClick={generateXReport}
         >
           Run X Report
@@ -291,20 +369,21 @@ export default function ManagerPage() {
 
         <button
           className={styles.btn}
-          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          style={{
+            backgroundColor: "#900",
+            color: "#fff",
+            marginLeft: "10px",
+          }}
           onClick={generateZReport}
         >
           Run Z Report
         </button>
       </div>
 
-      {/* X REPORT TABLE */}
       {xReportRows.length > 0 && (
         <div className={styles.tableWrap}>
-          <h3>
-            X-Report — {new Date().toLocaleDateString()}
-          </h3>
-      
+          <h3>X-Report — {new Date().toLocaleDateString()}</h3>
+
           <table className={styles.table}>
             <thead>
               <tr>
@@ -317,7 +396,11 @@ export default function ManagerPage() {
               {xReportRows.map((row, index) => (
                 <tr
                   key={index}
-                  style={row.totalRow ? { fontWeight: "bold", background: "#eee" } : {}}
+                  style={
+                    row.totalRow
+                      ? { fontWeight: "bold", background: "#eee" }
+                      : {}
+                  }
                 >
                   <td>{row.time}</td>
                   <td>{row.item}</td>
@@ -329,13 +412,13 @@ export default function ManagerPage() {
         </div>
       )}
 
-      {/* Z REPORT TABLE */}
       {zReportRows.length > 0 && (
-        <div className={styles.tableWrap} style={{ marginTop: "30px" }}>
-          <h3>
-            Z-Report — {new Date().toLocaleDateString()}
-          </h3>
-      
+        <div
+          className={styles.tableWrap}
+          style={{ marginTop: "30px" }}
+        >
+          <h3>Z-Report — {new Date().toLocaleDateString()}</h3>
+
           <table className={styles.table}>
             <thead>
               <tr>
@@ -344,7 +427,7 @@ export default function ManagerPage() {
               </tr>
             </thead>
             <tbody>
-              <tr style={{ fontWeight: "bold"}}>
+              <tr style={{ fontWeight: "bold" }}>
                 <td>{zReportRows[0].label}</td>
                 <td>{zReportRows[0].total.toFixed(2)}</td>
               </tr>
@@ -355,51 +438,67 @@ export default function ManagerPage() {
     </section>
   );
 
-  // MAIN RENDER ======================================================
   return (
     <div className={styles.wrap}>
       <header className={styles.topbar}>
         <h1 className={styles.title}>Manager Dashboard</h1>
 
+        {/* Manager can navigate between views */}
         <nav className={styles.links}>
-          <Link className={styles.link} href="/cashier">Cashier</Link>
-          <Link className={styles.link} href="/kiosk">Kiosk</Link>
+          <Link className={styles.link} href="/cashier">
+            Cashier
+          </Link>
+          <Link className={styles.link} href="/kitchen">
+            Kitchen
+          </Link>
+          <Link className={styles.link} href="/kiosk">
+            Kiosk
+          </Link>
         </nav>
       </header>
 
       <main className={styles.layout}>
         <aside className={styles.sidebar}>
           <button
-            className={`${styles.tab} ${activeTab === "sales" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "sales" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("sales")}
           >
             Sales
           </button>
 
           <button
-            className={`${styles.tab} ${activeTab === "menu" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "menu" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("menu")}
           >
             Menu Items
           </button>
 
           <button
-            className={`${styles.tab} ${activeTab === "inventory" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "inventory" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("inventory")}
           >
             Inventory
           </button>
 
           <button
-            className={`${styles.tab} ${activeTab === "restock" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "restock" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("restock")}
           >
             Restocks
           </button>
 
-          {/*REPORTS TAB */}
           <button
-            className={`${styles.tab} ${activeTab === "reports" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "reports" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("reports")}
           >
             Reports
