@@ -6,14 +6,32 @@ export default function ManagerPage() {
   const [activeTab, setActiveTab] = useState("sales");
   const [query, setQuery] = useState("");
 
-  // Dummy Data ======================================================
   const [sales, setSales] = useState([]);
 
-  const [menuItems, setMenuItems] = useState([
-    { id: 1, name: "Brown Sugar Milk Tea", category: "Milk Tea", price: 6.0, seasonal: false },
-    { id: 2, name: "Taro Milk Tea", category: "Milk Tea", price: 6.0, seasonal: false },
-    { id: 3, name: "Oolong Tea", category: "Tea", price: 5.0, seasonal: true },
-  ]);
+  const [menuItems, setMenuItems] = useState([]);
+
+  useEffect(() => {
+  async function fetchMenuItems() {
+    try {
+      const response = await fetch("/api/menu");
+      const data = await response.json();
+
+      setMenuItems(
+        data.map(item => ({
+          id: item.menuid,
+          name: item.menuname,
+          category: item.category,
+          price: Number(item.price),
+          seasonal: item.seasonalstart !== null
+        }))
+      );
+    } catch (err) {
+      console.error("Failed to load menu:", err);
+    }
+  }
+
+  fetchMenuItems();
+}, []);
 
   const [inventory, setInventory] = useState([
     { id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },

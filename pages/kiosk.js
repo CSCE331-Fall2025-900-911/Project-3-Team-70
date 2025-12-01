@@ -175,6 +175,7 @@ export default function KioskPage() {
         const response = await fetch("/api/menu");
         const data = await response.json();
 
+
         const formatted = data.map((item) => {
           const id = item.menuid ?? item.id;
           return {
