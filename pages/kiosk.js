@@ -283,9 +283,15 @@ export default function KioskPage() {
     { id: 10, name: "Black Tea", price: 1, allergy: "None" },
     { id: 11, name: "Green Tea", price: 1, allergy: "None" },
     { id: 12, name: "Oolong Tea", price: 1, allergy: "None" },
+    { id: 13, name: "Thai Tea", price: 1, allergy: "Dairy" },
     { id: 14, name: "Honey", price: 1, allergy: "None" },
     { id: 15, name: "Honey Jelly", price: 1, allergy: "None" },
     { id: 16, name: "Lychee Jelly", price: 1, allergy: "None" },
+    { id: 17, name: "Stevia", price: 1, allergy: "None" },
+    { id: 18, name: "Taro Powder", price: 1, allergy: "Dairy" },
+    { id: 19, name: "Matcha Powder", price: 1, allergy: "None" },
+    { id: 20, name: "Chocolate Syrup", price: 1, allergy: "Nuts" },
+    { id: 21, name: "Coffee Syrup", price: 1, allergy: "Nuts" },
     { id: 22, name: "Coffee Jelly", price: 1, allergy: "None" },
     { id: 23, name: "Tapioca Pearls", price: 1, allergy: "None" },
     { id: 24, name: "Crystal Boba", price: 1, allergy: "None" },
@@ -389,35 +395,62 @@ export default function KioskPage() {
         >
           {inventoryData.map((topping) => {
             const checked = selectedToppings.some((t) => t.id === topping.id);
+            const hasAllergen =
+              topping.allergy && topping.allergy !== "None";
+
             return (
               <div
                 key={topping.id}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  margin: "8px 0",
+                  margin: "10px 0",
+                  padding: "10px",
+                  borderRadius: "10px",
+                  backgroundColor: accessibilityMode ? "#111" : "#f9f9f9",
+                  border: checked ? "2px solid #FFD700" : "1px solid #ccc",
                 }}
               >
-                <label
+                <div
                   style={{
                     display: "flex",
+                    justifyContent: "space-between",
                     alignItems: "center",
-                    gap: "10px",
-                    fontSize: "20px",
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleTopping(topping)}
-                    style={{ width: "25px", height: "25px" }}
-                  />
-                  {topping.name}
-                </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      fontSize: accessibilityMode ? "26px" : "20px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleTopping(topping)}
+                      style={{ width: "25px", height: "25px" }}
+                    />
+                    {topping.name}
+                  </label>
 
-                <span style={{ fontSize: "18px" }}>
-                  + ${Number(topping.price).toFixed(2)}
-                </span>
+                  <span style={{ fontSize: accessibilityMode ? "22px" : "18px" }}>
+                    + ${Number(topping.price).toFixed(2)}
+                  </span>
+                </div>
+
+                {/* Allergy Warning */}
+                {hasAllergen && (
+                  <p
+                    style={{
+                      fontSize: accessibilityMode ? "22px" : "16px",
+                      fontWeight: "bold",
+                      color: "red",
+                      marginTop: "5px",
+                    }}
+                  >
+                    ⚠ Contains {topping.allergy}
+                  </p>
+                )}
               </div>
             );
           })}
@@ -485,7 +518,7 @@ export default function KioskPage() {
   };
 
   // === CART SCREEN ===
-  const CartScreen = () => {
+  const CartScreen = ({ accessibilityMode }) => {
     const removeItem = (indexToRemove) => {
       setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
     };
@@ -625,110 +658,110 @@ export default function KioskPage() {
   };
 
 
-// === CHECKOUT SCREEN ===
-const CheckoutScreen = () => {
-  // Use finalPrice when available, otherwise fallback to base price
-  const total = cart.reduce(
-    (sum, item) => sum + Number(item.finalPrice || item.price),
-    0
-  );
+  // === CHECKOUT SCREEN ===
+  const CheckoutScreen = ({ accessibilityMode }) => {
+    // Use finalPrice when available, otherwise fallback to base price
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.finalPrice || item.price),
+      0
+    );
 
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+    return (
+      <div style={{ padding: "20px" }}>
+        <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
 
-      {cart.map((item, index) => (
-        <div
-          key={index}
-          style={{
-            padding: "15px",
-            margin: "15px 0",
-            border: "1px solid #ccc",
-            borderRadius: "12px",
-            backgroundColor: "#fafafa",
-            fontSize: "20px",
-          }}
-        >
-          {/* NAME + FINAL PRICE */}
-          <p
+        {cart.map((item, index) => (
+          <div
+            key={index}
             style={{
-              fontSize: "24px",
-              fontWeight: "bold",
-              marginBottom: "10px",
+              padding: "15px",
+              margin: "15px 0",
+              border: "1px solid #ccc",
+              borderRadius: "12px",
+              backgroundColor: "#fafafa",
+              fontSize: "20px",
             }}
           >
-            {item.name} — ${ (item.finalPrice || item.price).toFixed(2) }
-          </p>
-
-          {/* SWEETNESS */}
-          {item.sweetness && (
-            <p style={{ margin: "5px 0" }}>
-              <strong>Sweetness:</strong> {item.sweetness}
+            {/* NAME + FINAL PRICE */}
+            <p
+              style={{
+                fontSize: "24px",
+                fontWeight: "bold",
+                marginBottom: "10px",
+              }}
+            >
+              {item.name} — ${ (item.finalPrice || item.price).toFixed(2) }
             </p>
-          )}
 
-          {/* ICE */}
-          {item.iceLevel && (
-            <p style={{ margin: "5px 0" }}>
-              <strong>Ice:</strong> {item.iceLevel}
-            </p>
-          )}
+            {/* SWEETNESS */}
+            {item.sweetness && (
+              <p style={{ margin: "5px 0" }}>
+                <strong>Sweetness:</strong> {item.sweetness}
+              </p>
+            )}
 
-          {/* TOPPINGS */}
-          {item.toppings && item.toppings.length > 0 && (
-            <div style={{ marginTop: "10px" }}>
-              <strong>Toppings:</strong>
-              <ul style={{ marginLeft: "20px", marginTop: "5px" }}>
-                {item.toppings.map((t, idx) => (
-                  <li key={idx}>
-                    {t.name} (+${t.price.toFixed(2)})
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      ))}
+            {/* ICE */}
+            {item.iceLevel && (
+              <p style={{ margin: "5px 0" }}>
+                <strong>Ice:</strong> {item.iceLevel}
+              </p>
+            )}
 
-      {/* TOTAL */}
-      <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
-        Total: ${total.toFixed(2)}
-      </h3>
+            {/* TOPPINGS */}
+            {item.toppings && item.toppings.length > 0 && (
+              <div style={{ marginTop: "10px" }}>
+                <strong>Toppings:</strong>
+                <ul style={{ marginLeft: "20px", marginTop: "5px" }}>
+                  {item.toppings.map((t, idx) => (
+                    <li key={idx}>
+                      {t.name} (+${t.price.toFixed(2)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ))}
 
-      <button
-        onClick={() => setScreen("payment")}
-        style={{
-          padding: "20px 40px",
-          backgroundColor: "#FFD700",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "24px",
-          marginTop: "20px",
-        }}
-      >
-        Continue to Payment
-      </button>
+        {/* TOTAL */}
+        <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
+          Total: ${total.toFixed(2)}
+        </h3>
 
-      <button
-        onClick={() => setScreen("cart")}
-        style={{
-          padding: "15px 30px",
-          backgroundColor: "#ccc",
-          borderRadius: "10px",
-          border: "none",
-          fontSize: "20px",
-          marginLeft: "20px",
-        }}
-      >
-        Back
-      </button>
-    </div>
-  );
-};
+        <button
+          onClick={() => setScreen("payment")}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "24px",
+            marginTop: "20px",
+          }}
+        >
+          Continue to Payment
+        </button>
+
+        <button
+          onClick={() => setScreen("cart")}
+          style={{
+            padding: "15px 30px",
+            backgroundColor: "#ccc",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: "20px",
+            marginLeft: "20px",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
 
 
   // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
-  const PaymentScreen = () => {
+  const PaymentScreen = ({ accessibilityMode }) => {
     const [confirmMethod, setConfirmMethod] = useState(null);
   
     const paymentMethods = [
@@ -905,11 +938,20 @@ const CheckoutScreen = () => {
   );
 
   // === MAIN RENDER SWITCH ===
-  if (screen === "details") return <DrinkDetailsPage />;
-  if (screen === "cart") return <CartScreen />;
-  if (screen === "checkout") return <CheckoutScreen />;
-  if (screen === "payment") return <PaymentScreen />;
-  if (screen === "success") return <SuccessScreen />;
+  if (screen === "details") 
+    return <DrinkDetailsPage accessibilityMode={accessibilityMode} />;
+
+  if (screen === "cart") 
+    return <CartScreen accessibilityMode={accessibilityMode} />;
+
+  if (screen === "checkout") 
+    return <CheckoutScreen accessibilityMode={accessibilityMode} />;
+
+  if (screen === "payment") 
+    return <PaymentScreen accessibilityMode={accessibilityMode} />;
+
+  if (screen === "success") 
+    return <SuccessScreen accessibilityMode={accessibilityMode} />;
 
   return (
     <div
