@@ -21,7 +21,7 @@ async function handleCreateOrder(req, res) {
   const session = await getServerSession(req, res, authOptions);
 
   const {
-    source = "kiosk",
+    orderSource = "kiosk",
     items = [],
     orderLocation = "Main Store",
     employeeID = null,
@@ -61,7 +61,7 @@ async function handleCreateOrder(req, res) {
         orderLocation,
         orderTotal,
         customerEmail,
-        source,
+        orderSource,
       ]
     );
 

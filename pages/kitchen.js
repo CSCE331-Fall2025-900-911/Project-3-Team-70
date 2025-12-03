@@ -9,7 +9,8 @@ export async function getServerSideProps(ctx) {
 
   if (
     !session ||
-    (session.user.role !== "employee" && session.user.role !== "manager")
+    (session.user.role !== "employee" &&
+      session.user.role !== "manager")
   ) {
     return {
       redirect: { destination: "/unauthorized", permanent: false },
@@ -104,7 +105,8 @@ export default function KitchenPage() {
                 </div>
                 <div className="order-body">
                   <p>
-                    <strong>Total:</strong> ${Number(o.ordertotal).toFixed(2)}
+                    <strong>Total:</strong>{" "}
+                    ${Number(o.ordertotal).toFixed(2)}
                   </p>
                   <p>
                     <strong>Placed:</strong>{" "}

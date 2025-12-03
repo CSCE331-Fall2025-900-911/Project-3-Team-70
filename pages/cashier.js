@@ -136,6 +136,7 @@ export default function CashierPage() {
   const total = order
     .reduce((acc, i) => acc + Number(i.price || 0) * i.qty, 0)
     .toFixed(2);
+    
 
   return (
     <div className="cashier-root">
@@ -379,25 +380,28 @@ export default function CashierPage() {
           padding: 8px 12px;
           cursor: pointer;
           font-weight: 600;
-          background: #fff;
+          background: #f3f4f6;  
+          color: #111827;        
         }
         .btn.primary {
-          background: var(--brand);
-          color: white;
+          background: #500000;   
+          color: #ffffff;
           border-color: transparent;
         }
         .btn.success {
-          background: var(--brand-2);
+          background: #16a34a;
           color: white;
           border-color: transparent;
         }
         .btn.danger {
-          background: var(--danger);
+          background: #b91c1c;
           color: white;
           border-color: transparent;
         }
         .btn.ghost {
           background: transparent;
+          color: #374151;
+          border-color: #d1d5db;
         }
         .order-header,
         .order-footer {

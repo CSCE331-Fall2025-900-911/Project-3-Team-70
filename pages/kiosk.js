@@ -2,15 +2,14 @@
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 
-// === SEND ORDERS TO BACKEND ===
-async function sendOrderToSystem(cart) {
-  try {
-    if (!cart || cart.length === 0) return;
 
-    const items = cart.map((item) => ({
-      menuID: item.id,                 // from formatted menu
-      quantity: 1,                     // kiosk items are 1 each
-      priceAtPurchase: Number(item.price || 0),
+// === SEND ORDERS TO BACKEND ===
+async function sendOrderToSystem(order) {
+  try {
+    const items = (order.items || []).map((i) => ({
+      menuID: i.id,
+      quantity: 1, // kiosk items are one each
+      priceAtPurchase: Number(i.price || 0),
       size: null,
     }));
 
@@ -27,13 +26,18 @@ async function sendOrderToSystem(cart) {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       console.error("Order submission failed:", data.error);
-      alert("Sorry, we couldn't send your order. Please try again.");
+      alert("Sorry, we couldn't process your order. Please try again.");
+      return false;
     }
+
+    return true;
   } catch (err) {
     console.error("Error sending order:", err);
-    alert("An error occurred sending your order.");
+    alert("Sorry, we couldn't process your order. Please try again.");
+    return false;
   }
 }
+
 
 
 // === Narration helper with language support ===
@@ -178,6 +182,11 @@ export default function KioskPage() {
   const [screen, setScreen] = useState("menu");
   const [detailsItem, setDetailsItem] = useState(null);
   const [cart, setCart] = useState([]);
+  const removeFromCart = (indexToRemove) => {setCart((prev) => prev.filter((_, i) => i !== indexToRemove));};
+  const [toppings, setToppings] = useState([]);
+  const [toppingsError, setToppingsError] = useState(null);
+  const [selectedToppings, setSelectedToppings] = useState([]);
+
 
   const categories = [
     "Ice-Blended",
@@ -193,19 +202,26 @@ export default function KioskPage() {
   });
 
   const { data: session } = useSession();
+  
   const [loyaltyPoints, setLoyaltyPoints] = useState(null);
   const [pointsError, setPointsError] = useState(null);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
   
     // Load rewards points for logged-in customers
   useEffect(() => {
-    if (!session?.user?.email) return;
+    if (!session?.user?.email) {
+      setLoyaltyPoints(null);
+      setPointsToRedeem(0);
+      return;
+    }
 
     async function loadPoints() {
       try {
         const res = await fetch("/api/rewards");
-        if (!res.ok) throw new Error("Failed to fetch rewards");
+        if (!res.ok) throw new Error("Failed");
         const data = await res.json();
         setLoyaltyPoints(data.loyaltyPoints ?? 0);
+        setPointsError(null);
       } catch (err) {
         console.error("Error loading rewards:", err);
         setPointsError("Could not load points");
@@ -214,6 +230,7 @@ export default function KioskPage() {
 
     loadPoints();
   }, [session]);
+
 
   
   useEffect(() => {
@@ -243,6 +260,21 @@ export default function KioskPage() {
       }
     }
     fetchMenu();
+  }, []);
+
+  useEffect(() => {
+    async function fetchToppings() {
+      try {
+        const res = await fetch("/api/toppings");
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        setToppings(data);
+      } catch (err) {
+        console.error("Error loading toppings:", err);
+        setToppingsError("Could not load toppings");
+      }
+    }
+    fetchToppings();
   }, []);
 
   // language widget
@@ -383,12 +415,94 @@ export default function KioskPage() {
         >
           {detailsItem.description}
         </p>
+        {/* Toppings selection */}
+        {toppings.length > 0 && (
+          <div
+            style={{
+              margin: "20px auto",
+              width: "80%",
+              textAlign: "left",
+            }}
+          >
+            <h3 style={{ fontSize: "24px", marginBottom: "10px" }}>
+              Customize your drink
+            </h3>
+            {toppingsError && (
+              <p style={{ color: "red" }}>{toppingsError}</p>
+            )}
+            {toppings.map((top) => {
+              const checked = selectedToppings.some(
+                (t) => t.inventoryID === top.inventoryID
+              );
+              return (
+                <label
+                  key={top.inventoryID}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid #eee",
+                    fontSize: "18px",
+                  }}
+                >
+                  <span>
+                    {top.inventoryName}
+                    {top.allergy && (
+                      <span
+                        style={{
+                          fontSize: "14px",
+                          marginLeft: "6px",
+                          color: "#b91c1c",
+                        }}
+                      >
+                        ({top.allergy})
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ marginLeft: "8px" }}>
+                    +${top.addOnPrice.toFixed(2)}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedToppings((prev) => {
+                        if (checked) {
+                          return prev.filter(
+                            (t) =>
+                              t.inventoryID !== top.inventoryID
+                          );
+                        }
+                        return [...prev, top];
+                      });
+                    }}
+                  />
+                </label>
+              );
+            })}
+          </div>
+        )}
 
         <button
           onClick={() => {
-            addToCart(detailsItem);
+            const basePrice = Number(detailsItem.price || 0);
+            const extrasTotal = selectedToppings.reduce(
+              (sum, t) => sum + Number(t.addOnPrice || 0),
+              0
+            );
+
+            const itemForCart = {
+              ...detailsItem,
+              toppings: selectedToppings,
+              price: (basePrice + extrasTotal).toFixed(2),
+            };
+
+            addToCart(itemForCart);
+            setSelectedToppings([]); // reset for next drink
             setScreen("menu");
           }}
+
           style={{
             padding: "20px 40px",
             backgroundColor: "#FFD700",
@@ -451,55 +565,164 @@ export default function KioskPage() {
   );
 
   const CheckoutScreen = () => {
-    const total = cart.reduce(
-      (sum, item) => sum + Number(item.price),
-      0
-    );
+  const total = cart.reduce(
+    (sum, item) => sum + Number(item.price),
+    0
+  );
 
-    return (
-      <div style={{ padding: "20px" }}>
-        <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+  // Points/discount (we’ll wire this up in 2.3)
+  const maxRedeemable =
+    typeof loyaltyPoints === "number"
+      ? Math.min(loyaltyPoints, Math.floor(total))
+      : 0;
+  const applied = Math.min(
+    pointsToRedeem || 0,
+    maxRedeemable
+  );
+  const finalTotal = total - applied;
 
-        {cart.map((item, index) => (
-          <p key={index} style={{ fontSize: "22px" }}>
-            {item.name} — ${item.price}
-          </p>
-        ))}
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
 
-        <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
-          Total: ${total.toFixed(2)}
-        </h3>
+      {cart.length === 0 && (
+        <p style={{ fontSize: "20px", marginTop: "10px" }}>
+          Your cart is empty.
+        </p>
+      )}
 
-        <button
-          onClick={() => setScreen("payment")}
+      {cart.map((item, index) => (
+        <div
+          key={index}
           style={{
-            padding: "20px 40px",
-            backgroundColor: "#FFD700",
-            border: "none",
-            borderRadius: "10px",
-            fontSize: "24px",
+            fontSize: "22px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            margin: "8px 0",
+          }}
+        >
+          <div>
+            <div>
+              {item.name} — ${Number(item.price).toFixed(2)}
+            </div>
+            {item.toppings && item.toppings.length > 0 && (
+              <div
+                style={{
+                  fontSize: "16px",
+                  opacity: 0.8,
+                  marginTop: "4px",
+                }}
+              >
+                Toppings:{" "}
+                {item.toppings
+                  .map((t) => t.inventoryName)
+                  .join(", ")}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => removeFromCart(index)}
+            style={{
+              padding: "8px 14px",
+              backgroundColor: "#b91c1c",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "16px",
+              cursor: "pointer",
+            }}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+
+      {/* Points / discount section */}
+      {cart.length > 0 && typeof loyaltyPoints === "number" && (
+        <div
+          style={{
             marginTop: "20px",
-          }}
-        >
-          Continue to Payment
-        </button>
-
-        <button
-          onClick={() => setScreen("cart")}
-          style={{
-            padding: "15px 30px",
-            backgroundColor: "#ccc",
+            padding: "12px",
             borderRadius: "10px",
-            border: "none",
-            fontSize: "20px",
-            marginLeft: "20px",
+            backgroundColor: "#f3f4f6",
           }}
         >
-          Back
-        </button>
-      </div>
-    );
-  };
+          <p style={{ fontSize: "18px", marginBottom: "6px" }}>
+            Available points: {loyaltyPoints}
+          </p>
+          <label style={{ fontSize: "16px" }}>
+            Apply points (max {maxRedeemable}):
+            <input
+              type="number"
+              min="0"
+              max={maxRedeemable}
+              value={pointsToRedeem}
+              onChange={(e) =>
+                setPointsToRedeem(
+                  Math.max(
+                    0,
+                    Math.min(
+                      maxRedeemable,
+                      Number(e.target.value) || 0
+                    )
+                  )
+                )
+              }
+              style={{
+                marginLeft: "10px",
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                width: "80px",
+              }}
+            />
+          </label>
+          <p style={{ fontSize: "16px", marginTop: "6px" }}>
+            Discount: ${applied.toFixed(2)}
+          </p>
+        </div>
+      )}
+
+      <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
+        Total: $
+        {(
+          cart.length > 0 ? finalTotal : 0
+        ).toFixed(2)}
+      </h3>
+
+      <button
+        onClick={() => setScreen("payment")}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "24px",
+          marginTop: "20px",
+        }}
+        disabled={cart.length === 0}
+      >
+        Continue to Payment
+      </button>
+
+      <button
+        onClick={() => setScreen("cart")}
+        style={{
+          padding: "15px 30px",
+          backgroundColor: "#ccc",
+          borderRadius: "10px",
+          border: "none",
+          fontSize: "20px",
+          marginLeft: "20px",
+        }}
+      >
+        Back
+      </button>
+    </div>
+  );
+};
+
 
   const PaymentScreen = () => {
     const [confirmMethod, setConfirmMethod] = useState(null);
@@ -689,7 +912,7 @@ export default function KioskPage() {
         style={{
           position: "absolute",
           top: "20px",
-          right: "140px",
+          right: "120px",
           backgroundColor: "#ffffff",
           borderRadius: "12px",
           padding: "8px 12px",
@@ -698,6 +921,7 @@ export default function KioskPage() {
           display: "flex",
           alignItems: "center",
           gap: "8px",
+          zIndex: 12,
         }}
       >
         {!session ? (
@@ -1068,6 +1292,30 @@ export default function KioskPage() {
           🛒 {cart.length}
         </button>
       )}
+      {/* Back to home button, always visible on kiosk */}
+      <button
+        onClick={() => {
+          window.location.href = "/";
+        }}
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          left: "20px",
+          padding: "16px 24px",
+          backgroundColor: "#500000",
+          color: "#fff",
+          borderRadius: "999px",
+          border: "none",
+          fontSize: "20px",
+          fontWeight: "600",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          cursor: "pointer",
+          zIndex: 2000,
+        }}
+      >
+        ← Back
+      </button>
+
     </div>
   );
 }
