@@ -5,8 +5,12 @@ import { useSession, signIn } from "next-auth/react";
 
 // === SEND ORDERS TO BACKEND ===
 async function sendOrderToSystem(order) {
+  const rawItems = Array.isArray(order)
+    ? order
+    : (order && order.items) || [];
+
   try {
-    const items = (order.items || []).map((i) => ({
+    const items = rawItems.map((i) => ({
       menuID: i.id,
       quantity: 1, // kiosk items are one each
       priceAtPurchase: Number(i.price || 0),

@@ -21,121 +21,148 @@ export default function ManagerPage() {
   const [activeTab, setActiveTab] = useState("sales");
   const [query, setQuery] = useState("");
 
+  // Sales rows from DB (kitchen-completed orders)
   const [sales, setSales] = useState([]);
 
-  const [menuItems, setMenuItems] = useState([
-    {
-      id: 1,
-      name: "Brown Sugar Milk Tea",
-      category: "Milk Tea",
-      price: 6.0,
-      seasonal: false,
-    },
-    {
-      id: 2,
-      name: "Taro Milk Tea",
-      category: "Milk Tea",
-      price: 6.0,
-      seasonal: false,
-    },
-    {
-      id: 3,
-      name: "Oolong Tea",
-      category: "Tea",
-      price: 5.0,
-      seasonal: true,
-    },
-  ]);
+  // Live menu & inventory from DB instead of hard-coded placeholders
+  const [menuItems, setMenuItems] = useState([]);
+  const [inventory, setInventory] = useState([]);
 
-  const [inventory, setInventory] = useState([
-    { id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
-    { id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
-    { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
-  ]);
-
+  // X/Z reports derived from `sales`
   const [xReportRows, setXReportRows] = useState([]);
   const [zReportRows, setZReportRows] = useState([]);
 
+  // Load data from APIs on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        // Sales: completed orders joined with orderItem + menu
+        const salesRes = await fetch("/api/manager/sales");
+        if (salesRes.ok) {
+          const salesJson = await salesRes.json();
+          const transformed = salesJson.map((row) => {
+            const dateISO = row.orderdate;
+            const d = new Date(dateISO);
+
+            return {
+              id: `${row.orderid}-${row.item}-${dateISO}`,
+              date: dateISO.slice(0, 10),
+              time: d.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              item: row.item,
+              qty: Number(row.qty || 0),
+              total: Number(row.total || 0),
+            };
+          });
+          setSales(transformed);
+        } else {
+          console.error("Failed to load sales");
+        }
+      } catch (err) {
+        console.error("Error loading sales:", err);
+      }
+
+      try {
+        // Menu items from DB
+        const menuRes = await fetch("/api/menu");
+        if (menuRes.ok) {
+          const menuJson = await menuRes.json();
+          const normalized = menuJson.map((m) => ({
+            id: m.menuid,
+            name: m.menuname,
+            category: m.category,
+            price: Number(m.price || 0),
+            seasonal:
+              !!m.seasonalstart && !!m.seasonalend,
+          }));
+          setMenuItems(normalized);
+        }
+      } catch (err) {
+        console.error("Error loading menu:", err);
+      }
+
+      try {
+        // Inventory from DB
+        const invRes = await fetch("/api/inventory");
+        if (invRes.ok) {
+          const invJson = await invRes.json();
+          const normalized = invJson.map((i) => ({
+            id: i.inventoryid,
+            name: i.inventoryname,
+            quantity: Number(i.quantityavailable || 0),
+            restockMin: Number(i.restockmin || 0),
+          }));
+          setInventory(normalized);
+        }
+      } catch (err) {
+        console.error("Error loading inventory:", err);
+      }
+    }
+
+    loadData();
+  }, []);
+
+  // ---- Reports: derive from `sales` instead of localStorage ----
   function generateXReport() {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
     const today = new Date().toISOString().slice(0, 10);
 
-    const todaysOrders = orders.filter((o) =>
-      o.time.startsWith(today)
+    const todaysSales = sales.filter(
+      (s) => s.date === today
     );
 
     const rows = [];
 
-    todaysOrders.forEach((order) => {
-      const dateTime = new Date(order.time);
-      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString(
-        [],
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      )}`;
-
-      order.items.forEach((item) => {
-        rows.push({
-          time: formatted,
-          item: item.name,
-          price: Number(item.price),
-          totalRow: false,
-        });
+    todaysSales.forEach((s) => {
+      rows.push({
+        time: `${s.date} ${s.time}`,
+        item: s.item,
+        price: s.total, // total for that row
+        totalRow: false,
       });
+    });
 
+    // Optional: add a grand total row at bottom
+    const grandTotal = todaysSales.reduce(
+      (acc, s) => acc + s.total,
+      0
+    );
+    if (todaysSales.length > 0) {
       rows.push({
         time: "",
         item: "Order Total",
-        price: order.total,
+        price: grandTotal,
         totalRow: true,
       });
-    });
+    }
 
     setZReportRows([]);
     setXReportRows(rows);
   }
 
-  useEffect(() => {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-
-    const transformed = orders.flatMap((order) =>
-      order.items.map((item) => ({
-        id: `${order.id}-${item.name}`,
-        date: order.time.slice(0, 10),
-        item: item.name,
-        qty: 1,
-        total: Number(item.price),
-      }))
-    );
-
-    setSales(transformed);
-  }, []);
-
   function generateZReport() {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
     const today = new Date().toISOString().slice(0, 10);
 
-    const todaysOrders = orders.filter((o) =>
-      o.time.startsWith(today)
+    const todaysSales = sales.filter(
+      (s) => s.date === today
     );
 
-    const grandTotal = todaysOrders.reduce(
-      (acc, order) => acc + order.total,
+    const grandTotal = todaysSales.reduce(
+      (acc, s) => acc + s.total,
       0
     );
 
     setXReportRows([]);
-
     setZReportRows([
       {
-        label: "Total Revenue",
+        label: "Total Revenue (Completed Orders)",
         total: grandTotal,
       },
     ]);
   }
 
+  // ---- Filtering helpers ----
   const filteredMenu = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return menuItems;
@@ -156,6 +183,7 @@ export default function ManagerPage() {
     );
   }, [query, inventory]);
 
+  // ---- Placeholder handlers (same as before) ----
   function handleAddMenuItem() {
     console.log("Add menu item");
   }
@@ -171,6 +199,8 @@ export default function ManagerPage() {
   function handleOrderRestock(item) {
     console.log("Restock ordered:", item.name);
   }
+
+  // ---- Tabs (mostly unchanged, just using new state) ----
 
   const SalesTab = (
     <section className={styles.panel}>
@@ -333,7 +363,9 @@ export default function ManagerPage() {
         {inventory.map((i) => (
           <li key={i.id} className={styles.restockItem}>
             <div className={styles.restockMain}>
-              <span className={styles.restockName}>{i.name}</span>
+              <span className={styles.restockName}>
+                {i.name}
+              </span>
               <span className={styles.restockMeta}>
                 Current: {i.quantity} • Min: {i.restockMin}
               </span>
@@ -382,7 +414,9 @@ export default function ManagerPage() {
 
       {xReportRows.length > 0 && (
         <div className={styles.tableWrap}>
-          <h3>X-Report — {new Date().toLocaleDateString()}</h3>
+          <h3>
+            X-Report — {new Date().toLocaleDateString()}
+          </h3>
 
           <table className={styles.table}>
             <thead>
@@ -398,7 +432,10 @@ export default function ManagerPage() {
                   key={index}
                   style={
                     row.totalRow
-                      ? { fontWeight: "bold", background: "#eee" }
+                      ? {
+                          fontWeight: "bold",
+                          background: "#eee",
+                        }
                       : {}
                   }
                 >
@@ -417,7 +454,9 @@ export default function ManagerPage() {
           className={styles.tableWrap}
           style={{ marginTop: "30px" }}
         >
-          <h3>Z-Report — {new Date().toLocaleDateString()}</h3>
+          <h3>
+            Z-Report — {new Date().toLocaleDateString()}
+          </h3>
 
           <table className={styles.table}>
             <thead>
