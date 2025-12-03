@@ -1,130 +1,238 @@
-import { useEffect, useState } from 'react';
+// pages/kitchen.js
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { getSession } from "next-auth/react";
 
-export default function KitchenPage() {
-  const [inProgress, setInProgress] = useState([]);
-  const [completed, setCompleted] = useState([]);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+// 🔐 Protect kitchen: employee OR manager
+export async function getServerSideProps(ctx) {
+  const session = await getSession(ctx);
 
-  // Load both lists
-  useEffect(() => {
-    async function fetchOrders() {
-      const currentRes = await fetch('/api/kitchen?type=current');
-      const completedRes = await fetch('/api/kitchen?type=completed');
-      const [current, done] = await Promise.all([currentRes.json(), completedRes.json()]);
-      setInProgress(current);
-      setCompleted(done);
-    }
-    fetchOrders();
-  }, []);
-
-  async function completeOrder(id) {
-    await fetch(`/api/kitchen?id=${id}`, { method: 'PATCH' });
-
-    setSelectedOrder(null);
-
-    // Refresh data
-    const currentRes = await fetch('/api/kitchen?type=current');
-    const completedRes = await fetch('/api/kitchen?type=completed');
-    const [current, done] = await Promise.all([currentRes.json(), completedRes.json()]);
-    setInProgress(current);
-    setCompleted(done);
+  if (
+    !session ||
+    (session.user.role !== "employee" &&
+      session.user.role !== "manager")
+  ) {
+    return {
+      redirect: { destination: "/unauthorized", permanent: false },
+    };
   }
 
+  return { props: {} };
+}
+
+export default function KitchenPage() {
+  const [tab, setTab] = useState("current");
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadOrders = async (type) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/kitchen?type=${type}`);
+      if (!res.ok) throw new Error("Failed to load orders");
+      const data = await res.json();
+      setOrders(data);
+    } catch (err) {
+      console.error(err);
+      setError("Error loading orders.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders(tab);
+  }, [tab]);
+
+  const markComplete = async (orderId) => {
+    try {
+      const res = await fetch(`/api/kitchen?id=${orderId}`, {
+        method: "PATCH",
+      });
+      if (!res.ok) throw new Error("Failed to update order");
+      await loadOrders("current");
+    } catch (err) {
+      console.error(err);
+      alert("Could not mark order complete.");
+    }
+  };
+
   return (
-    <div className="kitchen-container" style={styles.page}>
-      
-      <div style={styles.column}>
-        <h2 style={styles.heading}>In Progress</h2>
-        <div style={styles.scroll}>
-          {inProgress.map((order) => (
-            <div
-              key={order.orderid}
-              onClick={() => setSelectedOrder(order.orderid)}
-              style={{
-                ...styles.row,
-                backgroundColor:
-                  selectedOrder === order.orderid ? '#d1ffd1' : '#ffffff',
-                cursor: 'pointer',
-              }}
-            >
-              <p><strong>Order #{order.orderid}</strong></p>
-              <p>Total: ${order.ordertotal}</p>
-            </div>
-          ))}
+    <div className="kitchen-root">
+      <header className="kitchen-topbar">
+        <div className="title">Kitchen View</div>
+        <div className="actions">
+          <Link href="/">
+            <button className="btn ghost">Home</button>
+          </Link>
         </div>
-      </div>
+      </header>
 
-      {/* Middle Column - Action Button */}
-      <div style={styles.centerColumn}>
-        {selectedOrder && (
-          <button style={styles.button} onClick={() => completeOrder(selectedOrder)}>
-            Complete Order #{selectedOrder}
+      <main className="kitchen-main">
+        <div className="tabs">
+          <button
+            className={`tab ${tab === "current" ? "active" : ""}`}
+            onClick={() => setTab("current")}
+          >
+            Open Orders
           </button>
-        )}
-      </div>
-
-      <div style={styles.column}>
-        <h2 style={styles.heading}>Completed</h2>
-        <div style={styles.scroll}>
-          {completed.map((order) => (
-            <div key={order.orderid} style={styles.row}>
-              <p><strong>Order #{order.orderid}</strong></p>
-              <p>${order.ordertotal}</p>
-            </div>
-          ))}
+          <button
+            className={`tab ${tab === "completed" ? "active" : ""}`}
+            onClick={() => setTab("completed")}
+          >
+            Completed Today
+          </button>
         </div>
-      </div>
+
+        {loading && <p>Loading orders…</p>}
+        {error && <p style={{ color: "red" }}>{error}</p>}
+
+        {!loading && !error && (
+          <div className="orders-grid">
+            {orders.length === 0 && (
+              <p>No orders in this view right now.</p>
+            )}
+
+            {orders.map((o) => (
+              <div key={o.orderid} className="order-card">
+                <div className="order-header">
+                  <span className="order-id">Order #{o.orderid}</span>
+                  <span className="source-tag">
+                    {o.ordersource === "cashier" ? "Cashier" : "Kiosk"}
+                  </span>
+                </div>
+                <div className="order-body">
+                  <p>
+                    <strong>Total:</strong>{" "}
+                    ${Number(o.ordertotal).toFixed(2)}
+                  </p>
+                  <p>
+                    <strong>Placed:</strong>{" "}
+                    {new Date(o.orderdate).toLocaleTimeString()}
+                  </p>
+                  {o.customeremail && (
+                    <p>
+                      <strong>Customer:</strong> {o.customeremail}
+                    </p>
+                  )}
+                  {o.employeeid && (
+                    <p>
+                      <strong>Employee ID:</strong> {o.employeeid}
+                    </p>
+                  )}
+                </div>
+                {tab === "current" && (
+                  <button
+                    className="btn complete"
+                    onClick={() => markComplete(o.orderid)}
+                  >
+                    Mark Complete
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      <style jsx>{`
+        .kitchen-root {
+          min-height: 100vh;
+          background: #f7f7fb;
+          color: #1f2937;
+          display: flex;
+          flex-direction: column;
+        }
+        .kitchen-topbar {
+          height: 60px;
+          padding: 0 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: #500000;
+          color: #fff;
+        }
+        .title {
+          font-weight: 700;
+        }
+        .btn {
+          border-radius: 999px;
+          padding: 6px 16px;
+          border: none;
+          cursor: pointer;
+          font-weight: 600;
+        }
+        .btn.ghost {
+          background: transparent;
+          color: #fff;
+          border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+        .btn.complete {
+          background: #16a34a;
+          color: #fff;
+          width: 100%;
+          margin-top: 8px;
+        }
+        .kitchen-main {
+          padding: 16px;
+          flex: 1;
+        }
+        .tabs {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .tab {
+          padding: 8px 16px;
+          border-radius: 999px;
+          border: 1px solid #d1d5db;
+          background: #fff;
+          cursor: pointer;
+          font-size: 14px;
+        }
+        .tab.active {
+          background: #500000;
+          color: #fff;
+          border-color: #500000;
+        }
+        .orders-grid {
+          display: grid;
+          grid-template-columns: repeat(
+            auto-fit,
+            minmax(260px, 1fr)
+          );
+          gap: 12px;
+          margin-top: 8px;
+        }
+        .order-card {
+          background: #ffffff;
+          border-radius: 12px;
+          border: 1px solid #e5e7eb;
+          padding: 12px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+        .order-header {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .order-id {
+          font-weight: 700;
+        }
+        .source-tag {
+          font-size: 12px;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: #fee2e2;
+          color: #991b1b;
+        }
+        .order-body p {
+          margin: 2px 0;
+          font-size: 14px;
+        }
+      `}</style>
     </div>
   );
 }
-
-const styles = {
-  page: {
-    display: "flex",
-    gap: "30px",
-    padding: "20px",
-    height: "100vh",
-    background: "#f7f7f7",
-  },
-  column: {
-    flex: 1,
-    background: "white",
-    padding: "15px",
-    borderRadius: "10px",
-    boxShadow: "0 3px 8px rgba(0,0,0,0.1)",
-    display: "flex",
-    flexDirection: "column",
-  },
-  centerColumn: {
-    width: "200px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heading: {
-    marginBottom: "15px",
-    textAlign: "center",
-  },
-  scroll: {
-    overflowY: "auto",
-    flex: 1,
-  },
-  row: {
-    padding: "12px",
-    marginBottom: "10px",
-    borderRadius: "8px",
-    border: "1px solid #ddd",
-    background: "white",
-  },
-  button: {
-    padding: "15px 20px",
-    borderRadius: "8px",
-    border: "none",
-    background: "#4CAF50",
-    color: "white",
-    cursor: "pointer",
-    fontSize: "16px",
-    width: "100%",
-  },
-};
-
