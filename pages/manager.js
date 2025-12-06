@@ -1,42 +1,90 @@
-// pages/manager.js
-import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
-import { getSession } from "next-auth/react";
-import styles from "./manager.module.css";
-
-// 🔐 Protect manager: manager only
-export async function getServerSideProps(ctx) {
-  const session = await getSession(ctx);
-
-  if (!session || session.user.role !== "manager") {
-    return {
-      redirect: { destination: "/unauthorized", permanent: false },
-    };
-  }
-
-  return { props: {} };
-}
-
 export default function ManagerPage() {
   const [activeTab, setActiveTab] = useState("sales");
   const [query, setQuery] = useState("");
 
-  // Sales rows from DB (kitchen-completed orders)
   const [sales, setSales] = useState([]);
 
-  // Live menu & inventory from DB instead of hard-coded placeholders
   const [menuItems, setMenuItems] = useState([]);
-  const [inventory, setInventory] = useState([]);
 
-  // X/Z reports derived from `sales`
+  useEffect(() => {
+    async function fetchMenuItems() {
+      try {
+        const response = await fetch("/api/menu");
+        const data = await response.json();
+
+        const today = new Date();
+
+        setMenuItems(
+          data.map((item) => {
+            const start = item.seasonalstart ? new Date(item.seasonalstart) : null;
+            const end = item.seasonalend ? new Date(item.seasonalend) : null;
+
+            const ALL_YEAR_START = "2025-01-01T00:00:00";
+            const ALL_YEAR_END = "2025-12-31T23:59:59";
+
+            let seasonalDisplay = "All Year";
+
+            if (item.seasonalstart && item.seasonalend) {
+              const startDateStr = item.seasonalstart.slice(0, 10);
+              const endDateStr = item.seasonalend.slice(0, 10);
+
+              const isAllYear =
+                startDateStr === "2025-01-01" && endDateStr === "2025-12-31";
+
+              if (!isAllYear) {
+                const startStr = new Date(item.seasonalstart).toLocaleDateString(
+                  undefined,
+                  {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }
+                );
+
+                const endStr = new Date(item.seasonalend).toLocaleDateString(
+                  undefined,
+                  {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }
+                );
+
+                seasonalDisplay = `${startStr} → ${endStr}`;
+              }
+            }
+
+            return {
+              id: item.menuid,
+              name: item.menuname,
+              category: item.category,
+              price: Number(item.price),
+              seasonal: seasonalDisplay,
+              seasonalStart: item.seasonalstart,
+              seasonalEnd: item.seasonalend,
+            };
+          })
+        );
+      } catch (err) {
+        console.error("Failed to load menu:", err);
+      }
+    }
+
+    fetchMenuItems();
+  }, []);
+
+  const [inventory, setInventory] = useState([
+    { id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
+    { id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
+    { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
+  ]);
+
   const [xReportRows, setXReportRows] = useState([]);
   const [zReportRows, setZReportRows] = useState([]);
 
-  // Load data from APIs on mount
   useEffect(() => {
     async function loadData() {
       try {
-        // Sales: completed orders joined with orderItem + menu
         const salesRes = await fetch("/api/manager/sales");
         if (salesRes.ok) {
           const salesJson = await salesRes.json();
@@ -65,7 +113,6 @@ export default function ManagerPage() {
       }
 
       try {
-        // Menu items from DB
         const menuRes = await fetch("/api/menu");
         if (menuRes.ok) {
           const menuJson = await menuRes.json();
@@ -74,8 +121,7 @@ export default function ManagerPage() {
             name: m.menuname,
             category: m.category,
             price: Number(m.price || 0),
-            seasonal:
-              !!m.seasonalstart && !!m.seasonalend,
+            seasonal: !!m.seasonalstart && !!m.seasonalend,
           }));
           setMenuItems(normalized);
         }
@@ -84,7 +130,6 @@ export default function ManagerPage() {
       }
 
       try {
-        // Inventory from DB
         const invRes = await fetch("/api/inventory");
         if (invRes.ok) {
           const invJson = await invRes.json();
@@ -104,65 +149,79 @@ export default function ManagerPage() {
     loadData();
   }, []);
 
-  // ---- Reports: derive from `sales` instead of localStorage ----
   function generateXReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
     const today = new Date().toISOString().slice(0, 10);
 
-    const todaysSales = sales.filter(
-      (s) => s.date === today
-    );
+    const todaysOrders = orders.filter((o) => o.time.startsWith(today));
 
     const rows = [];
 
-    todaysSales.forEach((s) => {
-      rows.push({
-        time: `${s.date} ${s.time}`,
-        item: s.item,
-        price: s.total, // total for that row
-        totalRow: false,
+    todaysOrders.forEach((order) => {
+      const dateTime = new Date(order.time);
+      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`;
+
+      order.items.forEach((item) => {
+        rows.push({
+          time: formatted,
+          item: item.name,
+          price: Number(item.price),
+          totalRow: false,
+        });
       });
+
+      const grandTotal = todaysSales.reduce((acc, s) => acc + s.total, 0);
+      if (todaysSales.length > 0) {
+        rows.push({
+          time: "",
+          item: "Order Total",
+          price: grandTotal,
+          totalRow: true,
+        });
+      }
+
+      setZReportRows([]);
+      setXReportRows(rows);
     });
-
-    // Optional: add a grand total row at bottom
-    const grandTotal = todaysSales.reduce(
-      (acc, s) => acc + s.total,
-      0
-    );
-    if (todaysSales.length > 0) {
-      rows.push({
-        time: "",
-        item: "Order Total",
-        price: grandTotal,
-        totalRow: true,
-      });
-    }
-
-    setZReportRows([]);
-    setXReportRows(rows);
   }
 
+  useEffect(() => {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+
+    const transformed = orders.flatMap((order) =>
+      order.items.map((item) => ({
+        id: `${order.id}-${item.name}`,
+        date: order.time.slice(0, 10),
+        item: item.name,
+        qty: 1,
+        total: Number(item.price),
+      }))
+    );
+
+    setSales(transformed);
+  }, []);
+
   function generateZReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
     const today = new Date().toISOString().slice(0, 10);
 
-    const todaysSales = sales.filter(
-      (s) => s.date === today
-    );
+    const todaysOrders = orders.filter((o) => o.time.startsWith(today));
 
-    const grandTotal = todaysSales.reduce(
-      (acc, s) => acc + s.total,
-      0
-    );
+    const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
 
     setXReportRows([]);
+
     setZReportRows([
       {
-        label: "Total Revenue (Completed Orders)",
+        label: "Total Revenue",
         total: grandTotal,
       },
     ]);
   }
 
-  // ---- Filtering helpers ----
   const filteredMenu = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return menuItems;
@@ -183,7 +242,6 @@ export default function ManagerPage() {
     );
   }, [query, inventory]);
 
-  // ---- Placeholder handlers (same as before) ----
   function handleAddMenuItem() {
     console.log("Add menu item");
   }
@@ -200,52 +258,142 @@ export default function ManagerPage() {
     console.log("Restock ordered:", item.name);
   }
 
-  // ---- Tabs (mostly unchanged, just using new state) ----
+  const [salesSummary, setSalesSummary] = useState(null);
+  const [salesHourly, setSalesHourly] = useState([]);
+  const [salesOrders, setSalesOrders] = useState([]);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesError, setSalesError] = useState(null);
+
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  async function fetchSales() {
+    try {
+      setSalesLoading(true);
+      setSalesError(null);
+
+      let url = "/api/sales";
+
+      if (startDate && endDate) {
+        url += `?start=${startDate} 00:00:00&end=${endDate} 23:59:59`;
+      }
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const data = await res.json();
+      setSalesSummary(data.summary || null);
+      setSalesHourly(data.hourly || []);
+      setSalesOrders(data.orders || []);
+    } catch (err) {
+      console.error("Failed to fetch sales:", err);
+      setSalesError("Failed to load sales data.");
+    } finally {
+      setSalesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchSales();
+  }, []);
 
   const SalesTab = (
     <section className={styles.panel}>
-      <div className={styles.panelHeader}>
-        <h2>Sales</h2>
-        <input
-          type="search"
-          placeholder="Search (item/date)…"
-          className={styles.search}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+      <h2>Sales</h2>
+
+      <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+        <div>
+          <label>Start Date</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label>End Date</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+
+        <button onClick={fetchSales}>Generate</button>
       </div>
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Item</th>
-              <th>Qty</th>
-              <th>Total ($)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sales
-              .filter((s) => {
-                const q = query.trim().toLowerCase();
-                if (!q) return true;
-                return (
-                  s.item.toLowerCase().includes(q) ||
-                  s.date.includes(q)
-                );
-              })
-              .map((s) => (
-                <tr key={s.id}>
-                  <td>{s.date}</td>
-                  <td>{s.item}</td>
-                  <td>{s.qty}</td>
-                  <td>{s.total.toFixed(2)}</td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+      {salesLoading && <p>Loading sales...</p>}
+      {salesError && <p style={{ color: "red" }}>{salesError}</p>}
+
+      {salesSummary && !salesLoading && (
+        <div className={styles.summaryBox}>
+          <p>
+            <strong>Total Sales:</strong> $
+            {Number(salesSummary.totalsales).toFixed(2)}
+          </p>
+          <p>
+            <strong>Total Orders:</strong> {salesSummary.totalorders}
+          </p>
+          <p>
+            <strong>First Order:</strong>{" "}
+            {salesSummary.firstorder
+              ? new Date(salesSummary.firstorder).toLocaleString()
+              : "—"}
+          </p>
+          <p>
+            <strong>Last Order:</strong>{" "}
+            {salesSummary.lastorder
+              ? new Date(salesSummary.lastorder).toLocaleString()
+              : "—"}
+          </p>
+        </div>
+      )}
+
+      {salesOrders.length > 0 && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Employee ID</th>
+                <th>Location</th>
+                <th>Date</th>
+                <th>Total ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {salesOrders
+                .filter((row) => {
+                  const q = query.trim().toLowerCase();
+                  if (!q) return true;
+
+                  return (
+                    String(row.orderid).includes(q) ||
+                    String(row.employeeid).includes(q) ||
+                    (row.orderlocation || "")
+                      .toLowerCase()
+                      .includes(q) ||
+                    (row.orderdate || "").toString().includes(q)
+                  );
+                })
+                .map((row) => (
+                  <tr key={row.orderid}>
+                    <td>{row.orderid}</td>
+                    <td>{row.employeeid}</td>
+                    <td>{row.orderlocation}</td>
+                    <td>
+                      {row.orderdate
+                        ? new Date(row.orderdate).toLocaleString()
+                        : ""}
+                    </td>
+                    <td>{Number(row.ordertotal).toFixed(2)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 
@@ -260,10 +408,7 @@ export default function ManagerPage() {
           >
             Add
           </button>
-          <button
-            className={styles.btn}
-            onClick={handleUpdateMenuItem}
-          >
+          <button className={styles.btn} onClick={handleUpdateMenuItem}>
             Update
           </button>
         </div>
@@ -293,7 +438,7 @@ export default function ManagerPage() {
                 <td>{m.name}</td>
                 <td>{m.category}</td>
                 <td>{m.price.toFixed(2)}</td>
-                <td>{m.seasonal ? "Yes" : "No"}</td>
+                <td>{m.seasonal}</td>
               </tr>
             ))}
           </tbody>
@@ -313,10 +458,7 @@ export default function ManagerPage() {
           >
             Add
           </button>
-          <button
-            className={styles.btn}
-            onClick={handleUpdateInventory}
-          >
+          <button className={styles.btn} onClick={handleUpdateInventory}>
             Update
           </button>
         </div>
@@ -363,9 +505,7 @@ export default function ManagerPage() {
         {inventory.map((i) => (
           <li key={i.id} className={styles.restockItem}>
             <div className={styles.restockMain}>
-              <span className={styles.restockName}>
-                {i.name}
-              </span>
+              <span className={styles.restockName}>{i.name}</span>
               <span className={styles.restockMeta}>
                 Current: {i.quantity} • Min: {i.restockMin}
               </span>
@@ -414,49 +554,28 @@ export default function ManagerPage() {
 
       {xReportRows.length > 0 && (
         <div className={styles.tableWrap}>
-          <h3>
-            X-Report — {new Date().toLocaleDateString()}
-          </h3>
+          <h3>Z-Report — {new Date().toLocaleDateString()}</h3>
 
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Item</th>
-                <th>Price ($)</th>
+                <th>Description</th>
+                <th>Total ($)</th>
               </tr>
             </thead>
             <tbody>
-              {xReportRows.map((row, index) => (
-                <tr
-                  key={index}
-                  style={
-                    row.totalRow
-                      ? {
-                          fontWeight: "bold",
-                          background: "#eee",
-                        }
-                      : {}
-                  }
-                >
-                  <td>{row.time}</td>
-                  <td>{row.item}</td>
-                  <td>{row.price.toFixed(2)}</td>
-                </tr>
-              ))}
+              <tr style={{ fontWeight: "bold" }}>
+                <td>{zReportRows[0].label}</td>
+                <td>{zReportRows[0].total.toFixed(2)}</td>
+              </tr>
             </tbody>
           </table>
         </div>
       )}
 
       {zReportRows.length > 0 && (
-        <div
-          className={styles.tableWrap}
-          style={{ marginTop: "30px" }}
-        >
-          <h3>
-            Z-Report — {new Date().toLocaleDateString()}
-          </h3>
+        <div className={styles.tableWrap} style={{ marginTop: "30px" }}>
+          <h3>Z-Report — {new Date().toLocaleDateString()}</h3>
 
           <table className={styles.table}>
             <thead>
@@ -482,7 +601,6 @@ export default function ManagerPage() {
       <header className={styles.topbar}>
         <h1 className={styles.title}>Manager Dashboard</h1>
 
-        {/* Manager can navigate between views */}
         <nav className={styles.links}>
           <Link className={styles.link} href="/cashier">
             Cashier
