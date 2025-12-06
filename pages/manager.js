@@ -153,6 +153,31 @@ export default function ManagerPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch("/api/manager/sales")
+        .then(res => res.json())
+        .then(salesJson => {
+          const transformed = salesJson.map((row) => {
+            const dateISO = row.orderdate;
+            const d = new Date(dateISO);
+            return {
+              id: `${row.orderid}-${row.item}-${dateISO}`,
+              date: dateISO.slice(0, 10),
+              time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              item: row.item,
+              qty: Number(row.qty || 0),
+              total: Number(row.total || 0),
+              priceatpurchase: row.qty ? Number(row.total) / Number(row.qty) : 0,
+            };
+          });
+          setSales(transformed);
+        });
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   function generateXReport() {
     if (!sales || sales.length === 0) {
       setXReportRows([]);
@@ -160,14 +185,13 @@ export default function ManagerPage() {
     }
 
     const rows = sales.map((row) => ({
-      time: row.time,   // from transformed sales
+      time: row.time,
       item: row.item,
       qty: row.qty,
-      price: Number(row.total), // your backend already provides item total
-      totalRow: false
+      price: Number(row.total),
+      totalRow: false,
     }));
 
-    // Daily total for ALL items
     const grandTotal = rows.reduce((sum, r) => sum + r.price, 0);
 
     rows.push({
@@ -182,21 +206,6 @@ export default function ManagerPage() {
     setXReportRows(rows);
   }
 
-  useEffect(() => {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-
-    const transformed = orders.flatMap((order) =>
-      order.items.map((item) => ({
-        id: `${order.id}-${item.name}`,
-        date: order.time.slice(0, 10),
-        item: item.name,
-        qty: 1,
-        total: Number(item.price),
-      }))
-    );
-
-    setSales(transformed);
-  }, []);
 
   function generateZReport() {
     if (!sales || sales.length === 0) {
@@ -204,7 +213,6 @@ export default function ManagerPage() {
       return;
     }
 
-    // Total revenue = sum of all item totals shown in Sales tab
     const totalRevenue = sales.reduce(
       (sum, row) => sum + Number(row.total || 0),
       0
