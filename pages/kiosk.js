@@ -2,6 +2,10 @@
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 
+function getTextFromDOM(id) {
+  const el = document.getElementById(id);
+  return el ? el.innerText : "";
+}
 
 // === SEND ORDERS TO BACKEND ===
 async function sendOrderToSystem(order) {
@@ -41,8 +45,6 @@ async function sendOrderToSystem(order) {
     return false;
   }
 }
-
-
 
 // === Narration helper with language support ===
 const narrationVoices = {
@@ -172,8 +174,9 @@ function WeatherWidget({ accessibilityMode }) {
   );
 }
 
-// === Main Page ===
+// === Main Kiosk Page ===
 export default function KioskPage() {
+  // --- STATE ---
   const [accessibilityMode, setAccessibilityMode] = useState(false);
   const [narrationOn, setNarrationOn] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -182,15 +185,15 @@ export default function KioskPage() {
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState("en");
   const [activeCategory, setActiveCategory] = useState(null);
-
   const [screen, setScreen] = useState("menu");
   const [detailsItem, setDetailsItem] = useState(null);
   const [cart, setCart] = useState([]);
-  const removeFromCart = (indexToRemove) => {setCart((prev) => prev.filter((_, i) => i !== indexToRemove));};
   const [toppings, setToppings] = useState([]);
   const [toppingsError, setToppingsError] = useState(null);
   const [selectedToppings, setSelectedToppings] = useState([]);
 
+  const removeFromCart = (indexToRemove) =>
+    setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
 
   const categories = [
     "Ice-Blended",
@@ -206,12 +209,11 @@ export default function KioskPage() {
   });
 
   const { data: session } = useSession();
-  
   const [loyaltyPoints, setLoyaltyPoints] = useState(null);
   const [pointsError, setPointsError] = useState(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
-  
-    // Load rewards points for logged-in customers
+
+  // --- Load rewards points ---
   useEffect(() => {
     if (!session?.user?.email) {
       setLoyaltyPoints(null);
@@ -223,6 +225,7 @@ export default function KioskPage() {
       try {
         const res = await fetch("/api/rewards");
         if (!res.ok) throw new Error("Failed");
+
         const data = await res.json();
         setLoyaltyPoints(data.loyaltyPoints ?? 0);
         setPointsError(null);
@@ -235,8 +238,7 @@ export default function KioskPage() {
     loadPoints();
   }, [session]);
 
-
-  
+  // --- Load menu ---
   useEffect(() => {
     async function fetchMenu() {
       try {
@@ -245,6 +247,7 @@ export default function KioskPage() {
 
         const formatted = data.map((item) => {
           const id = item.menuid ?? item.id;
+
           return {
             id,
             name: item.menuname ?? item.name,
@@ -266,11 +269,13 @@ export default function KioskPage() {
     fetchMenu();
   }, []);
 
+  // --- Load toppings ---
   useEffect(() => {
     async function fetchToppings() {
       try {
         const res = await fetch("/api/toppings");
         if (!res.ok) throw new Error("Failed");
+
         const data = await res.json();
         setToppings(data);
       } catch (err) {
@@ -281,7 +286,7 @@ export default function KioskPage() {
     fetchToppings();
   }, []);
 
-  // language widget
+  // --- Google Translate widget ---
   useEffect(() => {
     const script = document.createElement("script");
     script.src =
@@ -313,25 +318,26 @@ export default function KioskPage() {
       langCode
     );
 
-    setAccessibilityLabel({
-      on: labelOn,
-      off: labelOff,
-    });
+    setAccessibilityLabel({ on: labelOn, off: labelOff });
 
     document.cookie = `googtrans=/en/${langCode};path=/`;
     window.location.reload();
   }
 
+  // --- Item narration ---
   const handlePress = (item) => {
     setSelectedItem(item.id);
 
     if (narrationOn) {
-      speak(
-        `${item.name}. Price ${item.price} dollars. ${
-          item.description || ""
-        }`,
-        language
-      );
+      const name = getTextFromDOM(`name-${item.id}`);
+      const price = getTextFromDOM(`price-${item.id}`);
+      const desc = getTextFromDOM(`desc-${item.id}`);
+
+      const message = `${name}. ${price}.${
+        desc ? " " + desc : ""
+      }`;
+
+      speak(message, language);
     }
 
     setTimeout(() => setSelectedItem(null), 300);
@@ -341,24 +347,23 @@ export default function KioskPage() {
     const newState = !narrationOn;
     setNarrationOn(newState);
 
-    if (newState) {
-      speak(
-        "Narration enabled. Tap a drink to hear its description.",
-        language
-      );
-    } else {
-      speak("Narration disabled.", language);
-    }
+    const msgId = newState
+      ? "narration-enabled"
+      : "narration-disabled";
+    const text = getTextFromDOM(msgId);
+
+    speak(text, language);
   };
 
   const addToCart = (item) => {
     setCart((prev) => [...prev, item]);
+
     if (narrationOn) {
       speak(`${item.name} added to cart.`, language);
     }
   };
 
-  // === DRINK DETAILS PAGE ===
+  // --- DRINK DETAILS PAGE ---
   const DrinkDetailsPage = () => {
     if (!detailsItem) return null;
 
@@ -374,7 +379,14 @@ export default function KioskPage() {
         }}
       >
         <button
-          onClick={() => setScreen("menu")}
+          id="back-btn"
+          onClick={async () => {
+            if (narrationOn) {
+              const msg = getTextFromDOM("going-back");
+              speak(msg, language);
+            }
+            setScreen("menu");
+          }}
           style={{
             position: "absolute",
             top: "20px",
@@ -404,11 +416,9 @@ export default function KioskPage() {
         />
 
         <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
-
         <p style={{ fontSize: "24px", opacity: 0.9 }}>
           ${Number(detailsItem.price).toFixed(2)}
         </p>
-
         <p
           style={{
             fontSize: "20px",
@@ -419,6 +429,7 @@ export default function KioskPage() {
         >
           {detailsItem.description}
         </p>
+
         {/* Toppings selection */}
         {toppings.length > 0 && (
           <div
@@ -431,13 +442,16 @@ export default function KioskPage() {
             <h3 style={{ fontSize: "24px", marginBottom: "10px" }}>
               Customize your drink
             </h3>
+
             {toppingsError && (
               <p style={{ color: "red" }}>{toppingsError}</p>
             )}
+
             {toppings.map((top) => {
               const checked = selectedToppings.some(
                 (t) => t.inventoryID === top.inventoryID
               );
+
               return (
                 <label
                   key={top.inventoryID}
@@ -464,9 +478,11 @@ export default function KioskPage() {
                       </span>
                     )}
                   </span>
+
                   <span style={{ marginLeft: "8px" }}>
                     +${top.addOnPrice.toFixed(2)}
                   </span>
+
                   <input
                     type="checkbox"
                     checked={checked}
@@ -474,8 +490,7 @@ export default function KioskPage() {
                       setSelectedToppings((prev) => {
                         if (checked) {
                           return prev.filter(
-                            (t) =>
-                              t.inventoryID !== top.inventoryID
+                            (t) => t.inventoryID !== top.inventoryID
                           );
                         }
                         return [...prev, top];
@@ -503,10 +518,9 @@ export default function KioskPage() {
             };
 
             addToCart(itemForCart);
-            setSelectedToppings([]); // reset for next drink
+            setSelectedToppings([]); // reset toppings
             setScreen("menu");
           }}
-
           style={{
             padding: "20px 40px",
             backgroundColor: "#FFD700",
@@ -523,6 +537,7 @@ export default function KioskPage() {
     );
   };
 
+  // --- CART SCREEN ---
   const CartScreen = () => (
     <div style={{ padding: "20px" }}>
       <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
@@ -538,7 +553,12 @@ export default function KioskPage() {
       )}
 
       <button
-        onClick={() => setScreen("checkout")}
+        onClick={() => {
+          if (narrationOn) {
+            speak("Proceeding to checkout.", language);
+          }
+          setScreen("checkout");
+        }}
         disabled={cart.length === 0}
         style={{
           padding: "20px 40px",
@@ -568,176 +588,210 @@ export default function KioskPage() {
     </div>
   );
 
+  // --- CHECKOUT SCREEN ---
   const CheckoutScreen = () => {
-  const total = cart.reduce(
-    (sum, item) => sum + Number(item.price),
-    0
-  );
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.price),
+      0
+    );
 
-  // Points/discount (we’ll wire this up in 2.3)
-  const maxRedeemable =
-    typeof loyaltyPoints === "number"
-      ? Math.min(loyaltyPoints, Math.floor(total))
-      : 0;
-  const applied = Math.min(
-    pointsToRedeem || 0,
-    maxRedeemable
-  );
-  const finalTotal = total - applied;
+    const maxRedeemable =
+      typeof loyaltyPoints === "number"
+        ? Math.min(loyaltyPoints, Math.floor(total))
+        : 0;
 
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+    const applied = Math.min(
+      pointsToRedeem || 0,
+      maxRedeemable
+    );
 
-      {cart.length === 0 && (
-        <p style={{ fontSize: "20px", marginTop: "10px" }}>
-          Your cart is empty.
-        </p>
-      )}
+    const finalTotal = total - applied;
 
-      {cart.map((item, index) => (
-        <div
-          key={index}
-          style={{
-            fontSize: "22px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            margin: "8px 0",
-          }}
-        >
-          <div>
-            <div>
-              {item.name} — ${Number(item.price).toFixed(2)}
-            </div>
-            {item.toppings && item.toppings.length > 0 && (
-              <div
-                style={{
-                  fontSize: "16px",
-                  opacity: 0.8,
-                  marginTop: "4px",
-                }}
-              >
-                Toppings:{" "}
-                {item.toppings
-                  .map((t) => t.inventoryName)
-                  .join(", ")}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => removeFromCart(index)}
+    return (
+      <div style={{ padding: "20px" }}>
+        <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+
+        {cart.length === 0 && (
+          <p style={{ fontSize: "20px", marginTop: "10px" }}>
+            Your cart is empty.
+          </p>
+        )}
+
+        {cart.map((item, index) => (
+          <div
+            key={index}
             style={{
-              padding: "8px 14px",
-              backgroundColor: "#b91c1c",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              fontSize: "16px",
-              cursor: "pointer",
+              fontSize: "22px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              margin: "8px 0",
             }}
           >
-            Remove
-          </button>
-        </div>
-      ))}
+            <div>
+              <div>
+                {item.name} — $
+                {Number(item.price).toFixed(2)}
+              </div>
 
-      {/* Points / discount section */}
-      {cart.length > 0 && typeof loyaltyPoints === "number" && (
-        <div
+              {item.toppings && item.toppings.length > 0 && (
+                <div
+                  style={{
+                    fontSize: "16px",
+                    opacity: 0.8,
+                    marginTop: "4px",
+                  }}
+                >
+                  Toppings:{" "}
+                  {item.toppings
+                    .map((t) => t.inventoryName)
+                    .join(", ")}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => removeFromCart(index)}
+              style={{
+                padding: "8px 14px",
+                backgroundColor: "#b91c1c",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "16px",
+                cursor: "pointer",
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+
+        {/* Points */}
+        {cart.length > 0 &&
+          typeof loyaltyPoints === "number" && (
+            <div
+              style={{
+                marginTop: "20px",
+                padding: "12px",
+                borderRadius: "10px",
+                backgroundColor: "#f3f4f6",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "18px",
+                  marginBottom: "6px",
+                }}
+              >
+                Available points: {loyaltyPoints}
+              </p>
+
+              <label style={{ fontSize: "16px" }}>
+                Apply points (max {maxRedeemable}):
+                <input
+                  type="number"
+                  min="0"
+                  max={maxRedeemable}
+                  value={pointsToRedeem}
+                  onChange={(e) =>
+                    setPointsToRedeem(
+                      Math.max(
+                        0,
+                        Math.min(
+                          maxRedeemable,
+                          Number(e.target.value) || 0
+                        )
+                      )
+                    )
+                  }
+                  style={{
+                    marginLeft: "10px",
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #ccc",
+                    width: "80px",
+                  }}
+                />
+              </label>
+
+              <p
+                style={{
+                  fontSize: "16px",
+                  marginTop: "6px",
+                }}
+              >
+                Discount: ${applied.toFixed(2)}
+              </p>
+            </div>
+          )}
+
+        <h3
           style={{
+            fontSize: "28px",
             marginTop: "20px",
-            padding: "12px",
-            borderRadius: "10px",
-            backgroundColor: "#f3f4f6",
           }}
         >
-          <p style={{ fontSize: "18px", marginBottom: "6px" }}>
-            Available points: {loyaltyPoints}
-          </p>
-          <label style={{ fontSize: "16px" }}>
-            Apply points (max {maxRedeemable}):
-            <input
-              type="number"
-              min="0"
-              max={maxRedeemable}
-              value={pointsToRedeem}
-              onChange={(e) =>
-                setPointsToRedeem(
-                  Math.max(
-                    0,
-                    Math.min(
-                      maxRedeemable,
-                      Number(e.target.value) || 0
-                    )
-                  )
-                )
-              }
-              style={{
-                marginLeft: "10px",
-                padding: "4px 8px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-                width: "80px",
-              }}
-            />
-          </label>
-          <p style={{ fontSize: "16px", marginTop: "6px" }}>
-            Discount: ${applied.toFixed(2)}
-          </p>
-        </div>
-      )}
+          Total: ${finalTotal.toFixed(2)}
+        </h3>
 
-      <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
-        Total: $
-        {(
-          cart.length > 0 ? finalTotal : 0
-        ).toFixed(2)}
-      </h3>
+        <button
+          onClick={() => {
+            if (narrationOn) {
+              speak("Continuing to payment.", language);
+            }
+            setScreen("payment");
+          }}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "24px",
+            marginTop: "20px",
+          }}
+          disabled={cart.length === 0}
+        >
+          Continue to Payment
+        </button>
 
-      <button
-        onClick={() => setScreen("payment")}
-        style={{
-          padding: "20px 40px",
-          backgroundColor: "#FFD700",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "24px",
-          marginTop: "20px",
-        }}
-        disabled={cart.length === 0}
-      >
-        Continue to Payment
-      </button>
+        <button
+          onClick={() => {
+            if (narrationOn) {
+              speak("Going back.", language);
+            }
+            setScreen("cart");
+          }}
+          style={{
+            padding: "15px 30px",
+            backgroundColor: "#ccc",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: "20px",
+            marginLeft: "20px",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
 
-      <button
-        onClick={() => setScreen("cart")}
-        style={{
-          padding: "15px 30px",
-          backgroundColor: "#ccc",
-          borderRadius: "10px",
-          border: "none",
-          fontSize: "20px",
-          marginLeft: "20px",
-        }}
-      >
-        Back
-      </button>
-    </div>
-  );
-};
-
-
+  // --- PAYMENT SCREEN ---
   const PaymentScreen = () => {
     const [confirmMethod, setConfirmMethod] = useState(null);
 
-    const paymentMethods = ["Card", "Tap to Pay", "Mobile Wallet", "Cash"];
+    const paymentMethods = [
+      "Card",
+      "Tap to Pay",
+      "Mobile Wallet",
+      "Cash",
+    ];
 
     if (!accessibilityMode) {
       return (
         <div style={{ padding: "20px" }}>
           <h2 style={{ fontSize: "36px" }}>Payment</h2>
-
           <p style={{ fontSize: "22px" }}>
             Choose a payment method:
           </p>
@@ -745,7 +799,12 @@ export default function KioskPage() {
           {paymentMethods.map((method) => (
             <button
               key={method}
-              onClick={() => setScreen("success")}
+              onClick={() => {
+                if (narrationOn) {
+                  speak(`${method} selected.`, language);
+                }
+                setScreen("success");
+              }}
               style={{
                 display: "block",
                 width: "80%",
@@ -779,6 +838,7 @@ export default function KioskPage() {
       );
     }
 
+    // ACCESSIBILITY MODE
     return (
       <div
         style={{
@@ -807,8 +867,18 @@ export default function KioskPage() {
               if (narrationOn) speak(method, language);
 
               if (confirmMethod !== method) {
+                if (narrationOn) {
+                  speak(
+                    `${method}. Tap again to confirm.`,
+                    language
+                  );
+                }
                 setConfirmMethod(method);
                 return;
+              }
+
+              if (narrationOn) {
+                speak("Payment confirmed.", language);
               }
 
               setScreen("success");
@@ -819,8 +889,11 @@ export default function KioskPage() {
               margin: "20px auto",
               display: "block",
               backgroundColor:
-                confirmMethod === method ? "#FFD700" : "#500000",
-              color: confirmMethod === method ? "#000" : "#fff",
+                confirmMethod === method
+                  ? "#FFD700"
+                  : "#500000",
+              color:
+                confirmMethod === method ? "#000" : "#fff",
               border: "none",
               borderRadius: "14px",
               fontSize: "32px",
@@ -828,6 +901,7 @@ export default function KioskPage() {
             }}
           >
             {method}
+
             {confirmMethod === method && (
               <div
                 style={{
@@ -861,46 +935,58 @@ export default function KioskPage() {
     );
   };
 
+  // --- SUCCESS SCREEN ---
   const SuccessScreen = () => (
-  <div style={{ padding: "40px", textAlign: "center" }}>
-    <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
-    <p style={{ fontSize: "24px", marginTop: "20px" }}>
-      Thank you for your order.
-    </p>
+    <div style={{ padding: "40px", textAlign: "center" }}>
+      <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
 
-    <button
-      onClick={async () => {
-        await sendOrderToSystem(cart);
-        setCart([]);
-        setScreen("menu");
-      }}
-      style={{
-        padding: "20px 40px",
-        backgroundColor: "#FFD700",
-        border: "none",
-        borderRadius: "10px",
-        fontSize: "24px",
-        marginTop: "30px",
-        cursor: "pointer",
-      }}
-    >
-      Done
-    </button>
-  </div>
-);
+      <p style={{ fontSize: "24px", marginTop: "20px" }}>
+        Thank you for your order.
+      </p>
 
+      <button
+        onClick={async () => {
+          if (narrationOn) {
+            speak(
+              "Order complete. Returning to menu.",
+              language
+            );
+          }
 
+          await sendOrderToSystem(cart);
+          setCart([]);
+          setScreen("menu");
+        }}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "24px",
+          marginTop: "30px",
+          cursor: "pointer",
+        }}
+      >
+        Done
+      </button>
+    </div>
+  );
+
+  // --- MAIN SCREEN SWITCH ---
   if (screen === "details") return <DrinkDetailsPage />;
   if (screen === "cart") return <CartScreen />;
   if (screen === "checkout") return <CheckoutScreen />;
   if (screen === "payment") return <PaymentScreen />;
   if (screen === "success") return <SuccessScreen />;
 
+  // --- MAIN MENU ---
   return (
     <div
       style={{
         textAlign: "center",
-        backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
+        backgroundColor: accessibilityMode
+          ? "#000"
+          : "#f8f0d7ff",
         color: accessibilityMode ? "#fff" : "#000",
         minHeight: "100vh",
         padding: accessibilityMode ? "40px" : "20px",
@@ -909,9 +995,27 @@ export default function KioskPage() {
         transition: "all 0.3s ease",
       }}
     >
-      <WeatherWidget accessibilityMode={accessibilityMode} />
+      {/* Hidden narration strings */}
+      <div id="narration-enabled" style={{ display: "none" }}>
+        Narration enabled. Tap a drink to hear its description.
+      </div>
 
-      {/* NEW: simple sign-in bar for rewards */}
+      <div
+        id="narration-disabled"
+        style={{ display: "none" }}
+      >
+        Narration disabled.
+      </div>
+
+      <div id="going-back" style={{ display: "none" }}>
+        Going back.
+      </div>
+
+      <WeatherWidget
+        accessibilityMode={accessibilityMode}
+      />
+
+      {/* Rewards / Sign In bar */}
       <div
         style={{
           position: "absolute",
@@ -931,9 +1035,12 @@ export default function KioskPage() {
         {!session ? (
           <>
             <span>Sign in for rewards:</span>
+
             <button
               onClick={() =>
-                signIn("google", { callbackUrl: "/kiosk" })
+                signIn("google", {
+                  callbackUrl: "/kiosk",
+                })
               }
               style={{
                 padding: "6px 10px",
@@ -954,12 +1061,19 @@ export default function KioskPage() {
               <> · Points: {loyaltyPoints}</>
             )}
             {pointsError && (
-              <> · <span style={{ color: "red" }}>Points unavailable</span></>
+              <>
+                {" "}
+                ·{" "}
+                <span style={{ color: "red" }}>
+                  Points unavailable
+                </span>
+              </>
             )}
           </span>
         )}
       </div>
 
+      {/* Narration toggle */}
       <button
         onClick={toggleNarration}
         aria-label="Toggle narration mode"
@@ -988,8 +1102,13 @@ export default function KioskPage() {
         🔊
       </button>
 
-      <div id="google_translate_element" style={{ display: "none" }} />
+      {/* Google Translate */}
+      <div
+        id="google_translate_element"
+        style={{ display: "none" }}
+      />
 
+      {/* Language dropdown */}
       <div
         style={{
           position: "absolute",
@@ -1000,7 +1119,9 @@ export default function KioskPage() {
       >
         <select
           defaultValue=""
-          onChange={(e) => handleLanguageChange(e.target.value)}
+          onChange={(e) =>
+            handleLanguageChange(e.target.value)
+          }
           style={{
             padding: "10px",
             fontSize: "16px",
@@ -1045,6 +1166,7 @@ export default function KioskPage() {
         Welcome! Tap a drink to start your order.
       </p>
 
+      {/* Categories buttons */}
       <div
         style={{
           display: "flex",
@@ -1056,12 +1178,24 @@ export default function KioskPage() {
         {categories.map((cat) => (
           <button
             key={cat}
-            onClick={() => setActiveCategory(cat)}
+            id={`${cat}-${cat}`}
+            onClick={async () => {
+              setActiveCategory(cat);
+
+              if (narrationOn) {
+                const spokenCat = getTextFromDOM(
+                  `${cat}-${cat}`
+                );
+                speak(spokenCat, language);
+              }
+            }}
             style={{
               padding: "12px 20px",
               borderRadius: "8px",
               backgroundColor:
-                activeCategory === cat ? "#FFD700" : "#500000",
+                activeCategory === cat
+                  ? "#FFD700"
+                  : "#500000",
               color: "#fff",
               border: "none",
               cursor: "pointer",
@@ -1074,15 +1208,22 @@ export default function KioskPage() {
         ))}
       </div>
 
+      {/* Accessibility toggle */}
       <button
-        onClick={() => setAccessibilityMode(!accessibilityMode)}
+        onClick={() =>
+          setAccessibilityMode(!accessibilityMode)
+        }
         aria-pressed={accessibilityMode}
         aria-label="Toggle Accessibility Mode"
         style={{
-          padding: accessibilityMode ? "18px 30px" : "10px 20px",
+          padding: accessibilityMode
+            ? "18px 30px"
+            : "10px 20px",
           fontSize: accessibilityMode ? "20px" : "18px",
           borderRadius: "10px",
-          backgroundColor: accessibilityMode ? "#FFD700" : "#500000",
+          backgroundColor: accessibilityMode
+            ? "#FFD700"
+            : "#500000",
           color: accessibilityMode ? "#000" : "#fff",
           border: "none",
           cursor: "pointer",
@@ -1092,14 +1233,18 @@ export default function KioskPage() {
       >
         <span
           id="label-off"
-          style={{ display: accessibilityMode ? "none" : "inline" }}
+          style={{
+            display: accessibilityMode ? "none" : "inline",
+          }}
         >
           Accessibility Mode: OFF
         </span>
 
         <span
           id="label-on"
-          style={{ display: accessibilityMode ? "inline" : "none" }}
+          style={{
+            display: accessibilityMode ? "inline" : "none",
+          }}
         >
           Accessibility Mode: ON
         </span>
@@ -1136,11 +1281,15 @@ export default function KioskPage() {
                     padding: "20px",
                     borderRadius: "12px",
                     backgroundColor:
-                      activeCategory === cat ? "#FFD700" : "#500000",
+                      activeCategory === cat
+                        ? "#FFD700"
+                        : "#500000",
                     color: "#fff",
                     border: "none",
                     cursor: "pointer",
-                    fontSize: accessibilityMode ? "28px" : "24px",
+                    fontSize: accessibilityMode
+                      ? "28px"
+                      : "24px",
                     textAlign: "left",
                     transition: "all 0.2s ease",
                   }}
@@ -1161,6 +1310,7 @@ export default function KioskPage() {
                       }}
                     />
                   )}
+
                   <span>{cat}</span>
                 </button>
 
@@ -1171,16 +1321,21 @@ export default function KioskPage() {
                       gridTemplateColumns: accessibilityMode
                         ? "repeat(auto-fit, minmax(300px, 1fr))"
                         : "repeat(auto-fit, minmax(220px, 1fr))",
-                      gap: accessibilityMode ? "40px" : "25px",
+                      gap: accessibilityMode
+                        ? "40px"
+                        : "25px",
                       marginTop: "20px",
                       marginBottom: "30px",
                     }}
                   >
                     {menuItems
-                      .filter((item) => item.category === cat)
+                      .filter(
+                        (item) => item.category === cat
+                      )
                       .map((item) => {
                         const isPressed =
                           selectedItem === item.id;
+
                         return (
                           <div
                             key={item.id}
@@ -1232,7 +1387,9 @@ export default function KioskPage() {
                                 marginBottom: "15px",
                               }}
                             />
+
                             <h3
+                              id={`name-${item.id}`}
                               style={{
                                 fontSize: accessibilityMode
                                   ? "28px"
@@ -1242,17 +1399,22 @@ export default function KioskPage() {
                             >
                               {item.name}
                             </h3>
+
                             <p
+                              id={`price-${item.id}`}
                               style={{
                                 fontSize: accessibilityMode
                                   ? "22px"
                                   : "18px",
                               }}
                             >
-                              ${Number(item.price).toFixed(2)}
+                              $
+                              {Number(item.price).toFixed(2)}
                             </p>
+
                             {item.description && (
                               <p
+                                id={`desc-${item.id}`}
                                 style={{
                                   fontSize: accessibilityMode
                                     ? "18px"
@@ -1296,7 +1458,8 @@ export default function KioskPage() {
           🛒 {cart.length}
         </button>
       )}
-      {/* Back to home button, always visible on kiosk */}
+
+      {/* Back to home button */}
       <button
         onClick={() => {
           window.location.href = "/";
@@ -1319,7 +1482,6 @@ export default function KioskPage() {
       >
         ← Back
       </button>
-
     </div>
   );
 }
