@@ -158,6 +158,7 @@ function WeatherWidget({ accessibilityMode }) {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
       }}
     >
       <div style={{ fontSize: accessibilityMode ? "28px" : "24px" }}>
@@ -371,6 +372,7 @@ export default function KioskPage() {
           color: accessibilityMode ? "#fff" : "#000",
           padding: "20px",
           textAlign: "center",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         <button
@@ -386,6 +388,7 @@ export default function KioskPage() {
             borderRadius: "10px",
             fontSize: "18px",
             cursor: "pointer",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           ← Back
@@ -415,6 +418,7 @@ export default function KioskPage() {
             width: "80%",
             margin: "0 auto",
             marginBottom: "40px",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           {detailsItem.description}
@@ -426,6 +430,7 @@ export default function KioskPage() {
               margin: "20px auto",
               width: "80%",
               textAlign: "left",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             }}
           >
             <h3 style={{ fontSize: "24px", marginBottom: "10px" }}>
@@ -448,6 +453,7 @@ export default function KioskPage() {
                     padding: "8px 0",
                     borderBottom: "1px solid #eee",
                     fontSize: "18px",
+                    fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
                   }}
                 >
                   <span>
@@ -515,6 +521,7 @@ export default function KioskPage() {
             borderRadius: "15px",
             fontSize: "26px",
             cursor: "pointer",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           Add to Cart
@@ -547,6 +554,7 @@ export default function KioskPage() {
           borderRadius: "10px",
           fontSize: "24px",
           marginTop: "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Proceed to Checkout
@@ -561,6 +569,7 @@ export default function KioskPage() {
           borderRadius: "10px",
           fontSize: "20px",
           marginLeft: "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Back
@@ -604,6 +613,7 @@ export default function KioskPage() {
             justifyContent: "space-between",
             alignItems: "center",
             margin: "8px 0",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           <div>
@@ -635,6 +645,7 @@ export default function KioskPage() {
               borderRadius: "8px",
               fontSize: "16px",
               cursor: "pointer",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             }}
           >
             Remove
@@ -704,6 +715,7 @@ export default function KioskPage() {
           borderRadius: "10px",
           fontSize: "24px",
           marginTop: "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
         disabled={cart.length === 0}
       >
@@ -719,6 +731,7 @@ export default function KioskPage() {
           border: "none",
           fontSize: "20px",
           marginLeft: "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Back
@@ -756,6 +769,7 @@ export default function KioskPage() {
                 border: "none",
                 borderRadius: "10px",
                 fontSize: "24px",
+                fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
               }}
             >
               {method}
@@ -771,6 +785,7 @@ export default function KioskPage() {
               border: "none",
               fontSize: "20px",
               marginTop: "20px",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             }}
           >
             Back
@@ -787,6 +802,7 @@ export default function KioskPage() {
           backgroundColor: "#000",
           color: "#fff",
           minHeight: "100vh",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         <h2 style={{ fontSize: "44px" }}>Payment</h2>
@@ -795,6 +811,7 @@ export default function KioskPage() {
           style={{
             fontSize: "28px",
             marginBottom: "30px",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           Choose a method:
@@ -825,6 +842,7 @@ export default function KioskPage() {
               borderRadius: "14px",
               fontSize: "32px",
               cursor: "pointer",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             }}
           >
             {method}
@@ -915,33 +933,47 @@ export default function KioskPage() {
       <div
         style={{
           position: "absolute",
-          top: "20px",
-          right: "120px",
-          backgroundColor: "#ffffff",
+          top: accessibilityMode ? "28px" : "20px",
+          right: accessibilityMode ? "240px" : "200px",
+
+          backgroundColor: accessibilityMode ? "#111" : "#ffffff",
+          color: accessibilityMode ? "#fff" : "#000",
+
           borderRadius: "12px",
-          padding: "8px 12px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-          fontSize: "14px",
+          padding: accessibilityMode ? "12px 16px" : "8px 12px",
+          boxShadow: accessibilityMode
+            ? "none"
+            : "0 2px 8px rgba(0,0,0,0.2)",
+
+          fontSize: accessibilityMode ? "18px" : "14px",
+          fontWeight: accessibilityMode ? "bold" : "normal",
+
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          gap: accessibilityMode ? "12px" : "8px",
+
           zIndex: 12,
+          transition: "all 0.3s ease",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         {!session ? (
           <>
             <span>Sign in for rewards:</span>
+
             <button
               onClick={() =>
                 signIn("google", { callbackUrl: "/kiosk" })
               }
               style={{
-                padding: "6px 10px",
+                padding: accessibilityMode ? "10px 16px" : "6px 10px",
                 borderRadius: "8px",
                 border: "none",
-                backgroundColor: "#500000",
+                backgroundColor: accessibilityMode ? "#b00000" : "#500000",
                 color: "#fff",
                 cursor: "pointer",
+                fontSize: accessibilityMode ? "18px" : "14px",
+                fontWeight: "bold",
               }}
             >
               Sign in
@@ -959,6 +991,7 @@ export default function KioskPage() {
           </span>
         )}
       </div>
+
 
       <button
         onClick={toggleNarration}
@@ -1031,6 +1064,7 @@ export default function KioskPage() {
         style={{
           fontSize: accessibilityMode ? "48px" : "36px",
           marginBottom: accessibilityMode ? "30px" : "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Sharetea Self-Order Kiosk
@@ -1040,6 +1074,7 @@ export default function KioskPage() {
         style={{
           fontSize: accessibilityMode ? "24px" : "18px",
           marginBottom: accessibilityMode ? "30px" : "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Welcome! Tap a drink to start your order.
