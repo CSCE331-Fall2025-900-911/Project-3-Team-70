@@ -365,6 +365,9 @@ export default function KioskPage() {
         <img
           src={detailsItem.image}
           alt={detailsItem.name}
+          onError={(e) => {
+             e.target.src = "/Images/default.png";
+            }}
           style={{
             width: "60%",
             maxWidth: "400px",
@@ -1153,7 +1156,7 @@ export default function KioskPage() {
                       src={sampleItem.image}
                       alt={cat}
                       onError={(e) => {
-                        e.target.src = "/images/default.png";
+                        e.target.src = "/Images/default.png";
                       }}
                       style={{
                         width: "120px",
