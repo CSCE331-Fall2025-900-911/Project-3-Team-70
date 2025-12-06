@@ -45,7 +45,7 @@ export default function ManagerPage() {
 							year: "numeric"
 						});
 
-						seasonalDisplay = `${startStr} → ${endStr}`;
+						seasonalDisplay = `${startStr} - ${endStr}`;
 					}
 				}
 
@@ -129,7 +129,7 @@ export default function ManagerPage() {
 	useEffect(() => {
 		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
 
-		// Convert kiosk order objects → rows for Sales table
+		// Convert kiosk order objects - rows for Sales table
 		const transformed = orders.flatMap(order =>
 			order.items.map(item => ({
 			id: `${order.id}-${item.name}`,
