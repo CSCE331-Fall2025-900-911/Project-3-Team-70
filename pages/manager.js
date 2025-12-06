@@ -20,47 +20,34 @@ export default function ManagerPage() {
 
 		setMenuItems(
 			data.map(item => {
-				const start = item.seasonalstart ? new Date(item.seasonalstart) : null;
-				const end = item.seasonalend ? new Date(item.seasonalend) : null;
 
-				const ALL_YEAR_START = "2025-01-01T00:00:00";
-				const ALL_YEAR_END   = "2025-12-31T23:59:59";
+				const startMD = item.seasonalstart ? getMonthDay(item.seasonalstart) : null;
+				const endMD   = item.seasonalend   ? getMonthDay(item.seasonalend)   : null;
 
 				let seasonalDisplay = "All Year";
 
-				if (item.seasonalstart && item.seasonalend) {
+				if (startMD && endMD) {
 
-					const startRaw = String(item.seasonalstart).trim();     
-					const endRaw   = String(item.seasonalend).trim();
-
-					let seasonalDisplay = "All Year";
-
-					// Extract date-only parts: "YYYY-MM-DD"
-					const startDateOnly = startRaw.slice(0, 10);
-					const endDateOnly   = endRaw.slice(0, 10);
-
-					// Detect all-year items
 					const isAllYear =
-						startDateOnly === "2025-01-01" &&
-						endDateOnly === "2025-12-31";
+						startMD === "01-01" &&
+						endMD === "12-31";
 
 					if (!isAllYear) {
-						const startStr = new Date(startRaw).toLocaleDateString(undefined, {
+						const startStr = new Date(item.seasonalstart).toLocaleDateString(undefined, {
 							month: "short",
 							day: "numeric",
-							year: "numeric",
+							year: "numeric"
 						});
 
-						const endStr = new Date(endRaw).toLocaleDateString(undefined, {
+						const endStr = new Date(item.seasonalend).toLocaleDateString(undefined, {
 							month: "short",
 							day: "numeric",
-							year: "numeric",
+							year: "numeric"
 						});
 
 						seasonalDisplay = `${startStr} → ${endStr}`;
 					}
 				}
-
 
 				return {
 					id: item.menuid,
@@ -70,9 +57,18 @@ export default function ManagerPage() {
 					seasonal: seasonalDisplay,
 					seasonalStart: item.seasonalstart,
 					seasonalEnd: item.seasonalend
-					};
-				})
+				};
+			})
 		);
+
+		// helper function
+		function getMonthDay(dateInput) {
+			const d = new Date(dateInput);
+			const month = String(d.getMonth() + 1).padStart(2, "0");
+			const day   = String(d.getDate()).padStart(2, "0");
+			return `${month}-${day}`;
+		}
+
 		} catch (err) {
 			console.error("Failed to load menu:", err);
 		}
