@@ -3,89 +3,110 @@ import Link from "next/link";
 import styles from "./manager.module.css";  // CSS MODULE
 
 export default function ManagerPage() {
-  const [activeTab, setActiveTab] = useState("sales");
-  const [query, setQuery] = useState("");
+	const [activeTab, setActiveTab] = useState("sales");
+	const [query, setQuery] = useState("");
 
-  const [sales, setSales] = useState([]);
+	const [sales, setSales] = useState([]);
 
-  const [menuItems, setMenuItems] = useState([]);
+	const [menuItems, setMenuItems] = useState([]);
 
-  useEffect(() => {
-  async function fetchMenuItems() {
+	useEffect(() => {
+	async function fetchMenuItems() {
     try {
-      const response = await fetch("/api/menu");
-      const data = await response.json();
+		const response = await fetch("/api/menu");
+		const data = await response.json();
 
-      const today = new Date();
+		const today = new Date();
 
-      setMenuItems(
-        data.map(item => {
-          const start = item.seasonalstart ? new Date(item.seasonalstart) : null;
-          const end = item.seasonalend ? new Date(item.seasonalend) : null;
+		setMenuItems(
+			data.map(item => {
+				const start = item.seasonalstart ? new Date(item.seasonalstart) : null;
+				const end = item.seasonalend ? new Date(item.seasonalend) : null;
 
-          let seasonalStatus = "Year-Round";
+				const ALL_YEAR_START = "2025-01-01T00:00:00";
+				const ALL_YEAR_END   = "2025-12-31T23:59:59";
 
-          if (start && end) {
-            seasonalStatus =
-              today >= start && today <= end
-                ? "In Season"
-                : "Out of Season";
-          }
+				let seasonalDisplay = "All Year";
 
-          return {
-            id: item.menuid,
-            name: item.menuname,
-            category: item.category,
-            price: Number(item.price),
-            seasonal: seasonalStatus,
-            seasonalStart: item.seasonalstart,
-            seasonalEnd: item.seasonalend
-          };
-        })
-      );
-    } catch (err) {
-      console.error("Failed to load menu:", err);
-    }
-  }
+				if (item.seasonalstart && item.seasonalend) {
+					const startDateStr = item.seasonalstart.slice(0, 10);  // "2025-01-01"
+					const endDateStr   = item.seasonalend.slice(0, 10);    // "2025-12-31"
+
+					const isAllYear =
+						startDateStr === "2025-01-01" &&
+						endDateStr === "2025-12-31";
+
+					if (!isAllYear) {
+						const startStr = new Date(item.seasonalstart).toLocaleDateString(undefined, {
+							month: "short",
+							day: "numeric",
+							year: "numeric",
+						});
+
+						const endStr = new Date(item.seasonalend).toLocaleDateString(undefined, {
+							month: "short",
+							day: "numeric",
+							year: "numeric",
+						});
+
+						seasonalDisplay = `${startStr} → ${endStr}`;
+					}
+				}
+
+				return {
+					id: item.menuid,
+					name: item.menuname,
+					category: item.category,
+					price: Number(item.price),
+					seasonal: seasonalDisplay,
+					seasonalStart: item.seasonalstart,
+					seasonalEnd: item.seasonalend
+					};
+				})
+		);
+		} catch (err) {
+			console.error("Failed to load menu:", err);
+		}
+	}
 
   fetchMenuItems();
 }, []);
 
 
-  const [inventory, setInventory] = useState([
-    { id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
-    { id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
-    { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
-  ]);
+	const [inventory, setInventory] = useState([
+		{ id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
+		{ id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
+		{ id: 3, name: "Cups", quantity: 300, restockMin: 100 },
+	]);
 
-  // NEW — Report State =======================================
-  const [xReportRows, setXReportRows] = useState([]);
-  const [zReportRows, setZReportRows] = useState([]);
+	// NEW — Report State =======================================
+	const [xReportRows, setXReportRows] = useState([]);
+	const [zReportRows, setZReportRows] = useState([]);
 
-  // NEW — X REPORT ============================================
-  function generateXReport() {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const today = new Date().toISOString().slice(0, 10);
+	// NEW — X REPORT ============================================
+	function generateXReport() {
+	const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+	const today = new Date().toISOString().slice(0, 10);
 
-    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+	const todaysOrders = orders.filter(o => o.time.startsWith(today));
 
-    const rows = [];
+	const rows = [];
 
     todaysOrders.forEach(order => {
-      const dateTime = new Date(order.time);
-      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      })}`;
+			const dateTime = new Date(order.time);
+			const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
+			hour: "2-digit",
+			minute: "2-digit"
+		})}`;
 
-      order.items.forEach(item => {
-        rows.push({
-          time: formatted,
-          item: item.name,
-          price: Number(item.price),
-          totalRow: false
-        });
-      });
+    	order.items.forEach(item => {
+			rows.push({
+				time: formatted,
+				item: item.name,
+				price: Number(item.price),
+				totalRow: false
+			});
+    	});
 
       rows.push({
         time: "",
@@ -100,43 +121,43 @@ export default function ManagerPage() {
   }
 
   // === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
-  useEffect(() => {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+	useEffect(() => {
+		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
 
-    // Convert kiosk order objects → rows for Sales table
-    const transformed = orders.flatMap(order =>
-      order.items.map(item => ({
-        id: `${order.id}-${item.name}`,
-        date: order.time.slice(0, 10),
-        item: item.name,
-        qty: 1,
-        total: Number(item.price)
-      }))
-    );
+		// Convert kiosk order objects → rows for Sales table
+		const transformed = orders.flatMap(order =>
+			order.items.map(item => ({
+			id: `${order.id}-${item.name}`,
+			date: order.time.slice(0, 10),
+			item: item.name,
+			qty: 1,
+			total: Number(item.price)
+			}))
+		);
 
-    setSales(transformed);
-  }, []);
+		setSales(transformed);
+	}, []);
 
   // NEW — Z REPORT (End of Day Reset) =========================
-  function generateZReport() {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const today = new Date().toISOString().slice(0, 10);
+	function generateZReport() {
+		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+		const today = new Date().toISOString().slice(0, 10);
 
-    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+		const todaysOrders = orders.filter(o => o.time.startsWith(today));
 
-    // Calculate grand total for the day
-    const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
+		// Calculate grand total for the day
+		const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
 
-    setXReportRows([]);
+		setXReportRows([]);
 
-    // Store one row containing only the total
-    setZReportRows([
-      {
-        label: "Total Revenue",
-        total: grandTotal
-      }
-    ]);
-  } 
+		// Store one row containing only the total
+		setZReportRows([
+			{
+			label: "Total Revenue",
+			total: grandTotal
+			}
+		]);
+	} 
 
 
   // Filtering =========================================================
@@ -180,29 +201,29 @@ const [endDate, setEndDate] = useState("");
 
 // Fetch sales data (with range or all-time)
 async function fetchSales() {
-  try {
-    setSalesLoading(true);
-    setSalesError(null);
+	try {
+		setSalesLoading(true);
+		setSalesError(null);
 
-    let url = "/api/sales";
+		let url = "/api/sales";
 
-    if (startDate && endDate) {
-      url += `?start=${startDate} 00:00:00&end=${endDate} 23:59:59`;
-    }
+		if (startDate && endDate) {
+			url += `?start=${startDate} 00:00:00&end=${endDate} 23:59:59`;
+		}
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("HTTP " + res.status);
+		const res = await fetch(url);
+		if (!res.ok) throw new Error("HTTP " + res.status);
 
-    const data = await res.json();
-    setSalesSummary(data.summary || null);
-    setSalesHourly(data.hourly || []);
-    setSalesOrders(data.orders || []);
-  } catch (err) {
-    console.error("Failed to fetch sales:", err);
-    setSalesError("Failed to load sales data.");
-  } finally {
-    setSalesLoading(false);
-  }
+		const data = await res.json();
+		setSalesSummary(data.summary || null);
+		setSalesHourly(data.hourly || []);
+		setSalesOrders(data.orders || []);
+		} catch (err) {
+		console.error("Failed to fetch sales:", err);
+		setSalesError("Failed to load sales data.");
+		} finally {
+		setSalesLoading(false);
+	}
 }
 
 // Run once on initial load
@@ -211,134 +232,134 @@ useEffect(() => {
 }, []);
 
 // Render Sales tab
-const SalesTab = (
-  <section className={styles.panel}>
-    <h2>Sales</h2>
+	const SalesTab = (
+	<section className={styles.panel}>
+	<h2>Sales</h2>
 
-    {/* Date Range Controls */}
-    <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
-      <div>
-        <label>Start Date</label>
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-      </div>
+	{/* Date Range Controls */}
+	<div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+		<div>
+		<label>Start Date</label>
+		<input
+			type="date"
+			value={startDate}
+			onChange={(e) => setStartDate(e.target.value)}
+		/>
+		</div>
 
-      <div>
-        <label>End Date</label>
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-        />
-      </div>
+		<div>
+		<label>End Date</label>
+		<input
+			type="date"
+			value={endDate}
+			onChange={(e) => setEndDate(e.target.value)}
+		/>
+		</div>
 
-      <button onClick={fetchSales}>Generate</button>
-    </div>
+		<button onClick={fetchSales}>Generate</button>
+	</div>
 
-    {/* Loading & Errors */}
-    {salesLoading && <p>Loading sales...</p>}
-    {salesError && <p style={{ color: "red" }}>{salesError}</p>}
+	{/* Loading & Errors */}
+	{salesLoading && <p>Loading sales...</p>}
+	{salesError && <p style={{ color: "red" }}>{salesError}</p>}
 
-    {/* Summary */}
-    {salesSummary && !salesLoading && (
-      <div className={styles.summaryBox}>
-        <p><strong>Total Sales:</strong> ${Number(salesSummary.totalsales).toFixed(2)}</p>
-        <p><strong>Total Orders:</strong> {salesSummary.totalorders}</p>
-        <p><strong>First Order:</strong> {salesSummary.firstorder ? new Date(salesSummary.firstorder).toLocaleString() : "—"}</p>
-        <p><strong>Last Order:</strong> {salesSummary.lastorder ? new Date(salesSummary.lastorder).toLocaleString() : "—"}</p>
-      </div>
-    )}
+	{/* Summary */}
+	{salesSummary && !salesLoading && (
+		<div className={styles.summaryBox}>
+		<p><strong>Total Sales:</strong> ${Number(salesSummary.totalsales).toFixed(2)}</p>
+		<p><strong>Total Orders:</strong> {salesSummary.totalorders}</p>
+		<p><strong>First Order:</strong> {salesSummary.firstorder ? new Date(salesSummary.firstorder).toLocaleString() : "—"}</p>
+		<p><strong>Last Order:</strong> {salesSummary.lastorder ? new Date(salesSummary.lastorder).toLocaleString() : "—"}</p>
+		</div>
+	)}
 
-    {/* Orders Table */}
-    {salesOrders.length > 0 && (
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Employee ID</th>
-              <th>Location</th>
-              <th>Date</th>
-              <th>Total ($)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {salesOrders
-              .filter((row) => {
-                const q = query.trim().toLowerCase();
-                if (!q) return true;
+	{/* Orders Table */}
+	{salesOrders.length > 0 && (
+		<div className={styles.tableWrap}>
+		<table className={styles.table}>
+			<thead>
+			<tr>
+				<th>Order ID</th>
+				<th>Employee ID</th>
+				<th>Location</th>
+				<th>Date</th>
+				<th>Total ($)</th>
+			</tr>
+			</thead>
+			<tbody>
+			{salesOrders
+				.filter((row) => {
+				const q = query.trim().toLowerCase();
+				if (!q) return true;
 
-                return (
-                  String(row.orderid).includes(q) ||
-                  String(row.employeeid).includes(q) ||
-                  (row.orderlocation || "").toLowerCase().includes(q) ||
-                  (row.orderdate || "").toString().includes(q)
-                );
-              })
-              .map((row) => (
-                <tr key={row.orderid}>
-                  <td>{row.orderid}</td>
-                  <td>{row.employeeid}</td>
-                  <td>{row.orderlocation}</td>
-                  <td>
-                    {row.orderdate
-                      ? new Date(row.orderdate).toLocaleString()
-                      : ""}
-                  </td>
-                  <td>{Number(row.ordertotal).toFixed(2)}</td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </section>
+				return (
+					String(row.orderid).includes(q) ||
+					String(row.employeeid).includes(q) ||
+					(row.orderlocation || "").toLowerCase().includes(q) ||
+					(row.orderdate || "").toString().includes(q)
+				);
+				})
+				.map((row) => (
+				<tr key={row.orderid}>
+					<td>{row.orderid}</td>
+					<td>{row.employeeid}</td>
+					<td>{row.orderlocation}</td>
+					<td>
+					{row.orderdate
+						? new Date(row.orderdate).toLocaleString()
+						: ""}
+					</td>
+					<td>{Number(row.ordertotal).toFixed(2)}</td>
+				</tr>
+				))}
+			</tbody>
+		</table>
+		</div>
+	)}
+	</section>
 );
 
 
-  const MenuTab = (
-    <section className={styles.panel}>
-      <div className={styles.panelHeader}>
-        <h2>Menu Items</h2>
-        <div className={styles.actions}>
-          <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
-          <button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
-        </div>
-      </div>
+	const MenuTab = (
+	<section className={styles.panel}>
+		<div className={styles.panelHeader}>
+		<h2>Menu Items</h2>
+		<div className={styles.actions}>
+			<button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
+			<button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
+		</div>
+		</div>
 
-      <input
-        type="search"
-        placeholder="Search menu…"
-        className={styles.search}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+		<input
+		type="search"
+		placeholder="Search menu…"
+		className={styles.search}
+		value={query}
+		onChange={(e) => setQuery(e.target.value)}
+		/>
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Name</th><th>Category</th><th>Price</th><th>Seasonal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredMenu.map((m) => (
-              <tr key={m.id}>
-                <td>{m.name}</td>
-                <td>{m.category}</td>
-                <td>{m.price.toFixed(2)}</td>
-                <td>{m.seasonal}</td>
+		<div className={styles.tableWrap}>
+		<table className={styles.table}>
+			<thead>
+			<tr>
+				<th>Name</th><th>Category</th><th>Price</th><th>Seasonal</th>
+			</tr>
+			</thead>
+			<tbody>
+			{filteredMenu.map((m) => (
+				<tr key={m.id}>
+				<td>{m.name}</td>
+				<td>{m.category}</td>
+				<td>{m.price.toFixed(2)}</td>
+				<td>{m.seasonal}</td>
 
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
+				</tr>
+			))}
+			</tbody>
+		</table>
+		</div>
+	</section>
+	);
 
   const InventoryTab = (
     <section className={styles.panel}>
