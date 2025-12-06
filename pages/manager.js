@@ -29,21 +29,29 @@ export default function ManagerPage() {
 				let seasonalDisplay = "All Year";
 
 				if (item.seasonalstart && item.seasonalend) {
-					const startDateStr = item.seasonalstart.slice(0, 10);  // "2025-01-01"
-					const endDateStr   = item.seasonalend.slice(0, 10);    // "2025-12-31"
 
+					const startRaw = String(item.seasonalstart).trim();     
+					const endRaw   = String(item.seasonalend).trim();
+
+					let seasonalDisplay = "All Year";
+
+					// Extract date-only parts: "YYYY-MM-DD"
+					const startDateOnly = startRaw.slice(0, 10);
+					const endDateOnly   = endRaw.slice(0, 10);
+
+					// Detect all-year items
 					const isAllYear =
-						startDateStr === "2025-01-01" &&
-						endDateStr === "2025-12-31";
+						startDateOnly === "2025-01-01" &&
+						endDateOnly === "2025-12-31";
 
 					if (!isAllYear) {
-						const startStr = new Date(item.seasonalstart).toLocaleDateString(undefined, {
+						const startStr = new Date(startRaw).toLocaleDateString(undefined, {
 							month: "short",
 							day: "numeric",
 							year: "numeric",
 						});
 
-						const endStr = new Date(item.seasonalend).toLocaleDateString(undefined, {
+						const endStr = new Date(endRaw).toLocaleDateString(undefined, {
 							month: "short",
 							day: "numeric",
 							year: "numeric",
@@ -52,6 +60,7 @@ export default function ManagerPage() {
 						seasonalDisplay = `${startStr} → ${endStr}`;
 					}
 				}
+
 
 				return {
 					id: item.menuid,
@@ -118,9 +127,9 @@ export default function ManagerPage() {
 
     setZReportRows([]);      // allow clean switching
     setXReportRows(rows);    // update table
-  }
+	}
 
-  // === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
+  	// === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
 	useEffect(() => {
 		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
 
