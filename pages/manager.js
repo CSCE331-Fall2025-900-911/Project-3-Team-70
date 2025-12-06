@@ -16,14 +16,32 @@ export default function ManagerPage() {
       const response = await fetch("/api/menu");
       const data = await response.json();
 
+      const today = new Date();
+
       setMenuItems(
-        data.map(item => ({
-          id: item.menuid,
-          name: item.menuname,
-          category: item.category,
-          price: Number(item.price),
-          seasonal: item.seasonalstart !== null
-        }))
+        data.map(item => {
+          const start = item.seasonalstart ? new Date(item.seasonalstart) : null;
+          const end = item.seasonalend ? new Date(item.seasonalend) : null;
+
+          let seasonalStatus = "Year-Round";
+
+          if (start && end) {
+            seasonalStatus =
+              today >= start && today <= end
+                ? "In Season"
+                : "Out of Season";
+          }
+
+          return {
+            id: item.menuid,
+            name: item.menuname,
+            category: item.category,
+            price: Number(item.price),
+            seasonal: seasonalStatus,
+            seasonalStart: item.seasonalstart,
+            seasonalEnd: item.seasonalend
+          };
+        })
       );
     } catch (err) {
       console.error("Failed to load menu:", err);
@@ -32,6 +50,7 @@ export default function ManagerPage() {
 
   fetchMenuItems();
 }, []);
+
 
   const [inventory, setInventory] = useState([
     { id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
@@ -311,7 +330,8 @@ const SalesTab = (
                 <td>{m.name}</td>
                 <td>{m.category}</td>
                 <td>{m.price.toFixed(2)}</td>
-                <td>{m.seasonal ? "Yes" : "No"}</td>
+                <td>{m.seasonal}</td>
+
               </tr>
             ))}
           </tbody>
