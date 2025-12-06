@@ -153,78 +153,78 @@ export default function ManagerPage() {
     loadData();
   }, []);
 
-  // function generateXReport() {
-  //   const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-  //   const today = new Date().toISOString().slice(0, 10);
+  function generateXReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const today = new Date().toISOString().slice(0, 10);
 
-  //   const todaysOrders = orders.filter((o) => o.time.startsWith(today));
+    const todaysOrders = orders.filter((o) => o.time.startsWith(today));
 
-  //   const rows = [];
+    const rows = [];
 
-  //   todaysOrders.forEach((order) => {
-  //     const dateTime = new Date(order.time);
-  //     const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
-  //       hour: "2-digit",
-  //       minute: "2-digit",
-  //     })}`;
+    todaysOrders.forEach((order) => {
+      const dateTime = new Date(order.time);
+      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`;
 
-  //     order.items.forEach((item) => {
-  //       rows.push({
-  //         time: formatted,
-  //         item: item.name,
-  //         price: Number(item.price),
-  //         totalRow: false,
-  //       });
-  //     });
+      order.items.forEach((item) => {
+        rows.push({
+          time: formatted,
+          item: item.name,
+          price: Number(item.price),
+          totalRow: false,
+        });
+      });
 
-  //     const grandTotal = todaysSales.reduce((acc, s) => acc + s.total, 0);
-  //     if (todaysSales.length > 0) {
-  //       rows.push({
-  //         time: "",
-  //         item: "Order Total",
-  //         price: grandTotal,
-  //         totalRow: true,
-  //       });
-  //     }
+      const grandTotal = todaysSales.reduce((acc, s) => acc + s.total, 0);
+      if (todaysSales.length > 0) {
+        rows.push({
+          time: "",
+          item: "Order Total",
+          price: grandTotal,
+          totalRow: true,
+        });
+      }
 
-  //     setZReportRows([]);
-  //     setXReportRows(rows);
-  //   });
-  // }
+      setZReportRows([]);
+      setXReportRows(rows);
+    });
+  }
 
-  // useEffect(() => {
-  //   const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+  useEffect(() => {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
 
-  //   const transformed = orders.flatMap((order) =>
-  //     order.items.map((item) => ({
-  //       id: `${order.id}-${item.name}`,
-  //       date: order.time.slice(0, 10),
-  //       item: item.name,
-  //       qty: 1,
-  //       total: Number(item.price),
-  //     }))
-  //   );
+    const transformed = orders.flatMap((order) =>
+      order.items.map((item) => ({
+        id: `${order.id}-${item.name}`,
+        date: order.time.slice(0, 10),
+        item: item.name,
+        qty: 1,
+        total: Number(item.price),
+      }))
+    );
 
-  //   setSales(transformed);
-  // }, []);
+    setSales(transformed);
+  }, []);
 
-  // function generateZReport() {
-  //   const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-  //   const today = new Date().toISOString().slice(0, 10);
+  function generateZReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const today = new Date().toISOString().slice(0, 10);
 
-  //   const todaysOrders = orders.filter((o) => o.time.startsWith(today));
+    const todaysOrders = orders.filter((o) => o.time.startsWith(today));
 
-  //   const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
+    const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
 
-  //   setXReportRows([]);
+    setXReportRows([]);
 
-  //   setZReportRows([
-  //     {
-  //       label: "Total Revenue",
-  //       total: grandTotal,
-  //     },
-  //   ]);
-  // }
+    setZReportRows([
+      {
+        label: "Total Revenue",
+        total: grandTotal,
+      },
+    ]);
+  }
 
   const filteredMenu = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -538,7 +538,7 @@ export default function ManagerPage() {
             color: "#fff",
             marginLeft: "10px",
           }}
-          // onClick={generateXReport}
+          onClick={generateXReport}
         >
           Run X Report
         </button>
@@ -550,7 +550,7 @@ export default function ManagerPage() {
             color: "#fff",
             marginLeft: "10px",
           }}
-          // onClick={generateZReport}
+          onClick={generateZReport}
         >
           Run Z Report
         </button>
