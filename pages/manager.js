@@ -1,22 +1,22 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import styles from "./manager.module.css";  // CSS MODULE
+import styles from "./manager.module.css";
 
 export default function ManagerPage() {
-	const [activeTab, setActiveTab] = useState("sales");
-	const [query, setQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("sales");
+  const [query, setQuery] = useState("");
 
-	const [sales, setSales] = useState([]);
+  const [sales, setSales] = useState([]);
 
-	const [menuItems, setMenuItems] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
 
-	useEffect(() => {
-	async function fetchMenuItems() {
-    try {
-		const response = await fetch("/api/menu");
-		const data = await response.json();
+  useEffect(() => {
+    async function fetchMenuItems() {
+      try {
+        const response = await fetch("/api/menu");
+        const data = await response.json();
 
-		const today = new Date();
+        const today = new Date();
 
 		setMenuItems(
 			data.map(item => {
@@ -24,7 +24,7 @@ export default function ManagerPage() {
 				const startMD = item.seasonalstart ? getMonthDay(item.seasonalstart) : null;
 				const endMD   = item.seasonalend   ? getMonthDay(item.seasonalend)   : null;
 
-				let seasonalDisplay = "All Year";
+            let seasonalDisplay = "All Year";
 
 				if (startMD && endMD) {
 
@@ -74,98 +74,159 @@ export default function ManagerPage() {
 		}
 	}
 
-  fetchMenuItems();
-}, []);
+    fetchMenuItems();
+  }, []);
 
+  const [inventory, setInventory] = useState([
+    { id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
+    { id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
+    { id: 3, name: "Cups", quantity: 300, restockMin: 100 },
+  ]);
 
-	const [inventory, setInventory] = useState([
-		{ id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
-		{ id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
-		{ id: 3, name: "Cups", quantity: 300, restockMin: 100 },
-	]);
+  const [xReportRows, setXReportRows] = useState([]);
+  const [zReportRows, setZReportRows] = useState([]);
 
-	// NEW — Report State =======================================
-	const [xReportRows, setXReportRows] = useState([]);
-	const [zReportRows, setZReportRows] = useState([]);
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const salesRes = await fetch("/api/manager/sales");
+        if (salesRes.ok) {
+          const salesJson = await salesRes.json();
+          const transformed = salesJson.map((row) => {
+            const dateISO = row.orderdate;
+            const d = new Date(dateISO);
 
-	// NEW — X REPORT ============================================
-	function generateXReport() {
-	const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-	const today = new Date().toISOString().slice(0, 10);
+            return {
+              id: `${row.orderid}-${row.item}-${dateISO}`,
+              date: dateISO.slice(0, 10),
+              time: d.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              item: row.item,
+              qty: Number(row.qty || 0),
+              total: Number(row.total || 0),
+            };
+          });
+          setSales(transformed);
+        } else {
+          console.error("Failed to load sales");
+        }
+      } catch (err) {
+        console.error("Error loading sales:", err);
+      }
 
-	const todaysOrders = orders.filter(o => o.time.startsWith(today));
+      try {
+        const menuRes = await fetch("/api/menu");
+        if (menuRes.ok) {
+          const menuJson = await menuRes.json();
+          const normalized = menuJson.map((m) => ({
+            id: m.menuid,
+            name: m.menuname,
+            category: m.category,
+            price: Number(m.price || 0),
+            seasonal: !!m.seasonalstart && !!m.seasonalend,
+          }));
+          setMenuItems(normalized);
+        }
+      } catch (err) {
+        console.error("Error loading menu:", err);
+      }
 
-	const rows = [];
+      try {
+        const invRes = await fetch("/api/inventory");
+        if (invRes.ok) {
+          const invJson = await invRes.json();
+          const normalized = invJson.map((i) => ({
+            id: i.inventoryid,
+            name: i.inventoryname,
+            quantity: Number(i.quantityavailable || 0),
+            restockMin: Number(i.restockmin || 0),
+          }));
+          setInventory(normalized);
+        }
+      } catch (err) {
+        console.error("Error loading inventory:", err);
+      }
+    }
 
-    todaysOrders.forEach(order => {
-			const dateTime = new Date(order.time);
-			const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit"
-		})}`;
+    loadData();
+  }, []);
 
-    	order.items.forEach(item => {
-			rows.push({
-				time: formatted,
-				item: item.name,
-				price: Number(item.price),
-				totalRow: false
-			});
-    	});
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch("/api/manager/sales")
+        .then(res => res.json())
+        .then(salesJson => {
+          const transformed = salesJson.map((row) => {
+            const dateISO = row.orderdate;
+            const d = new Date(dateISO);
+            return {
+              id: `${row.orderid}-${row.item}-${dateISO}`,
+              date: dateISO.slice(0, 10),
+              time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              item: row.item,
+              qty: Number(row.qty || 0),
+              total: Number(row.total || 0),
+              priceatpurchase: row.qty ? Number(row.total) / Number(row.qty) : 0,
+            };
+          });
+          setSales(transformed);
+        });
+    }, 2000);
 
-      rows.push({
-        time: "",
-        item: "Order Total",
-        price: order.total,
-        totalRow: true
-      });
+    return () => clearInterval(interval);
+  }, []);
+
+  function generateXReport() {
+    if (!sales || sales.length === 0) {
+      setXReportRows([]);
+      return;
+    }
+
+    const rows = sales.map((row) => ({
+      time: row.time,
+      item: row.item,
+      qty: row.qty,
+      price: Number(row.total),
+      totalRow: false,
+    }));
+
+    const grandTotal = rows.reduce((sum, r) => sum + r.price, 0);
+
+    rows.push({
+      time: "",
+      item: "Daily Total",
+      qty: "",
+      price: grandTotal,
+      totalRow: true,
     });
 
-    setZReportRows([]);      // allow clean switching
-    setXReportRows(rows);    // update table
-	}
-
-  	// === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
-	useEffect(() => {
-		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-
-		// Convert kiosk order objects - rows for Sales table
-		const transformed = orders.flatMap(order =>
-			order.items.map(item => ({
-			id: `${order.id}-${item.name}`,
-			date: order.time.slice(0, 10),
-			item: item.name,
-			qty: 1,
-			total: Number(item.price)
-			}))
-		);
-
-		setSales(transformed);
-	}, []);
-
-  // NEW — Z REPORT (End of Day Reset) =========================
-	function generateZReport() {
-		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-		const today = new Date().toISOString().slice(0, 10);
-
-		const todaysOrders = orders.filter(o => o.time.startsWith(today));
-
-		// Calculate grand total for the day
-		const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
-
-		setXReportRows([]);
-
-		// Store one row containing only the total
-		setZReportRows([
-			{
-			label: "Total Revenue",
-			total: grandTotal
-			}
-		]);
-	} 
+    setZReportRows([]);
+    setXReportRows(rows);
+  }
 
 
-  // Filtering =========================================================
+  function generateZReport() {
+    if (!sales || sales.length === 0) {
+      setZReportRows([]);
+      return;
+    }
+
+    const totalRevenue = sales.reduce(
+      (sum, row) => sum + Number(row.total || 0),
+      0
+    );
+
+    setXReportRows([]);
+    setZReportRows([
+      {
+        label: "Total Revenue Today",
+        total: totalRevenue,
+      },
+    ]);
+  }
+
   const filteredMenu = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return menuItems;
@@ -186,193 +247,225 @@ export default function ManagerPage() {
     );
   }, [query, inventory]);
 
-  // Event Handlers ===================================================
-  function handleAddMenuItem() { console.log("Add menu item"); }
-  function handleUpdateMenuItem() { console.log("Update menu item"); }
-  function handleAddInventory() { console.log("Add inventory"); }
-  function handleUpdateInventory() { console.log("Update inventory"); }
-  function handleOrderRestock(item) { console.log("Restock ordered:", item.name); }
+  function handleAddMenuItem() {
+    console.log("Add menu item");
+  }
+  function handleUpdateMenuItem() {
+    console.log("Update menu item");
+  }
+  function handleAddInventory() {
+    console.log("Add inventory");
+  }
+  function handleUpdateInventory() {
+    console.log("Update inventory");
+  }
+  function handleOrderRestock(item) {
+    console.log("Restock ordered:", item.name);
+  }
 
-  // TAB COMPONENTS ===================================================
-// ===== SALES TAB =====
-const [salesSummary, setSalesSummary] = useState(null);
-const [salesHourly, setSalesHourly] = useState([]);
-const [salesOrders, setSalesOrders] = useState([]);
-const [salesLoading, setSalesLoading] = useState(false);
-const [salesError, setSalesError] = useState(null);
+  const [salesSummary, setSalesSummary] = useState(null);
+  const [salesHourly, setSalesHourly] = useState([]);
+  const [salesOrders, setSalesOrders] = useState([]);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesError, setSalesError] = useState(null);
 
-const [startDate, setStartDate] = useState("");
-const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-// Fetch sales data (with range or all-time)
-async function fetchSales() {
-	try {
-		setSalesLoading(true);
-		setSalesError(null);
+  async function fetchSales() {
+    try {
+      setSalesLoading(true);
+      setSalesError(null);
 
-		let url = "/api/sales";
+      let url = "/api/sales";
 
-		if (startDate && endDate) {
-			url += `?start=${startDate} 00:00:00&end=${endDate} 23:59:59`;
-		}
+      if (startDate && endDate) {
+        url += `?start=${startDate} 00:00:00&end=${endDate} 23:59:59`;
+      }
 
-		const res = await fetch(url);
-		if (!res.ok) throw new Error("HTTP " + res.status);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
 
-		const data = await res.json();
-		setSalesSummary(data.summary || null);
-		setSalesHourly(data.hourly || []);
-		setSalesOrders(data.orders || []);
-		} catch (err) {
-		console.error("Failed to fetch sales:", err);
-		setSalesError("Failed to load sales data.");
-		} finally {
-		setSalesLoading(false);
-	}
-}
+      const data = await res.json();
+      setSalesSummary(data.summary || null);
+      setSalesHourly(data.hourly || []);
+      setSalesOrders(data.orders || []);
+    } catch (err) {
+      console.error("Failed to fetch sales:", err);
+      setSalesError("Failed to load sales data.");
+    } finally {
+      setSalesLoading(false);
+    }
+  }
 
-// Run once on initial load
-useEffect(() => {
-  fetchSales();
-}, []);
+  useEffect(() => {
+    fetchSales();
+  }, []);
 
-// Render Sales tab
-	const SalesTab = (
-	<section className={styles.panel}>
-	<h2>Sales</h2>
+  const SalesTab = (
+    <section className={styles.panel}>
+      <h2>Sales</h2>
 
-	{/* Date Range Controls */}
-	<div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
-		<div>
-		<label>Start Date</label>
-		<input
-			type="date"
-			value={startDate}
-			onChange={(e) => setStartDate(e.target.value)}
-		/>
-		</div>
+      <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+        <div>
+          <label>Start Date</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
 
-		<div>
-		<label>End Date</label>
-		<input
-			type="date"
-			value={endDate}
-			onChange={(e) => setEndDate(e.target.value)}
-		/>
-		</div>
+        <div>
+          <label>End Date</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
 
-		<button onClick={fetchSales}>Generate</button>
-	</div>
+        <button onClick={fetchSales}>Generate</button>
+      </div>
 
-	{/* Loading & Errors */}
-	{salesLoading && <p>Loading sales...</p>}
-	{salesError && <p style={{ color: "red" }}>{salesError}</p>}
+      {salesLoading && <p>Loading sales...</p>}
+      {salesError && <p style={{ color: "red" }}>{salesError}</p>}
 
-	{/* Summary */}
-	{salesSummary && !salesLoading && (
-		<div className={styles.summaryBox}>
-		<p><strong>Total Sales:</strong> ${Number(salesSummary.totalsales).toFixed(2)}</p>
-		<p><strong>Total Orders:</strong> {salesSummary.totalorders}</p>
-		<p><strong>First Order:</strong> {salesSummary.firstorder ? new Date(salesSummary.firstorder).toLocaleString() : "—"}</p>
-		<p><strong>Last Order:</strong> {salesSummary.lastorder ? new Date(salesSummary.lastorder).toLocaleString() : "—"}</p>
-		</div>
-	)}
+      {salesSummary && !salesLoading && (
+        <div className={styles.summaryBox}>
+          <p>
+            <strong>Total Sales:</strong> $
+            {Number(salesSummary.totalsales).toFixed(2)}
+          </p>
+          <p>
+            <strong>Total Orders:</strong> {salesSummary.totalorders}
+          </p>
+          <p>
+            <strong>First Order:</strong>{" "}
+            {salesSummary.firstorder
+              ? new Date(salesSummary.firstorder).toLocaleString()
+              : "—"}
+          </p>
+          <p>
+            <strong>Last Order:</strong>{" "}
+            {salesSummary.lastorder
+              ? new Date(salesSummary.lastorder).toLocaleString()
+              : "—"}
+          </p>
+        </div>
+      )}
 
-	{/* Orders Table */}
-	{salesOrders.length > 0 && (
-		<div className={styles.tableWrap}>
-		<table className={styles.table}>
-			<thead>
-			<tr>
-				<th>Order ID</th>
-				<th>Employee ID</th>
-				<th>Location</th>
-				<th>Date</th>
-				<th>Total ($)</th>
-			</tr>
-			</thead>
-			<tbody>
-			{salesOrders
-				.filter((row) => {
-				const q = query.trim().toLowerCase();
-				if (!q) return true;
+      {salesOrders.length > 0 && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Employee ID</th>
+                <th>Location</th>
+                <th>Date</th>
+                <th>Total ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {salesOrders
+                .filter((row) => {
+                  const q = query.trim().toLowerCase();
+                  if (!q) return true;
 
-				return (
-					String(row.orderid).includes(q) ||
-					String(row.employeeid).includes(q) ||
-					(row.orderlocation || "").toLowerCase().includes(q) ||
-					(row.orderdate || "").toString().includes(q)
-				);
-				})
-				.map((row) => (
-				<tr key={row.orderid}>
-					<td>{row.orderid}</td>
-					<td>{row.employeeid}</td>
-					<td>{row.orderlocation}</td>
-					<td>
-					{row.orderdate
-						? new Date(row.orderdate).toLocaleString()
-						: ""}
-					</td>
-					<td>{Number(row.ordertotal).toFixed(2)}</td>
-				</tr>
-				))}
-			</tbody>
-		</table>
-		</div>
-	)}
-	</section>
-);
+                  return (
+                    String(row.orderid).includes(q) ||
+                    String(row.employeeid).includes(q) ||
+                    (row.orderlocation || "")
+                      .toLowerCase()
+                      .includes(q) ||
+                    (row.orderdate || "").toString().includes(q)
+                  );
+                })
+                .map((row) => (
+                  <tr key={row.orderid}>
+                    <td>{row.orderid}</td>
+                    <td>{row.employeeid}</td>
+                    <td>{row.orderlocation}</td>
+                    <td>
+                      {row.orderdate
+                        ? new Date(row.orderdate).toLocaleString()
+                        : ""}
+                    </td>
+                    <td>{Number(row.ordertotal).toFixed(2)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
 
+  const MenuTab = (
+    <section className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <h2>Menu Items</h2>
+        <div className={styles.actions}>
+          <button
+            className={`${styles.btn} ${styles.primary}`}
+            onClick={handleAddMenuItem}
+          >
+            Add
+          </button>
+          <button className={styles.btn} onClick={handleUpdateMenuItem}>
+            Update
+          </button>
+        </div>
+      </div>
 
-	const MenuTab = (
-	<section className={styles.panel}>
-		<div className={styles.panelHeader}>
-		<h2>Menu Items</h2>
-		<div className={styles.actions}>
-			<button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
-			<button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
-		</div>
-		</div>
+      <input
+        type="search"
+        placeholder="Search menu…"
+        className={styles.search}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
 
-		<input
-		type="search"
-		placeholder="Search menu…"
-		className={styles.search}
-		value={query}
-		onChange={(e) => setQuery(e.target.value)}
-		/>
-
-		<div className={styles.tableWrap}>
-		<table className={styles.table}>
-			<thead>
-			<tr>
-				<th>Name</th><th>Category</th><th>Price</th><th>Seasonal</th>
-			</tr>
-			</thead>
-			<tbody>
-			{filteredMenu.map((m) => (
-				<tr key={m.id}>
-				<td>{m.name}</td>
-				<td>{m.category}</td>
-				<td>{m.price.toFixed(2)}</td>
-				<td>{m.seasonal}</td>
-
-				</tr>
-			))}
-			</tbody>
-		</table>
-		</div>
-	</section>
-	);
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th>Seasonal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredMenu.map((m) => (
+              <tr key={m.id}>
+                <td>{m.name}</td>
+                <td>{m.category}</td>
+                <td>{m.price.toFixed(2)}</td>
+                <td>{m.seasonal}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 
   const InventoryTab = (
     <section className={styles.panel}>
       <div className={styles.panelHeader}>
         <h2>Inventory</h2>
         <div className={styles.actions}>
-          <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddInventory}>Add</button>
-          <button className={styles.btn} onClick={handleUpdateInventory}>Update</button>
+          <button
+            className={`${styles.btn} ${styles.primary}`}
+            onClick={handleAddInventory}
+          >
+            Add
+          </button>
+          <button className={styles.btn} onClick={handleUpdateInventory}>
+            Update
+          </button>
         </div>
       </div>
 
@@ -387,7 +480,11 @@ useEffect(() => {
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
-            <tr><th>Item</th><th>Qty</th><th>Min</th></tr>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Min</th>
+            </tr>
           </thead>
           <tbody>
             {filteredInventory.map((i) => (
@@ -418,8 +515,10 @@ useEffect(() => {
                 Current: {i.quantity} • Min: {i.restockMin}
               </span>
             </div>
-            <button className={`${styles.btn} ${styles.success}`}
-              onClick={() => handleOrderRestock(i)}>
+            <button
+              className={`${styles.btn} ${styles.success}`}
+              onClick={() => handleOrderRestock(i)}
+            >
               Order
             </button>
           </li>
@@ -428,7 +527,6 @@ useEffect(() => {
     </section>
   );
 
-  // NEW — REPORTS TAB ============================================
   const ReportsTab = (
     <section className={styles.panel}>
       <h2>Reports</h2>
@@ -436,7 +534,11 @@ useEffect(() => {
       <div style={{ marginTop: "20px", marginBottom: "20px" }}>
         <button
           className={styles.btn}
-          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          style={{
+            backgroundColor: "#900",
+            color: "#fff",
+            marginLeft: "10px",
+          }}
           onClick={generateXReport}
         >
           Run X Report
@@ -444,37 +546,36 @@ useEffect(() => {
 
         <button
           className={styles.btn}
-          style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
+          style={{
+            backgroundColor: "#900",
+            color: "#fff",
+            marginLeft: "10px",
+          }}
           onClick={generateZReport}
         >
           Run Z Report
         </button>
       </div>
-
-      {/* X REPORT TABLE */}
       {xReportRows.length > 0 && (
         <div className={styles.tableWrap}>
-          <h3>
-            X-Report — {new Date().toLocaleDateString()}
-          </h3>
+          <h3>X-Report — {new Date().toLocaleDateString()}</h3>
       
           <table className={styles.table}>
             <thead>
               <tr>
                 <th>Time</th>
                 <th>Item</th>
-                <th>Price ($)</th>
+                <th>Qty</th>
+                <th>Total ($)</th>
               </tr>
             </thead>
             <tbody>
-              {xReportRows.map((row, index) => (
-                <tr
-                  key={index}
-                  style={row.totalRow ? { fontWeight: "bold", background: "#eee" } : {}}
-                >
-                  <td>{row.time}</td>
-                  <td>{row.item}</td>
-                  <td>{row.price.toFixed(2)}</td>
+              {xReportRows.map((r, i) => (
+                <tr key={i} style={r.totalRow ? { fontWeight: "bold" } : {}}>
+                  <td>{r.time}</td>
+                  <td>{r.item}</td>
+                  <td>{r.qty}</td>
+                  <td>{r.price.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -482,13 +583,10 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Z REPORT TABLE */}
       {zReportRows.length > 0 && (
         <div className={styles.tableWrap} style={{ marginTop: "30px" }}>
-          <h3>
-            Z-Report — {new Date().toLocaleDateString()}
-          </h3>
-      
+          <h3>Z-Report — {new Date().toLocaleDateString()}</h3>
+
           <table className={styles.table}>
             <thead>
               <tr>
@@ -497,7 +595,7 @@ useEffect(() => {
               </tr>
             </thead>
             <tbody>
-              <tr style={{ fontWeight: "bold"}}>
+              <tr style={{ fontWeight: "bold" }}>
                 <td>{zReportRows[0].label}</td>
                 <td>{zReportRows[0].total.toFixed(2)}</td>
               </tr>
@@ -508,51 +606,66 @@ useEffect(() => {
     </section>
   );
 
-  // MAIN RENDER ======================================================
   return (
     <div className={styles.wrap}>
       <header className={styles.topbar}>
         <h1 className={styles.title}>Manager Dashboard</h1>
 
         <nav className={styles.links}>
-          <Link className={styles.link} href="/cashier">Cashier</Link>
-          <Link className={styles.link} href="/kiosk">Kiosk</Link>
+          <Link className={styles.link} href="/cashier">
+            Cashier
+          </Link>
+          <Link className={styles.link} href="/kitchen">
+            Kitchen
+          </Link>
+          <Link className={styles.link} href="/kiosk">
+            Kiosk
+          </Link>
         </nav>
       </header>
 
       <main className={styles.layout}>
         <aside className={styles.sidebar}>
           <button
-            className={`${styles.tab} ${activeTab === "sales" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "sales" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("sales")}
           >
             Sales
           </button>
 
           <button
-            className={`${styles.tab} ${activeTab === "menu" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "menu" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("menu")}
           >
             Menu Items
           </button>
 
           <button
-            className={`${styles.tab} ${activeTab === "inventory" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "inventory" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("inventory")}
           >
             Inventory
           </button>
 
           <button
-            className={`${styles.tab} ${activeTab === "restock" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "restock" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("restock")}
           >
             Restocks
           </button>
 
-          {/*REPORTS TAB */}
           <button
-            className={`${styles.tab} ${activeTab === "reports" ? styles.active : ""}`}
+            className={`${styles.tab} ${
+              activeTab === "reports" ? styles.active : ""
+            }`}
             onClick={() => setActiveTab("reports")}
           >
             Reports
