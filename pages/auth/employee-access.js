@@ -26,8 +26,6 @@ export default function EmployeeAccess() {
         return;
       }
 
-      // ✅
- After Google, land on the cashier view
       await signIn("google", {
         callbackUrl: "/cashier",
       });
