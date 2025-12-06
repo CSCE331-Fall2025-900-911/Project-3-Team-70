@@ -154,42 +154,32 @@ export default function ManagerPage() {
   }, []);
 
   function generateXReport() {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const today = new Date().toISOString().slice(0, 10);
+    if (!sales || sales.length === 0) {
+      setXReportRows([]);
+      return;
+    }
 
-    const todaysOrders = orders.filter((o) => o.time.startsWith(today));
+    const rows = sales.map((row) => ({
+      time: row.time,   // from transformed sales
+      item: row.item,
+      qty: row.qty,
+      price: Number(row.total), // your backend already provides item total
+      totalRow: false
+    }));
 
-    const rows = [];
+    // Daily total for ALL items
+    const grandTotal = rows.reduce((sum, r) => sum + r.price, 0);
 
-    todaysOrders.forEach((order) => {
-      const dateTime = new Date(order.time);
-      const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })}`;
-
-      order.items.forEach((item) => {
-        rows.push({
-          time: formatted,
-          item: item.name,
-          price: Number(item.price),
-          totalRow: false,
-        });
-      });
-
-      const grandTotal = todaysSales.reduce((acc, s) => acc + s.total, 0);
-      if (todaysSales.length > 0) {
-        rows.push({
-          time: "",
-          item: "Order Total",
-          price: grandTotal,
-          totalRow: true,
-        });
-      }
-
-      setZReportRows([]);
-      setXReportRows(rows);
+    rows.push({
+      time: "",
+      item: "Daily Total",
+      qty: "",
+      price: grandTotal,
+      totalRow: true,
     });
+
+    setZReportRows([]);
+    setXReportRows(rows);
   }
 
   useEffect(() => {
@@ -209,19 +199,22 @@ export default function ManagerPage() {
   }, []);
 
   function generateZReport() {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const today = new Date().toISOString().slice(0, 10);
+    if (!sales || sales.length === 0) {
+      setZReportRows([]);
+      return;
+    }
 
-    const todaysOrders = orders.filter((o) => o.time.startsWith(today));
-
-    const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
+    // Total revenue = sum of all item totals shown in Sales tab
+    const totalRevenue = sales.reduce(
+      (sum, row) => sum + Number(row.total || 0),
+      0
+    );
 
     setXReportRows([]);
-
     setZReportRows([
       {
-        label: "Total Revenue",
-        total: grandTotal,
+        label: "Total Revenue Today",
+        total: totalRevenue,
       },
     ]);
   }
@@ -555,23 +548,28 @@ export default function ManagerPage() {
           Run Z Report
         </button>
       </div>
-
       {xReportRows.length > 0 && (
         <div className={styles.tableWrap}>
-          <h3>Z-Report — {new Date().toLocaleDateString()}</h3>
-
+          <h3>X-Report — {new Date().toLocaleDateString()}</h3>
+      
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Description</th>
+                <th>Time</th>
+                <th>Item</th>
+                <th>Qty</th>
                 <th>Total ($)</th>
               </tr>
             </thead>
             <tbody>
-              <tr style={{ fontWeight: "bold" }}>
-                <td>{zReportRows[0].label}</td>
-                <td>{zReportRows[0].total.toFixed(2)}</td>
-              </tr>
+              {xReportRows.map((r, i) => (
+                <tr key={i} style={r.totalRow ? { fontWeight: "bold" } : {}}>
+                  <td>{r.time}</td>
+                  <td>{r.item}</td>
+                  <td>{r.qty}</td>
+                  <td>{r.price.toFixed(2)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
