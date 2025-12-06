@@ -275,7 +275,7 @@ export default function KioskPage() {
     { id: 2, name: "Whole Milk", price: 1, allergy: "Dairy" },
     { id: 3, name: "Skim Milk", price: 1, allergy: "Dairy" },
     { id: 4, name: "Oat Milk", price: 1, allergy: "None" },
-    { id: 5, name: "Soy Milk", price: 1, allergy: "None" },
+    { id: 5, name: "Soy Milk", price: 1, allergy: "Soy" },
     { id: 6, name: "Condensed Milk", price: 1, allergy: "Dairy" },
     { id: 7, name: "Coconut Milk", price: 1, allergy: "None" },
     { id: 8, name: "Non-dairy Creamer", price: 1, allergy: "None" },
@@ -298,6 +298,7 @@ export default function KioskPage() {
     { id: 25, name: "Strawberry Popping Boba", price: 1, allergy: "None" },
     { id: 26, name: "Mango Popping Boba", price: 1, allergy: "None" }
   ];
+
 
   // === CUSTOMIZATION UI ===
   const DrinkDetailsPage = () => {
@@ -1061,6 +1062,7 @@ export default function KioskPage() {
           marginBottom: "30px",
         }}
       >
+
         {categories.map((cat) => (
           <button
             key={cat}
