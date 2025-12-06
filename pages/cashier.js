@@ -103,7 +103,7 @@ export default function CashierPage() {
 
     try {
       const items = order.map((i) => ({
-        menuID: i.id,
+        menuID: i.menuid,
         quantity: i.qty,
         priceAtPurchase: Number(i.price || 0),
       }));

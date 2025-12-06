@@ -11,8 +11,8 @@ async function sendOrderToSystem(order) {
 
   try {
     const items = rawItems.map((i) => ({
-      menuID: i.id,
-      quantity: 1, // kiosk items are one each
+      menuID: i.menuid,                      // FIXED
+      quantity: Number(i.quantity || 1),     // matches kiosk
       priceAtPurchase: Number(i.price || 0),
       size: null,
     }));
@@ -41,6 +41,7 @@ async function sendOrderToSystem(order) {
     return false;
   }
 }
+
 
 
 
@@ -750,6 +751,7 @@ export default function KioskPage() {
       return (
         <div style={{ padding: "20px" }}>
           <h2 style={{ fontSize: "36px" }}>Payment</h2>
+          
 
           <p style={{ fontSize: "22px" }}>
             Choose a payment method:
@@ -1337,8 +1339,8 @@ export default function KioskPage() {
           window.location.href = "/";
         }}
         style={{
-          position: "fixed",
-          bottom: "20px",
+          position: "absolute",
+          top: "200px",
           left: "20px",
           padding: "16px 24px",
           backgroundColor: "#500000",

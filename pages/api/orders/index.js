@@ -70,7 +70,7 @@ async function handleCreateOrder(req, res) {
 
       params.push(
         nextOrderItemID++,                 // orderItemID
-        item.menuID,                      // menuID
+        item.menuid,                      // menuID
         Number(item.priceAtPurchase || 0),// priceAtPurchase
         Number(item.quantity || 0),       // quantityPurchased
         orderID,                          // orderID (FK to ordertest)
