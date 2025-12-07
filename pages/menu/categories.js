@@ -91,14 +91,19 @@ export default function AutoCycleCategoriesPage() {
     <div
       style={{
         backgroundColor: "#f8f0d7ff",
-        minHeight: "100vh",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
         padding: "20px",
         color: "#000",
+        overflow: "hidden",
       }}
     >
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
-
+    
       {!loading && !error && (
         <div
           style={{
