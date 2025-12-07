@@ -6,8 +6,8 @@ export default function AutoCycleCategoriesPage() {
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [boxHeight, setBoxHeight] = useState(0);
 
-  const [selectedItem, setSelectedItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -43,18 +43,18 @@ export default function AutoCycleCategoriesPage() {
     loadMenu();
   }, []);
 
-  // Detect screen height and calculate items per page
+  // Calculate box height dynamically to fit 2x2 grid
   useEffect(() => {
-    function updateItemsPerPage() {
-      const availableHeight = window.innerHeight - 200; // header + padding buffer
-      const itemHeight = 70; // approx height per item in px
-      const perPage = Math.floor(availableHeight / itemHeight);
-      setItemsPerPage(perPage > 0 ? perPage : 1);
+    function updateBoxHeight() {
+      const gap = 20; // same as grid gap
+      const padding = 40; // container padding top + bottom
+      const availableHeight = window.innerHeight - padding - gap;
+      setBoxHeight(availableHeight / 2);
     }
 
-    updateItemsPerPage();
-    window.addEventListener("resize", updateItemsPerPage);
-    return () => window.removeEventListener("resize", updateItemsPerPage);
+    updateBoxHeight();
+    window.addEventListener("resize", updateBoxHeight);
+    return () => window.removeEventListener("resize", updateBoxHeight);
   }, []);
 
   // Cycle through categories and pages
@@ -69,10 +69,9 @@ export default function AutoCycleCategoriesPage() {
       if (currentPageIndex + 1 < totalPages) {
         setCurrentPageIndex((prev) => prev + 1);
       } else {
-        // Move to next 3 categories
         setCurrentPageIndex(0);
         setCurrentCategoryIndex((prev) =>
-          prev + 3 >= categories.length ? 0 : prev + 3
+          prev + 4 >= categories.length ? 0 : prev + 4
         );
       }
     }, 10000);
@@ -80,44 +79,45 @@ export default function AutoCycleCategoriesPage() {
     return () => clearInterval(interval);
   }, [categories, currentCategoryIndex, currentPageIndex, menuItems, itemsPerPage]);
 
-  const handlePress = (id) => {
-    setSelectedItem(id);
-    setTimeout(() => setSelectedItem(null), 200);
-  };
-
-  // Get current three categories
+  // Get current four categories
   const currentCategories = [
     categories[currentCategoryIndex],
     categories[currentCategoryIndex + 1] || null,
     categories[currentCategoryIndex + 2] || null,
+    categories[currentCategoryIndex + 3] || null,
   ].filter(Boolean);
 
   return (
     <div
       style={{
         backgroundColor: "#f8f0d7ff",
-        minHeight: "100vh",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
         padding: "20px",
         color: "#000",
+        overflow: "hidden",
       }}
     >
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
-
+    
       {!loading && !error && (
         <div
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gridTemplateRows: "repeat(2, 1fr)",
             gap: "20px",
+            maxWidth: "1200px",
+            margin: "0 auto",
           }}
         >
-          {currentCategories.map((cat) => {
+          {currentCategories.map((cat, idx) => {
             const items = menuItems.filter((i) => i.category === cat);
-            const totalPages = Math.ceil(items.length / itemsPerPage);
-            const pageIndex =
-              cat === currentCategories[0] ? currentPageIndex : 0; // only paginate first category
+            const pageIndex = idx === 0 ? currentPageIndex : 0;
             const itemsToShow = items.slice(
               pageIndex * itemsPerPage,
               (pageIndex + 1) * itemsPerPage
@@ -127,44 +127,44 @@ export default function AutoCycleCategoriesPage() {
               <div
                 key={cat}
                 style={{
-                  flex: "1 1 300px",
-                  maxWidth: "500px",
                   backgroundColor: "#fff8dc",
                   borderRadius: "15px",
                   padding: "15px",
-                  boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                  display: "flex",
+                  flexDirection: "column",
+                  height: `${boxHeight}px`,
                   overflow: "hidden",
                 }}
               >
-                <h1 style={{ textAlign: "center", fontSize: "28px" }}>
-                  {cat}
-                </h1>
-
-                <div style={{ marginTop: "10px" }}>
+                <h1 style={{ textAlign: "center", fontSize: "24px" }}>{cat}</h1>
+                <div style={{ marginTop: "10px", flexGrow: 1 }}>
                   {itemsToShow.map((item) => {
-                    const isSelected = selectedItem === item.id;
+                    const price = `$${Number(item.price).toFixed(2)}`;
                     return (
                       <div
                         key={item.id}
-                        onClick={() => handlePress(item.id)}
                         style={{
-                          backgroundColor: isSelected ? "#ffe680" : "#fff",
-                          borderRadius: "12px",
-                          boxShadow: isSelected
-                            ? "0 0 0 4px #FFD700"
-                            : "0 2px 6px rgba(0,0,0,0.1)",
-                          padding: "12px",
-                          marginBottom: "10px",
-                          cursor: "pointer",
-                          transition: "all 0.2s ease",
+                          fontSize: "18px",
+                          marginBottom: "8px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          whiteSpace: "nowrap",
+                          fontFamily: "monospace",
                         }}
                       >
-                        <h2 style={{ fontSize: "20px", margin: "0 0 5px 0" }}>
+                        <span style={{ flexGrow: 1, overflow: "hidden" }}>
                           {item.name}
-                        </h2>
-                        <p style={{ fontSize: "16px", margin: 0 }}>
-                          ${Number(item.price).toFixed(2)}
-                        </p>
+                          <span
+                            style={{
+                              borderBottom: "1px dashed #000",
+                              margin: "0 8px",
+                              width: "100%",
+                              display: "inline-block",
+                              transform: "translateY(-3px)",
+                            }}
+                          ></span>
+                        </span>
+                        <span>{price}</span>
                       </div>
                     );
                   })}
