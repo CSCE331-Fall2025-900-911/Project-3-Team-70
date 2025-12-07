@@ -457,6 +457,9 @@ export default function KioskPage() {
         <img
           src={detailsItem.image}
           alt={detailsItem.name}
+          onError={(e) => {
+             e.target.src = "/Images/default.png";
+            }}
           style={{
             width: "60%",
             maxWidth: "400px",
@@ -623,22 +626,35 @@ export default function KioskPage() {
     );
 
     return (
-      <div style={{ padding: "20px" }}>
-        <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
+      <div
+        style={{
+          padding: accessibilityMode ? "40px" : "20px",
+          backgroundColor: accessibilityMode ? "#000" : "#fff",
+          color: accessibilityMode ? "#fff" : "#000",
+          minHeight: "100vh",
+          transition: "all 0.3s ease",
+        }}
+      >
+        <h2 style={{ fontSize: accessibilityMode ? "48px" : "36px" }}>
+          Your Cart
+        </h2>
 
         {cart.length === 0 ? (
-          <p style={{ fontSize: "22px" }}>Your cart is empty.</p>
+          <p style={{ fontSize: accessibilityMode ? "28px" : "22px" }}>
+            Your cart is empty.
+          </p>
         ) : (
           cart.map((item, index) => (
             <div
               key={index}
               style={{
-                padding: "15px",
+                padding: accessibilityMode ? "25px" : "15px",
                 margin: "15px 0",
-                border: "1px solid #ccc",
+                border: accessibilityMode ? "2px solid #FFD700" : "1px solid #ccc",
                 borderRadius: "12px",
-                fontSize: "20px",
-                backgroundColor: "#fafafa",
+                fontSize: accessibilityMode ? "26px" : "20px",
+                backgroundColor: accessibilityMode ? "#111" : "#fafafa",
+                color: accessibilityMode ? "#fff" : "#000",
                 position: "relative",
               }}
             >
@@ -647,14 +663,14 @@ export default function KioskPage() {
                 onClick={() => removeItem(index)}
                 style={{
                   position: "absolute",
-                  top: "10px",
-                  right: "10px",
+                  top: accessibilityMode ? "15px" : "10px",
+                  right: accessibilityMode ? "15px" : "10px",
                   backgroundColor: "#b00000",
                   color: "white",
                   border: "none",
-                  padding: "8px 14px",
+                  padding: accessibilityMode ? "12px 18px" : "8px 14px",
                   borderRadius: "8px",
-                  fontSize: "16px",
+                  fontSize: accessibilityMode ? "20px" : "16px",
                   cursor: "pointer",
                 }}
               >
@@ -664,12 +680,12 @@ export default function KioskPage() {
               {/* NAME + PRICE */}
               <p
                 style={{
-                  fontSize: "24px",
+                  fontSize: accessibilityMode ? "32px" : "24px",
                   fontWeight: "bold",
                   marginBottom: "10px",
                 }}
               >
-                {item.name} — ${ (item.finalPrice || item.price).toFixed(2) }
+                {item.name} — ${(item.finalPrice || item.price).toFixed(2)}
               </p>
 
               {/* SWEETNESS */}
@@ -707,7 +723,7 @@ export default function KioskPage() {
         {cart.length > 0 && (
           <h2
             style={{
-              fontSize: "32px",
+              fontSize: accessibilityMode ? "40px" : "32px",
               marginTop: "30px",
               textAlign: "right",
               paddingRight: "10px",
@@ -717,31 +733,35 @@ export default function KioskPage() {
           </h2>
         )}
 
-        {/* BUTTONS */}
+        {/* PROCEED BUTTON */}
         <button
           onClick={() => setScreen("checkout")}
           disabled={cart.length === 0}
           style={{
-            padding: "20px 40px",
+            padding: accessibilityMode ? "28px 50px" : "20px 40px",
             backgroundColor: "#FFD700",
             border: "none",
             borderRadius: "10px",
-            fontSize: "24px",
+            fontSize: accessibilityMode ? "32px" : "24px",
             marginTop: "20px",
+            cursor: "pointer",
           }}
         >
           Proceed to Checkout
         </button>
 
+        {/* BACK BUTTON */}
         <button
           onClick={() => setScreen("menu")}
           style={{
-            padding: "15px 30px",
-            backgroundColor: "#ccc",
+            padding: accessibilityMode ? "22px 40px" : "15px 30px",
+            backgroundColor: accessibilityMode ? "#555" : "#ccc",
             border: "none",
             borderRadius: "10px",
-            fontSize: "20px",
+            fontSize: accessibilityMode ? "28px" : "20px",
             marginLeft: "20px",
+            color: accessibilityMode ? "#fff" : "#000",
+            cursor: "pointer",
           }}
         >
           Back
@@ -751,164 +771,133 @@ export default function KioskPage() {
   };
 
 
-  const CheckoutScreen = () => {
-  const total = cart.reduce(
-    (sum, item) => sum + Number(item.price),
-    0
-  );
 
-  // Points/discount (we’ll wire this up in 2.3)
-  const maxRedeemable =
-    typeof loyaltyPoints === "number"
-      ? Math.min(loyaltyPoints, Math.floor(total))
-      : 0;
-  const applied = Math.min(
-    pointsToRedeem || 0,
-    maxRedeemable
-  );
-  const finalTotal = total - applied;
+  // === CHECKOUT SCREEN ===
+  const CheckoutScreen = ({ accessibilityMode }) => {
+    // Use finalPrice when available, otherwise fallback to base price
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.finalPrice || item.price),
+      0
+    );
 
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ fontSize: "36px" }}>Order Summary</h2>
+    return (
+      <div
+        style={{
+          padding: accessibilityMode ? "40px" : "20px",
+          backgroundColor: accessibilityMode ? "#000" : "#fff",
+          color: accessibilityMode ? "#fff" : "#000",
+          minHeight: "100vh",
+          transition: "all 0.3s ease",
+        }}
+      >
+        <h2 style={{ fontSize: accessibilityMode ? "48px" : "36px" }}>
+          Order Summary
+        </h2>
 
-      {cart.length === 0 && (
-        <p style={{ fontSize: "20px", marginTop: "10px" }}>
-          Your cart is empty.
-        </p>
-      )}
+        {cart.map((item, index) => (
+          <div
+            key={index}
+            style={{
+              padding: accessibilityMode ? "25px" : "15px",
+              margin: "15px 0",
+              border: accessibilityMode ? "2px solid #FFD700" : "1px solid #ccc",
+              borderRadius: "12px",
+              backgroundColor: accessibilityMode ? "#111" : "#fafafa",
+              color: accessibilityMode ? "#fff" : "#000",
+              fontSize: accessibilityMode ? "26px" : "20px",
+              transition: "all 0.3s ease",
+            }}
+          >
+            {/* NAME + FINAL PRICE */}
+            <p
+              style={{
+                fontSize: accessibilityMode ? "32px" : "24px",
+                fontWeight: "bold",
+                marginBottom: "10px",
+              }}
+            >
+              {item.name} — ${(item.finalPrice || item.price).toFixed(2)}
+            </p>
 
-      {cart.map((item, index) => (
-        <div
-          key={index}
-          style={{
-            fontSize: "22px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            margin: "8px 0",
-          }}
-        >
-          <div>
-            <div>
-              {item.name} — ${Number(item.price).toFixed(2)}
-            </div>
+            {/* SWEETNESS */}
+            {item.sweetness && (
+              <p style={{ margin: "5px 0" }}>
+                <strong>Sweetness:</strong> {item.sweetness}
+              </p>
+            )}
+
+            {/* ICE */}
+            {item.iceLevel && (
+              <p style={{ margin: "5px 0" }}>
+                <strong>Ice:</strong> {item.iceLevel}
+              </p>
+            )}
+
+            {/* TOPPINGS */}
             {item.toppings && item.toppings.length > 0 && (
-              <div
-                style={{
-                  fontSize: "16px",
-                  opacity: 0.8,
-                  marginTop: "4px",
-                }}
-              >
-                Toppings:{" "}
-                {item.toppings
-                  .map((t) => t.inventoryName)
-                  .join(", ")}
+              <div style={{ marginTop: "10px" }}>
+                <strong>Toppings:</strong>
+                <ul style={{ marginLeft: "20px", marginTop: "5px" }}>
+                  {item.toppings.map((t, idx) => (
+                    <li key={idx}>
+                      {t.name} (+${t.price.toFixed(2)})
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
-          <button
-            onClick={() => removeFromCart(index)}
-            style={{
-              padding: "8px 14px",
-              backgroundColor: "#b91c1c",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              fontSize: "16px",
-              cursor: "pointer",
-            }}
-          >
-            Remove
-          </button>
-        </div>
-      ))}
+        ))}
 
-      {/* Points / discount section */}
-      {cart.length > 0 && typeof loyaltyPoints === "number" && (
-        <div
+        {/* TOTAL */}
+        <h3
           style={{
+            fontSize: accessibilityMode ? "40px" : "28px",
             marginTop: "20px",
-            padding: "12px",
-            borderRadius: "10px",
-            backgroundColor: "#f3f4f6",
+            textAlign: "right",
+            paddingRight: "10px",
           }}
         >
-          <p style={{ fontSize: "18px", marginBottom: "6px" }}>
-            Available points: {loyaltyPoints}
-          </p>
-          <label style={{ fontSize: "16px" }}>
-            Apply points (max {maxRedeemable}):
-            <input
-              type="number"
-              min="0"
-              max={maxRedeemable}
-              value={pointsToRedeem}
-              onChange={(e) =>
-                setPointsToRedeem(
-                  Math.max(
-                    0,
-                    Math.min(
-                      maxRedeemable,
-                      Number(e.target.value) || 0
-                    )
-                  )
-                )
-              }
-              style={{
-                marginLeft: "10px",
-                padding: "4px 8px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-                width: "80px",
-              }}
-            />
-          </label>
-          <p style={{ fontSize: "16px", marginTop: "6px" }}>
-            Discount: ${applied.toFixed(2)}
-          </p>
-        </div>
-      )}
+          Total: ${total.toFixed(2)}
+        </h3>
 
-      <h3 style={{ fontSize: "28px", marginTop: "20px" }}>
-        Total: $
-        {(
-          cart.length > 0 ? finalTotal : 0
-        ).toFixed(2)}
-      </h3>
+        {/* CONTINUE TO PAYMENT */}
+        <button
+          onClick={() => setScreen("payment")}
+          style={{
+            padding: accessibilityMode ? "28px 50px" : "20px 40px",
+            backgroundColor: "#FFD700",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: accessibilityMode ? "32px" : "24px",
+            cursor: "pointer",
+            marginTop: "20px",
+          }}
+        >
+          Continue to Payment
+        </button>
 
-      <button
-        onClick={() => setScreen("payment")}
-        style={{
-          padding: "20px 40px",
-          backgroundColor: "#FFD700",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "24px",
-          marginTop: "20px",
-        }}
-        disabled={cart.length === 0}
-      >
-        Continue to Payment
-      </button>
+        {/* BACK BUTTON */}
+        <button
+          onClick={() => setScreen("cart")}
+          style={{
+            padding: accessibilityMode ? "22px 40px" : "15px 30px",
+            backgroundColor: accessibilityMode ? "#555" : "#ccc",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: accessibilityMode ? "28px" : "20px",
+            marginLeft: "20px",
+            color: accessibilityMode ? "#fff" : "#000",
+            cursor: "pointer",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
 
-      <button
-        onClick={() => setScreen("cart")}
-        style={{
-          padding: "15px 30px",
-          backgroundColor: "#ccc",
-          borderRadius: "10px",
-          border: "none",
-          fontSize: "20px",
-          marginLeft: "20px",
-        }}
-      >
-        Back
-      </button>
-    </div>
-  );
-};
+
 
   // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
   const PaymentScreen = ({ accessibilityMode }) => {
@@ -1343,7 +1332,7 @@ export default function KioskPage() {
                       src={sampleItem.image}
                       alt={cat}
                       onError={(e) => {
-                        e.target.src = "/images/default.png";
+                        e.target.src = "/Images/default.png";
                       }}
                       style={{
                         width: "120px",

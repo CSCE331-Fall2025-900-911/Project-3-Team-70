@@ -1,19 +1,22 @@
 // pages/index.js
 export default function HomePage() {
   const buttonStyle = {
-    padding: "10px 20px",
+    padding: "12px 24px",
     fontSize: "18px",
-    borderRadius: "10px",
+    borderRadius: "12px",
     backgroundColor: "#500000",
     color: "#fff",
     border: "none",
     cursor: "pointer",
-    margin: "15px",
+    margin: "10px",
     minWidth: "200px",
-    transition: "all 0.2s ease",
+    transition: "0.2s",
     textDecoration: "none",
     display: "inline-block",
     textAlign: "center",
+
+    // Clean modern safe-font stack
+    fontFamily: `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`,
   };
 
   return (
@@ -22,42 +25,62 @@ export default function HomePage() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        backgroundColor: "#f4f4f4",
-        color: "#000",
+        justifyContent: "space-evenly",
+        height: "100vh",       // ENSURES NO SCROLLING
+        width: "100vw",
+        overflow: "hidden",    // PREVENT SCROLL
+        backgroundColor: "#000",
+        color: "#fff",
         textAlign: "center",
-        padding: "20px",
+        padding: "0",
+
+        // Beautiful clean system font
+        fontFamily: `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`,
       }}
     >
-      <h1 style={{ fontSize: "36px", marginBottom: "30px" }}>
-        HAIIIIII ヾ(≧▽≦*)o
+      {/* Logo */}
+      <img
+        src="/Images/ShareteaLogo.jpg"
+        alt="Sharetea"
+        style={{
+          width: "320px",
+          height: "auto",
+          border: "4px solid white",
+          borderRadius: "10px",
+          boxShadow: "0 0 25px rgba(255,255,255,0.1)",
+        }}
+      />
+
+      {/* Title */}
+      <h1
+        style={{
+          fontSize: "40px",
+          margin: "0",
+          fontWeight: "600",
+          letterSpacing: "1px",
+        }}
+      >
+        Welcome to Sharetea
       </h1>
 
-      <h1 style={{ fontSize: "36px", marginBottom: "30px" }}>
-        W-WELCOME TO MY PROJECT, END-USER-SENPAI (*/ω＼*)
-      </h1>
+      {/* Subtitle */}
+      <h2
+        style={{
+          fontSize: "22px",
+          margin: "0",
+          opacity: 0.9,
+          fontWeight: "300",
+        }}
+      >
+        Crafted with passion. Served with joy.
+      </h2>
 
-      <h1 style={{ fontSize: "36px", marginBottom: "30px" }}>
-        YOU CAN USE THE BUTTONS TO NAVIGATE TO OTHER PAGES DESU （〃｀ 3′〃）
-      </h1>
-
-      <div>
-        {/* Public */}
-        <a href="/kiosk" style={buttonStyle}>
-          KIOSK
-        </a>
-
-        {/* Staff-gated flows */}
-        <a href="/auth/employee-access" style={buttonStyle}>
-          CASHIER
-        </a>
-        <a href="/auth/manager-access" style={buttonStyle}>
-          MANAGER
-        </a>
-        <a href="/kitchen" style={buttonStyle}>
-          KITCHEN
-        </a>
+      {/* Buttons */}
+      <div style={{ marginTop: "10px" }}>
+        <a href="/kiosk" style={buttonStyle}>KIOSK</a>
+        <a href="/auth/employee-access" style={buttonStyle}>CASHIER</a>
+        <a href="/auth/manager-access" style={buttonStyle}>MANAGER</a>
+        <a href="/kitchen" style={buttonStyle}>KITCHEN</a>
       </div>
     </div>
   );
