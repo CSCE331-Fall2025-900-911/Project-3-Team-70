@@ -1,4 +1,3 @@
-// pages/auth/manager-access.js
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 
@@ -21,28 +20,19 @@ export default function ManagerAccess() {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setErr(data.error || "Incorrect password.");
+      setErr(data.error || "Invalid password");
       return;
     }
 
-    // Verified → Google login
-    signIn("google", {
-      callbackUrl: "/staff/after-login?role=manager",
+    await signIn("google", {
+      callbackUrl: "/manager",
     });
   };
 
   return (
     <div style={{ padding: 40 }}>
       <h1>Manager Access</h1>
-      <form
-        onSubmit={submit}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          maxWidth: 300,
-        }}
-      >
+      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 260 }}>
         <input
           type="password"
           value={pw}

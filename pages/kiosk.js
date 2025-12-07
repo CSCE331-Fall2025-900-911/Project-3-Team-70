@@ -174,6 +174,8 @@ function WeatherWidget({ accessibilityMode }) {
   );
 }
 
+
+
 // === Main Page ===
 export default function KioskPage() {
   const [accessibilityMode, setAccessibilityMode] = useState(false);
@@ -244,6 +246,7 @@ export default function KioskPage() {
       try {
         const response = await fetch("/api/menu");
         const data = await response.json();
+
 
         const formatted = data.map((item) => {
           const id = item.menuid ?? item.id;
@@ -360,9 +363,69 @@ export default function KioskPage() {
     }
   };
 
-  // === DRINK DETAILS PAGE ===
+  // === INVENTORY DATA (temporary local version) ===
+  const inventoryData = [
+    { id: 1, name: "Sugar", price: 1, allergy: "None" },
+    { id: 2, name: "Whole Milk", price: 1, allergy: "Dairy" },
+    { id: 3, name: "Skim Milk", price: 1, allergy: "Dairy" },
+    { id: 4, name: "Oat Milk", price: 1, allergy: "None" },
+    { id: 5, name: "Soy Milk", price: 1, allergy: "Soy" },
+    { id: 6, name: "Condensed Milk", price: 1, allergy: "Dairy" },
+    { id: 7, name: "Coconut Milk", price: 1, allergy: "None" },
+    { id: 8, name: "Non-dairy Creamer", price: 1, allergy: "None" },
+    { id: 9, name: "Ice Cream", price: 1.5, allergy: "Dairy" },
+    { id: 10, name: "Black Tea", price: 1, allergy: "None" },
+    { id: 11, name: "Green Tea", price: 1, allergy: "None" },
+    { id: 12, name: "Oolong Tea", price: 1, allergy: "None" },
+    { id: 13, name: "Thai Tea", price: 1, allergy: "Dairy" },
+    { id: 14, name: "Honey", price: 1, allergy: "None" },
+    { id: 15, name: "Honey Jelly", price: 1, allergy: "None" },
+    { id: 16, name: "Lychee Jelly", price: 1, allergy: "None" },
+    { id: 17, name: "Stevia", price: 1, allergy: "None" },
+    { id: 18, name: "Taro Powder", price: 1, allergy: "Dairy" },
+    { id: 19, name: "Matcha Powder", price: 1, allergy: "None" },
+    { id: 20, name: "Chocolate Syrup", price: 1, allergy: "Nuts" },
+    { id: 21, name: "Coffee Syrup", price: 1, allergy: "Nuts" },
+    { id: 22, name: "Coffee Jelly", price: 1, allergy: "None" },
+    { id: 23, name: "Tapioca Pearls", price: 1, allergy: "None" },
+    { id: 24, name: "Crystal Boba", price: 1, allergy: "None" },
+    { id: 25, name: "Strawberry Popping Boba", price: 1, allergy: "None" },
+    { id: 26, name: "Mango Popping Boba", price: 1, allergy: "None" }
+  ];
+
+
+  // === CUSTOMIZATION UI ===
   const DrinkDetailsPage = () => {
+    const [selectedToppings, setSelectedToppings] = useState([]);
+    const [sweetness, setSweetness] = useState("100%");
+    const [iceLevel, setIceLevel] = useState("Regular Ice");
+
     if (!detailsItem) return null;
+
+    // Match by ID, not object reference
+    const toggleTopping = (topping) => {
+      setSelectedToppings((prev) =>
+        prev.some((t) => t.id === topping.id)
+          ? prev.filter((t) => t.id !== topping.id)
+          : [...prev, topping]
+      );
+    };
+
+    const totalPrice =
+      Number(detailsItem.price) +
+      selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
+
+    const finalize = () => {
+      addToCart({
+        ...detailsItem,
+        toppings: selectedToppings,
+        sweetness,
+        iceLevel,
+        finalPrice: totalPrice
+      });
+
+      setScreen("menu");
+    };
 
     return (
       <div
@@ -410,12 +473,14 @@ export default function KioskPage() {
         <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
 
         <p style={{ fontSize: "24px", opacity: 0.9 }}>
-          ${Number(detailsItem.price).toFixed(2)}
+          Base Price: ${Number(detailsItem.price).toFixed(2)}
         </p>
 
-        <p
+        {/* TOPPINGS */}
+        <h2 style={{ fontSize: "30px", marginTop: "20px" }}>Toppings</h2>
+
+        <div
           style={{
-            fontSize: "20px",
             width: "80%",
             margin: "0 auto",
             marginBottom: "40px",
@@ -423,7 +488,8 @@ export default function KioskPage() {
           }}
         >
           {detailsItem.description}
-        </p>
+        </div>
+
         {/* Toppings selection */}
         {toppings.length > 0 && (
           <div
@@ -437,83 +503,114 @@ export default function KioskPage() {
             <h3 style={{ fontSize: "24px", marginBottom: "10px" }}>
               Customize your drink
             </h3>
+
             {toppingsError && (
               <p style={{ color: "red" }}>{toppingsError}</p>
             )}
+
             {toppings.map((top) => {
               const checked = selectedToppings.some(
                 (t) => t.inventoryID === top.inventoryID
               );
+
               return (
-                <label
-                  key={top.inventoryID}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "8px 0",
-                    borderBottom: "1px solid #eee",
-                    fontSize: "18px",
-                    fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-                  }}
-                >
-                  <span>
-                    {top.inventoryName}
-                    {top.allergy && (
-                      <span
-                        style={{
-                          fontSize: "14px",
-                          marginLeft: "6px",
-                          color: "#b91c1c",
-                        }}
-                      >
-                        ({top.allergy})
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ marginLeft: "8px" }}>
-                    +${top.addOnPrice.toFixed(2)}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => {
-                      setSelectedToppings((prev) => {
-                        if (checked) {
-                          return prev.filter(
-                            (t) =>
-                              t.inventoryID !== top.inventoryID
-                          );
-                        }
-                        return [...prev, top];
-                      });
+                <div key={top.inventoryID} style={{ marginBottom: "10px" }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 0",
+                      borderBottom: "1px solid #eee",
+                      fontSize: "18px",
+                      fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
                     }}
-                  />
-                </label>
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        fontSize: accessibilityMode ? "26px" : "20px",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleTopping(top)}
+                        style={{ width: "25px", height: "25px" }}
+                      />
+                      {top.name}
+                    </label>
+
+                    <span style={{ fontSize: accessibilityMode ? "22px" : "18px" }}>
+                      + ${Number(top.price).toFixed(2)}
+                    </span>
+                  </label>
+
+                  {/* Allergy Warning */}
+                  {top.allergy && (
+                    <p
+                      style={{
+                        fontSize: accessibilityMode ? "22px" : "16px",
+                        fontWeight: "bold",
+                        color: "red",
+                        marginTop: "5px",
+                      }}
+                    >
+                      ⚠ Contains {top.allergy}
+                    </p>
+                  )}
+                </div>
               );
             })}
           </div>
         )}
 
-        <button
-          onClick={() => {
-            const basePrice = Number(detailsItem.price || 0);
-            const extrasTotal = selectedToppings.reduce(
-              (sum, t) => sum + Number(t.addOnPrice || 0),
-              0
-            );
-
-            const itemForCart = {
-              ...detailsItem,
-              toppings: selectedToppings,
-              price: (basePrice + extrasTotal).toFixed(2),
-            };
-
-            addToCart(itemForCart);
-            setSelectedToppings([]); // reset for next drink
-            setScreen("menu");
+        {/* SWEETNESS */}
+        <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
+        <select
+          value={sweetness}
+          onChange={(e) => setSweetness(e.target.value)}
+          style={{
+            padding: "10px",
+            fontSize: "20px",
+            borderRadius: "10px",
+            marginBottom: "20px",
           }}
+        >
+          <option>0%</option>
+          <option>25%</option>
+          <option>50%</option>
+          <option>75%</option>
+          <option>100%</option>
+        </select>
 
+        {/* ICE LEVEL */}
+        <h2>Ice Level</h2>
+        <select
+          value={iceLevel}
+          onChange={(e) => setIceLevel(e.target.value)}
+          style={{
+            padding: "10px",
+            fontSize: "20px",
+            borderRadius: "10px",
+            marginBottom: "20px",
+          }}
+        >
+          <option>Regular Ice</option>
+          <option>Less Ice</option>
+          <option>No Ice</option>
+          <option>Extra Ice</option>
+        </select>
+
+        {/* FINAL TOTAL */}
+        <h2 style={{ marginTop: "30px", fontSize: "30px" }}>
+          Total: ${totalPrice.toFixed(2)}
+        </h2>
+
+        <button
+          onClick={finalize}
           style={{
             padding: "20px 40px",
             backgroundColor: "#FFD700",
@@ -531,52 +628,84 @@ export default function KioskPage() {
     );
   };
 
-  const CartScreen = () => (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ fontSize: "36px" }}>Your Cart</h2>
+    const CartScreen = ({ accessibilityMode }) => {
+    const removeItem = (indexToRemove) => {
+      setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
+    };
 
-      {cart.length === 0 ? (
-        <p style={{ fontSize: "22px" }}>Your cart is empty.</p>
-      ) : (
-        cart.map((item, index) => (
-          <p key={index} style={{ fontSize: "22px" }}>
-            {item.name} — ${item.price}
-          </p>
-        ))
-      )}
+    const cartTotal = cart.reduce(
+      (sum, item) => sum + Number(item.finalPrice || item.price),
+      0
+    );
 
-      <button
-        onClick={() => setScreen("checkout")}
-        disabled={cart.length === 0}
-        style={{
-          padding: "20px 40px",
-          backgroundColor: "#FFD700",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "24px",
-          marginTop: "20px",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-        }}
-      >
-        Proceed to Checkout
-      </button>
+    return (
+      <div style={{ textAlign: "center", marginTop: "20px" }}>
+        {/* Cart Items */}
+        {cart.map((item, index) => (
+          <div key={index} style={{ marginBottom: "20px" }}>
+            <h3 style={{ fontSize: "22px" }}>{item.name}</h3>
+            <p>
+              ${Number(item.finalPrice || item.price).toFixed(2)}
+            </p>
 
-      <button
-        onClick={() => setScreen("menu")}
-        style={{
-          padding: "15px 30px",
-          backgroundColor: "#ccc",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "20px",
-          marginLeft: "20px",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-        }}
-      >
-        Back
-      </button>
-    </div>
-  );
+            <button
+              onClick={() => removeItem(index)}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: "red",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                marginTop: "10px",
+                fontSize: "18px",
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+
+        {/* Total */}
+        <h2 style={{ fontSize: "26px", marginTop: "20px" }}>
+          Total: ${cartTotal.toFixed(2)}
+        </h2>
+
+        {/* Proceed Button */}
+        <button
+          onClick={() => setScreen("checkout")}
+          disabled={cart.length === 0}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "24px",
+            marginTop: "20px",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          }}
+        >
+          Proceed to Checkout
+        </button>
+
+        {/* Back Button */}
+        <button
+          onClick={() => setScreen("menu")}
+          style={{
+            padding: "15px 30px",
+            backgroundColor: "#ccc",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "20px",
+            marginLeft: "20px",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  };
 
   const CheckoutScreen = () => {
   const total = cart.reduce(
@@ -741,8 +870,8 @@ export default function KioskPage() {
   );
 };
 
-
-  const PaymentScreen = () => {
+  // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
+  const PaymentScreen = ({ accessibilityMode }) => {
     const [confirmMethod, setConfirmMethod] = useState(null);
 
     const paymentMethods = ["Card", "Tap to Pay", "Mobile Wallet", "Cash"];
@@ -909,12 +1038,21 @@ export default function KioskPage() {
   </div>
 );
 
+  // === MAIN RENDER SWITCH ===
+  if (screen === "details") 
+    return <DrinkDetailsPage accessibilityMode={accessibilityMode} />;
 
-  if (screen === "details") return <DrinkDetailsPage />;
-  if (screen === "cart") return <CartScreen />;
-  if (screen === "checkout") return <CheckoutScreen />;
-  if (screen === "payment") return <PaymentScreen />;
-  if (screen === "success") return <SuccessScreen />;
+  if (screen === "cart") 
+    return <CartScreen accessibilityMode={accessibilityMode} />;
+
+  if (screen === "checkout") 
+    return <CheckoutScreen accessibilityMode={accessibilityMode} />;
+
+  if (screen === "payment") 
+    return <PaymentScreen accessibilityMode={accessibilityMode} />;
+
+  if (screen === "success") 
+    return <SuccessScreen accessibilityMode={accessibilityMode} />;
 
   return (
     <div
@@ -1090,6 +1228,7 @@ export default function KioskPage() {
           marginBottom: "30px",
         }}
       >
+
         {categories.map((cat) => (
           <button
             key={cat}
