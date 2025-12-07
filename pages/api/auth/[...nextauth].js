@@ -1,9 +1,8 @@
-// pages/api/auth/[...nextauth].js
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { query } from "../../../lib/db-connector";
 
-export default NextAuth({
+export const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -27,7 +26,6 @@ export default NextAuth({
         }
       } catch (err) {
         console.error("Error in signIn callback:", err);
-        // You *can* return false to block sign-in, but for now keep it true
       }
       return true;
     },
@@ -35,7 +33,6 @@ export default NextAuth({
     // Attach role from DB to the JWT
     async jwt({ token, user }) {
       try {
-        // On first call after signIn, `user` is defined; persist email into token
         if (user?.email) {
           token.email = user.email;
         }
@@ -53,7 +50,6 @@ export default NextAuth({
 
           token.role = dbRole || "customer";
         } else {
-          // No email? fall back
           token.role = token.role || "customer";
         }
       } catch (err) {
@@ -73,8 +69,10 @@ export default NextAuth({
   },
 
   pages: {
-    signIn: "/login", // your custom login page
+    signIn: "/login",
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+export default NextAuth(authOptions);

@@ -69,10 +69,10 @@ export default function AutoCycleCategoriesPage() {
       if (currentPageIndex + 1 < totalPages) {
         setCurrentPageIndex((prev) => prev + 1);
       } else {
-        // Move to next categories
+        // Move to next 3 categories
         setCurrentPageIndex(0);
         setCurrentCategoryIndex((prev) =>
-          prev + 2 >= categories.length ? 0 : prev + 2
+          prev + 3 >= categories.length ? 0 : prev + 3
         );
       }
     }, 10000);
@@ -85,10 +85,11 @@ export default function AutoCycleCategoriesPage() {
     setTimeout(() => setSelectedItem(null), 200);
   };
 
-  // Get current two categories
+  // Get current three categories
   const currentCategories = [
     categories[currentCategoryIndex],
     categories[currentCategoryIndex + 1] || null,
+    categories[currentCategoryIndex + 2] || null,
   ].filter(Boolean);
 
   return (
