@@ -277,7 +277,16 @@ export default function KioskPage() {
         const res = await fetch("/api/toppings");
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
-        setToppings(data);
+
+        // Convert API shape → UI shape
+        const formatted = data.map((t) => ({
+          id: t.inventoryID,
+          name: t.inventoryName,
+          price: Number(t.addOnPrice),
+          allergy: t.allergy,
+        }));
+
+        setToppings(formatted);
       } catch (err) {
         console.error("Error loading toppings:", err);
         setToppingsError("Could not load toppings");
@@ -285,6 +294,7 @@ export default function KioskPage() {
     }
     fetchToppings();
   }, []);
+
 
   // language widget
   useEffect(() => {
@@ -792,16 +802,37 @@ export default function KioskPage() {
 
       {cart.map((item, index) => (
         <div
-          key={index}
-          style={{
-            fontSize: "22px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            margin: "8px 0",
-            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-          }}
-        >
+        key={index}
+        style={{
+          fontSize: accessibilityMode ? "32px" : "22px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+
+          // More padding for accessibility
+          padding: accessibilityMode ? "24px" : "12px",
+
+          // High-contrast modes
+          backgroundColor: accessibilityMode ? "#111" : "#fafafa",
+          color: accessibilityMode ? "#fff" : "#000",
+
+          // Larger spacing
+          margin: accessibilityMode ? "16px 0" : "8px 0",
+
+          border: accessibilityMode ? "2px solid #FFD700" : "1px solid #ccc",
+          borderRadius: "12px",
+
+          // Stronger visual structure
+          boxShadow: accessibilityMode
+            ? "0 0 12px rgba(255,215,0,0.4)"
+            : "0 2px 6px rgba(0,0,0,0.1)",
+
+          transition: "all 0.25s ease",
+
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+        }}
+      >
+
           <div>
             <div>
               {item.name} — ${Number(item.price).toFixed(2)}
@@ -842,13 +873,24 @@ export default function KioskPage() {
       {/* Points / discount section */}
       {cart.length > 0 && typeof loyaltyPoints === "number" && (
         <div
-          style={{
-            marginTop: "20px",
-            padding: "12px",
-            borderRadius: "10px",
-            backgroundColor: "#f3f4f6",
-          }}
-        >
+        style={{
+          marginTop: "20px",
+          padding: accessibilityMode ? "20px" : "12px",
+          borderRadius: "12px",
+
+          // High contrast support:
+          backgroundColor: accessibilityMode ? "#111" : "#f3f4f6",
+          color: accessibilityMode ? "#fff" : "#000",
+
+          border: accessibilityMode ? "2px solid #FFD700" : "1px solid #ddd",
+          boxShadow: accessibilityMode
+            ? "0 0 10px rgba(255,215,0,0.3)"
+            : "0 2px 6px rgba(0,0,0,0.1)",
+
+          transition: "all 0.25s ease",
+        }}
+      >
+
           <p style={{ fontSize: "18px", marginBottom: "6px" }}>
             Available points: {loyaltyPoints}
           </p>
