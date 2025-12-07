@@ -718,6 +718,7 @@ export default function KioskPage() {
           >
             Cart Total: ${cartTotal.toFixed(2)}
           </h2>
+        )}
 
         {/* PROCEED BUTTON */}
         <button
@@ -749,7 +750,7 @@ export default function KioskPage() {
             marginLeft: "20px",
             color: accessibilityMode ? "#fff" : "#000",
             cursor: "pointer",
-            font
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           Back
