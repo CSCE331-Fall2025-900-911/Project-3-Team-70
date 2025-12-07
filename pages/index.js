@@ -46,7 +46,7 @@ export default function HomePage() {
       >
         {/* Logo */}
         <img
-          src="/Images/ShareteaLogo.jpg"
+          src="/images/ShareteaLogo.jpg"
           alt="Sharetea"
           style={{
             width: "320px",
