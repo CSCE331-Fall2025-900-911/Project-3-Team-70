@@ -89,41 +89,41 @@ export default function ManagerPage() {
 	const [zReportRows, setZReportRows] = useState([]);
 
 	// NEW — X REPORT ============================================
-	function generateXReport() {
-	const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-	const today = new Date().toISOString().slice(0, 10);
+function generateXReport() {
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+    const today = new Date().toISOString().slice(0, 10);
 
-	const todaysOrders = orders.filter(o => o.time.startsWith(today));
+    const todaysOrders = orders.filter(o => o.time.startsWith(today));
 
-	const rows = [];
+    const rows = [];
 
     todaysOrders.forEach(order => {
-			const dateTime = new Date(order.time);
-			const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit"
-		})}`;
+        const dateTime = new Date(order.time);
+        const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        })}`;
 
-    	order.items.forEach(item => {
-			rows.push({
-				time: formatted,
-				item: item.name,
-				price: Number(item.price),
-				totalRow: false
-			});
-    	});
+        order.items.forEach(item => {
+            rows.push({
+                time: formatted,
+                item: item.name,
+                price: Number(item.price),
+                totalRow: false
+            });
+        });
 
-      rows.push({
-        time: "",
-        item: "Order Total",
-        price: order.total,
-        totalRow: true
-      });
+        rows.push({
+            time: "",
+            item: "Order Total",
+            price: order.total,
+            totalRow: true
+        });
     });
 
-    setZReportRows([]);      // allow clean switching
-    setXReportRows(rows);    // update table
-	}
+    setZReportRows([]);
+    setXReportRows(rows);
+}
 
   	// === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
 	useEffect(() => {
@@ -142,6 +142,33 @@ export default function ManagerPage() {
 
 		setSales(transformed);
 	}, []);
+
+  // === LOAD INVENTORY FROM DATABASE ===
+useEffect(() => {
+  async function loadInventory() {
+    try {
+      const invRes = await fetch("/api/inventory");
+      if (!invRes.ok) return;
+
+      const invJson = await invRes.json();
+
+      const normalized = invJson.map(i => ({
+        id: i.inventoryid,
+        name: i.inventoryname,
+        quantity: Number(i.quantityavailable || 0),
+        restockMin: Number(i.restockmin || 0),
+        unit: i.unit
+      }));
+
+      setInventory(normalized);
+    } catch (err) {
+      console.error("Error loading inventory:", err);
+    }
+  }
+
+  loadInventory();
+}, []);
+
 
   // NEW — Z REPORT (End of Day Reset) =========================
 	function generateZReport() {
@@ -240,6 +267,14 @@ useEffect(() => {
 	const SalesTab = (
 	<section className={styles.panel}>
 	<h2>Sales</h2>
+  <input
+    type="search"
+    placeholder="Search (item/date)…"
+    className={styles.search}
+    value={query}
+    onChange={(e) => setQuery(e.target.value)}
+  />
+
 
 	{/* Date Range Controls */}
 	<div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
@@ -347,7 +382,7 @@ useEffect(() => {
 		<table className={styles.table}>
 			<thead>
 			<tr>
-				<th>Name</th><th>Category</th><th>Price</th><th>Seasonal</th>
+				<th>Name</th><th>Category</th><th>Price ($)</th><th>Seasonal</th>
 			</tr>
 			</thead>
 			<tbody>
@@ -386,14 +421,20 @@ useEffect(() => {
 
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <thead>
-            <tr><th>Item</th><th>Qty</th><th>Min</th></tr>
-          </thead>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Unit</th>
+            <th>Min</th>
+          </tr>
+        </thead>
           <tbody>
             {filteredInventory.map((i) => (
               <tr key={i.id}>
                 <td>{i.name}</td>
                 <td>{i.quantity}</td>
+                <td>{i.unit}</td>
                 <td>{i.restockMin}</td>
               </tr>
             ))}
@@ -415,7 +456,7 @@ useEffect(() => {
             <div className={styles.restockMain}>
               <span className={styles.restockName}>{i.name}</span>
               <span className={styles.restockMeta}>
-                Current: {i.quantity} • Min: {i.restockMin}
+                Current: {i.quantity} {i.unit} | Min: {i.restockMin} {i.unit}
               </span>
             </div>
             <button className={`${styles.btn} ${styles.success}`}
