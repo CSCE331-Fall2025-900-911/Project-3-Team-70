@@ -247,7 +247,7 @@ export default function KioskPage() {
             price: item.price,
             description: item.menudescription ?? item.description,
             category: item.category,
-            image: `/Images/${id}.png`,
+            image: `/images/${id}.png`,
           };
         });
 
@@ -446,7 +446,7 @@ export default function KioskPage() {
           src={detailsItem.image}
           alt={detailsItem.name}
           onError={(e) => {
-            e.target.src = "/Images/default.png";
+            e.target.src = "/images/default.png";
           }}
           style={{
             width: "60%",
@@ -1313,7 +1313,7 @@ export default function KioskPage() {
                       src={sampleItem.image}
                       alt={cat}
                       onError={(e) => {
-                        e.target.src = "/Images/default.png";
+                        e.target.src = "/images/default.png";
                       }}
                       style={{
                         width: "120px",
@@ -1385,7 +1385,7 @@ export default function KioskPage() {
                               alt={item.name}
                               onError={(e) => {
                                 e.target.src =
-                                  "/Images/default.png";
+                                  "/images/default.png";
                               }}
                               style={{
                                 width: "100%",
