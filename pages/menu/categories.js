@@ -6,7 +6,6 @@ export default function AutoCycleCategoriesPage() {
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [boxHeight, setBoxHeight] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,20 +40,6 @@ export default function AutoCycleCategoriesPage() {
     }
 
     loadMenu();
-  }, []);
-
-  // Calculate box height dynamically to fit 2x2 grid
-  useEffect(() => {
-    function updateBoxHeight() {
-      const gap = 20; // same as grid gap
-      const padding = 40; // container padding top + bottom
-      const availableHeight = window.innerHeight - padding - gap;
-      setBoxHeight(availableHeight / 2);
-    }
-
-    updateBoxHeight();
-    window.addEventListener("resize", updateBoxHeight);
-    return () => window.removeEventListener("resize", updateBoxHeight);
   }, []);
 
   // Cycle through categories and pages
@@ -99,20 +84,21 @@ export default function AutoCycleCategoriesPage() {
         padding: "20px",
         color: "#000",
         overflow: "hidden",
+        boxSizing: "border-box",
       }}
     >
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
-    
+
       {!loading && !error && (
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            gridTemplateRows: "repeat(2, 1fr)",
+            gridTemplateColumns: "1fr 1fr",
+            gridTemplateRows: "1fr 1fr",
             gap: "20px",
-            maxWidth: "1200px",
-            margin: "0 auto",
+            width: "100%",
+            height: "100%",
           }}
         >
           {currentCategories.map((cat, idx) => {
@@ -132,12 +118,18 @@ export default function AutoCycleCategoriesPage() {
                   padding: "15px",
                   display: "flex",
                   flexDirection: "column",
-                  height: `${boxHeight}px`,
                   overflow: "hidden",
                 }}
               >
-                <h1 style={{ textAlign: "center", fontSize: "24px" }}>{cat}</h1>
-                <div style={{ marginTop: "10px", flexGrow: 1 }}>
+                <h1 style={{ textAlign: "center", fontSize: "24px", margin: 0 }}>{cat}</h1>
+                <div
+                  style={{
+                    marginTop: "10px",
+                    flexGrow: 1,
+                    overflowY: "auto",
+                    paddingRight: "5px",
+                  }}
+                >
                   {itemsToShow.map((item) => {
                     const price = `$${Number(item.price).toFixed(2)}`;
                     return (
@@ -152,7 +144,7 @@ export default function AutoCycleCategoriesPage() {
                           fontFamily: "monospace",
                         }}
                       >
-                        <span style={{ flexGrow: 1, overflow: "hidden" }}>
+                        <span style={{ flexGrow: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
                           {item.name}
                           <span
                             style={{
