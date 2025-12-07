@@ -139,23 +139,18 @@ export default function AutoCycleCategoriesPage() {
                           fontSize: "18px",
                           marginBottom: "8px",
                           display: "flex",
-                          justifyContent: "space-between",
-                          whiteSpace: "nowrap",
+                          alignItems: "center",
                           fontFamily: "monospace",
                         }}
                       >
-                        <span style={{ flexGrow: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {item.name}
-                          <span
-                            style={{
-                              borderBottom: "1px dashed #000",
-                              margin: "0 8px",
-                              width: "100%",
-                              display: "inline-block",
-                              transform: "translateY(-3px)",
-                            }}
-                          ></span>
-                        </span>
+                        <span>{item.name}</span>
+                        <span
+                          style={{
+                            flexGrow: 1,
+                            borderBottom: "1px dashed #000",
+                            margin: "0 8px",
+                          }}
+                        />
                         <span>{price}</span>
                       </div>
                     );
