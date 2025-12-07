@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS ordertest (
     orderLocation VARCHAR,
     orderDate TIMESTAMP,
     orderTotal DECIMAL,
-    orderComplete BOOLEAN DEFAULT false
+    orderComplete BOOLEAN DEFAULT false,
+    customerEmail VARCHAR,
+    orderSource VARCHAR DEFAULT 'kiosk'
 );
 
 

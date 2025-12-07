@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { query } from "../../../lib/db-connector";
 
-export default NextAuth({
+export const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -11,37 +11,59 @@ export default NextAuth({
   ],
 
   callbacks: {
-    // 1. Run when user logs in
+    // Ensure a row exists in app_users for this email
     async signIn({ user }) {
-      await query(
-        `
-        INSERT INTO app_users (userEmail, userName)
-        VALUES ($1, $2)
-        ON CONFLICT (userEmail) DO NOTHING
-        `,
-        [user.email, user.name]
-      );
-
+      try {
+        if (user?.email) {
+          await query(
+            `
+            INSERT INTO app_users (userEmail, userName)
+            VALUES ($1, $2)
+            ON CONFLICT (userEmail) DO NOTHING
+            `,
+            [user.email, user.name || null]
+          );
+        }
+      } catch (err) {
+        console.error("Error in signIn callback:", err);
+      }
       return true;
     },
 
-    // 2. Attach database info into JWT
-    async jwt({ token }) {
-      if (token.email) {
-        const { rows } = await query(
-          `SELECT userRole FROM app_users WHERE userEmail = $1`,
-          [token.email]
-        );
+    // Attach role from DB to the JWT
+    async jwt({ token, user }) {
+      try {
+        if (user?.email) {
+          token.email = user.email;
+        }
 
-        token.role = rows[0]?.userrole || "customer";
+        if (token.email) {
+          const result = await query(
+            "SELECT userRole FROM app_users WHERE userEmail = $1",
+            [token.email]
+          );
+
+          const dbRole =
+            result.rows && result.rows[0]
+              ? result.rows[0].userrole
+              : null;
+
+          token.role = dbRole || "customer";
+        } else {
+          token.role = token.role || "customer";
+        }
+      } catch (err) {
+        console.error("Error in jwt callback:", err);
+        token.role = token.role || "customer";
       }
 
       return token;
     },
 
-    // 3. Make role available on client-side session
+    // Expose role to the client
     async session({ session, token }) {
-      session.user.role = token.role;
+      session.user.role = token.role || "customer";
+      session.user.email = token.email || session.user.email;
       return session;
     },
   },
@@ -51,4 +73,6 @@ export default NextAuth({
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+export default NextAuth(authOptions);

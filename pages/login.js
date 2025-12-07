@@ -1,59 +1,68 @@
-import { getSession, signIn } from "next-auth/react";
-
-export async function getServerSideProps(context) {
-  const session = await getSession(context);
-
-  // If user is already logged in → send to homepage
-  if (session) {
-    return {
-      redirect: {
-        destination: "/",
-        permanent: false,
-      },
-    };
-  }
-
-  return { props: {} };
-}
+import Link from "next/link";
 
 export default function LoginPage() {
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "center",
-      alignItems: "center",
-      height: "100vh",
-      backgroundColor: "#f4f4f4"
-    }}>
-      
-      <h1 style={{ marginBottom: "40px", fontSize: "32px", color: "#500000" }}>
-        Welcome — Please Sign In
-      </h1>
-
-      <button
-        onClick={() => signIn("google")}
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#020617",
+        color: "#f9fafb",
+      }}
+    >
+      <div
         style={{
-          padding: "12px 24px",
-          fontSize: "18px",
-          borderRadius: "8px",
-          backgroundColor: "#4285F4",
-          color: "white",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px"
+          padding: 24,
+          borderRadius: 12,
+          border: "1px solid #374151",
+          background: "#111827",
+          maxWidth: 360,
+          width: "100%",
         }}
       >
-        <img 
-          src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-          alt="Google Logo"
-          style={{ width: "24px", height: "24px" }}
-        />
-        Sign in with Google
-      </button>
+        <h1 style={{ fontSize: 24, marginBottom: 16 }}>
+          Staff Login
+        </h1>
+        <p style={{ fontSize: 14, marginBottom: 20 }}>
+          Choose how you want to sign in:
+        </p>
 
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Link href="/auth/employee-access">
+            <button
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 999,
+                border: "1px solid #4b5563",
+                background: "#0f172a",
+                color: "#e5e7eb",
+                cursor: "pointer",
+              }}
+            >
+              Employee Login
+            </button>
+          </Link>
+
+          <Link href="/auth/manager-access">
+            <button
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 999,
+                border: "1px solid #f59e0b",
+                background: "#f59e0b",
+                color: "#111827",
+                cursor: "pointer",
+              }}
+            >
+              Manager Login
+            </button>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
