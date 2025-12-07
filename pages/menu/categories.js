@@ -5,7 +5,7 @@ export default function AutoCycleCategoriesPage() {
   const [categories, setCategories] = useState([]);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(7);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -128,6 +128,9 @@ export default function AutoCycleCategoriesPage() {
                     flexGrow: 1,
                     overflowY: "auto",
                     paddingRight: "5px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
                   }}
                 >
                   {itemsToShow.map((item) => {
@@ -136,7 +139,7 @@ export default function AutoCycleCategoriesPage() {
                       <div
                         key={item.id}
                         style={{
-                          fontSize: "18px",
+                          fontSize: "22px",
                           marginBottom: "8px",
                           display: "flex",
                           alignItems: "center",
