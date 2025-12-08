@@ -821,6 +821,12 @@ useEffect(() => {
                 Current: {i.quantity} {i.unit} | Min: {i.restockMin} {i.unit}
               </span>
 
+              {Number(i.quantity) < Number(i.restockMin) && (
+                <span style={{ color: "red", fontWeight: "bold" }}>
+                  ⚠ Needs Restocking
+                </span>
+              )}
+
               {i.restockOrdered > 0 && (
                 <span className={styles.restockPending}>
                   Pending Restock: {i.restockOrdered} {i.unit}

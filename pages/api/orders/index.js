@@ -15,18 +15,17 @@ export default async function handler(req, res) {
 async function handleCreateOrder(req, res) {
   try {
     const {
-      source = "kiosk",          // "kiosk" or "cashier"
-      orderLocation = "Kiosk",   // e.g. "Front Counter"
+      source = "kiosk",
+      orderLocation = "Kiosk",
       items = [],
-      employeeID = null,         // cashier can send this later if desired
-      // customerEmail = null,   // optional, not used in DB schema yet
+      employeeID = null,
     } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "No items in order" });
     }
 
-    // Compute order total from line items
+    // Compute order total
     const orderTotal = items.reduce(
       (sum, item) =>
         sum +
@@ -35,13 +34,12 @@ async function handleCreateOrder(req, res) {
       0
     );
 
-    // 1) Pick the next orderID based on current max
     const nextOrderResult = await query(
       "SELECT COALESCE(MAX(orderID), 0) + 1 AS nextId FROM ordertest"
     );
     const orderID = Number(nextOrderResult.rows[0].nextid);
 
-    // 2) Insert into ordertest (matches databaseUpload.sql schema)
+    // 2) Insert into ordertest
     await query(
       `
       INSERT INTO ordertest
@@ -52,8 +50,7 @@ async function handleCreateOrder(req, res) {
       [orderID, employeeID, orderLocation, orderTotal]
     );
 
-    // 3) Insert into orderItem
-    //    Need safe new orderItemID values (PK, no sequence in schema)
+    // 3) Prepare orderItem insert
     const nextItemResult = await query(
       "SELECT COALESCE(MAX(orderItemID), 0) AS maxId FROM orderItem"
     );
@@ -63,21 +60,21 @@ async function handleCreateOrder(req, res) {
     const params = [];
 
     for (const item of items) {
-      // Build one row: (orderItemID, menuID, priceAtPurchase, quantityPurchased, orderID, orderSize)
       valueStrings.push(
         `($${params.length + 1}, $${params.length + 2}, $${params.length + 3}, $${params.length + 4}, $${params.length + 5}, $${params.length + 6})`
       );
 
       params.push(
-        nextOrderItemID++,                 // orderItemID
-        item.menuID,                      // menuID
-        Number(item.priceAtPurchase || 0),// priceAtPurchase
-        Number(item.quantity || 0),       // quantityPurchased
-        orderID,                          // orderID (FK to ordertest)
-        item.size ?? null                 // orderSize (can be null)
+        nextOrderItemID++,                 
+        item.menuID,
+        Number(item.priceAtPurchase || 0),
+        Number(item.quantity || 0),
+        orderID,
+        item.size ?? null
       );
     }
 
+    // Insert all order items at once
     await query(
       `
       INSERT INTO orderItem
@@ -87,12 +84,38 @@ async function handleCreateOrder(req, res) {
       `,
       params
     );
+    for (const item of items) {
+      const ingredientRows = await query(
+        `
+        SELECT inventoryID, menuInfoQuantity
+        FROM menuInfo
+        WHERE menuID = $1
+        `,
+        [item.menuID]
+      );
 
+      for (const ing of ingredientRows.rows) {
+        const subtractAmount =
+          Number(ing.menuinfoquantity) * Number(item.quantity || 0);
+
+        await query(
+          `
+          UPDATE inventory
+          SET quantityAvailable = quantityAvailable - $1
+          WHERE inventoryID = $2
+          `,
+          [subtractAmount, ing.inventoryid]
+        );
+      }
+    }
+
+    // DONE
     return res.status(201).json({
       success: true,
       orderID,
       orderTotal,
     });
+
   } catch (err) {
     console.error("Error creating order:", err);
     return res.status(500).json({ error: "Failed to create order" });
