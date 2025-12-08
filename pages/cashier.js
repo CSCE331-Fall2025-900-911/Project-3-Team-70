@@ -27,6 +27,12 @@ export default function CashierPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Modifier state
+  const [showModifier, setShowModifier] = useState(false);
+  const [modTarget, setModTarget] = useState(null);
+  const [modToppings, setModToppings] = useState([]);
+  const [toppingOptions, setToppingOptions] = useState([]);
+
   // Fetch and normalize menu data from API
   useEffect(() => {
     async function fetchMenu() {
@@ -51,7 +57,6 @@ export default function CashierPage() {
               "",
             category: row.category ?? "Uncategorized",
             price: Number(row.price ?? 0),
-            // 🔧 Images under /public/images/<id>.png
             image: id ? `/images/${id}.png` : "/images/default.png",
           };
         });
@@ -65,6 +70,21 @@ export default function CashierPage() {
       }
     }
     fetchMenu();
+  }, []);
+
+  // Fetch toppings/ingredients from DB
+  useEffect(() => {
+    async function fetchToppings() {
+      try {
+        const res = await fetch("/api/modifiers");
+        if (!res.ok) throw new Error("Failed to load modifiers");
+        const data = await res.json();
+        setToppingOptions(data.toppings || []);
+      } catch (err) {
+        console.error("Error fetching modifiers:", err);
+      }
+    }
+    fetchToppings();
   }, []);
 
   // Filtering logic (case-safe)
@@ -83,12 +103,23 @@ export default function CashierPage() {
     return matchCat && matchQuery;
   });
 
+  // Add to order (takes modifications into account)
   const addToOrder = (item) => {
     setOrder((prev) => {
-      const existing = prev.find((x) => x.id === item.id);
+      const existing = prev.find(
+        (x) =>
+          x.id === item.id &&
+          JSON.stringify(x.modifications || {}) ===
+            JSON.stringify(item.modifications || {})
+      );
+
       if (existing) {
         return prev.map((x) =>
-          x.id === item.id ? { ...x, qty: x.qty + 1 } : x
+          x.id === item.id &&
+          JSON.stringify(x.modifications || {}) ===
+            JSON.stringify(item.modifications || {})
+            ? { ...x, qty: x.qty + 1 }
+            : x
         );
       }
       return [...prev, { ...item, qty: 1 }];
@@ -103,9 +134,10 @@ export default function CashierPage() {
 
     try {
       const items = order.map((i) => ({
-        menuID: i.menuid,
+        menuID: i.id, // using normalized id
         quantity: i.qty,
         priceAtPurchase: Number(i.price || 0),
+        modifications: i.modifications || null,
       }));
 
       const res = await fetch("/api/orders", {
@@ -136,7 +168,27 @@ export default function CashierPage() {
   const total = order
     .reduce((acc, i) => acc + Number(i.price || 0) * i.qty, 0)
     .toFixed(2);
-    
+
+  // When user clicks "Add" on a menu item
+  const handleOpenModifier = (item) => {
+    setModTarget(item);
+    setModToppings([]);
+    setShowModifier(true);
+  };
+
+  // When user confirms in modal
+  const handleConfirmModifier = () => {
+    if (!modTarget) {
+      setShowModifier(false);
+      return;
+    }
+    const modifications = { toppings: modToppings };
+    addToOrder({
+      ...modTarget,
+      modifications,
+    });
+    setShowModifier(false);
+  };
 
   return (
     <div className="cashier-root">
@@ -206,7 +258,7 @@ export default function CashierPage() {
                       </div>
                       <button
                         className="btn primary"
-                        onClick={() => addToOrder(item)}
+                        onClick={() => handleOpenModifier(item)}
                       >
                         Add
                       </button>
@@ -230,9 +282,21 @@ export default function CashierPage() {
             {order.length === 0 ? (
               <p style={{ padding: "8px 0" }}>No items yet.</p>
             ) : (
-              order.map((line) => (
-                <div key={line.id} className="order-item">
-                  <div className="name">{line.name}</div>
+              order.map((line, idx) => (
+                <div
+                  key={line.id + "_" + idx}
+                  className="order-item"
+                >
+                  <div className="name">
+                    {line.name}
+                    {line.modifications?.toppings &&
+                      line.modifications.toppings.length > 0 && (
+                        <div className="mods">
+                          Toppings:{" "}
+                          {line.modifications.toppings.join(", ")}
+                        </div>
+                      )}
+                  </div>
                   <div className="qty">x{line.qty}</div>
                   <div className="subtotal">
                     $
@@ -253,6 +317,58 @@ export default function CashierPage() {
         </aside>
       </main>
 
+      {/* MODIFIER POPUP */}
+      {showModifier && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2>Customize {modTarget?.name}</h2>
+
+            <div className="mod-section">
+              <p>Select ingredients / toppings:</p>
+              {toppingOptions.length === 0 ? (
+                <p className="mods-empty">
+                  No ingredients configured in inventory.
+                </p>
+              ) : (
+                toppingOptions.map((t) => (
+                  <label key={t} className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={modToppings.includes(t)}
+                      onChange={(e) => {
+                        setModToppings((prev) => {
+                          if (e.target.checked) {
+                            return [...prev, t];
+                          }
+                          return prev.filter((x) => x !== t);
+                        });
+                      }}
+                    />
+                    {t}
+                  </label>
+                ))
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn danger"
+                onClick={() => setShowModifier(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn success"
+                onClick={handleConfirmModifier}
+              >
+                Add to Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAGE + MODAL STYLES */}
       <style jsx>{`
         :root {
           --bg: #f7f7fb;
@@ -380,11 +496,11 @@ export default function CashierPage() {
           padding: 8px 12px;
           cursor: pointer;
           font-weight: 600;
-          background: #f3f4f6;  
-          color: #111827;        
+          background: #f3f4f6;
+          color: #111827;
         }
         .btn.primary {
-          background: #500000;   
+          background: #500000;
           color: #ffffff;
           border-color: transparent;
         }
@@ -443,10 +559,59 @@ export default function CashierPage() {
           font-weight: 600;
           font-size: 14px;
         }
+        .mods {
+          font-size: 11px;
+          color: #6b7280;
+          margin-top: 4px;
+        }
         .total {
           font-weight: 800;
+        }
+        /* Modal styles */
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 2000;
+        }
+        .modal {
+          background: #ffffff;
+          padding: 20px;
+          border-radius: 14px;
+          width: 360px;
+          max-width: 95vw;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+        }
+        .mod-section {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 260px;
+          overflow: auto;
+        }
+        .mods-empty {
+          font-size: 13px;
+          color: #6b7280;
+        }
+        .checkbox-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          font-size: 14px;
+        }
+        .modal-actions {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 6px;
         }
       `}</style>
     </div>
   );
 }
+
