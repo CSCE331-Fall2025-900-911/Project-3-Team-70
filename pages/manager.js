@@ -31,6 +31,7 @@ export default function ManagerPage() {
   const [newMenuName, setNewMenuName] = useState("");
   const [newMenuCategory, setNewMenuCategory] = useState("");
   const [newMenuPrice, setNewMenuPrice] = useState("");
+  const [newMenuDescription, setNewMenuDescription] = useState("");
   const [newMenuStart, setNewMenuStart] = useState("2025-01-01");
   const [newMenuEnd, setNewMenuEnd] = useState("2025-12-31");
 
@@ -360,14 +361,16 @@ async function generateZReport() {
         categoryToSave = newCategoryInput.trim();
     }
       try {
-          const payload = {
-              name: newMenuName,
-              category: categoryToSave,
-              price: parseFloat(newMenuPrice),
-              seasonalStart: `${newMenuStart} 00:00:00`,
-              seasonalEnd: `${newMenuEnd} 23:59:59`,
-              ingredients: newMenuIngredients
-          };
+        const payload = {
+          name: newMenuName,
+          category: categoryToSave,
+          price: parseFloat(newMenuPrice),
+          seasonalStart: `${newMenuStart} 00:00:00`,
+          seasonalEnd: `${newMenuEnd} 23:59:59`,
+          description: newMenuDescription,
+          ingredients: newMenuIngredients
+        };
+
 
           const res = await fetch("/api/menu/create", {
               method: "POST",
@@ -862,6 +865,17 @@ useEffect(() => {
                 step="0.01"
                 value={newMenuPrice}
                 onChange={(e) => setNewMenuPrice(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.modalField}>
+              <label>Description</label>
+              <textarea
+                value={newMenuDescription}
+                onChange={(e) => setNewMenuDescription(e.target.value)}
+                rows={4}
+                style={{ width: "100%", resize: "vertical" }}
+                placeholder="Enter menu item description…"
               />
             </div>
 

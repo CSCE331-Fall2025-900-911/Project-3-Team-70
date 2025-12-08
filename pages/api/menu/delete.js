@@ -15,7 +15,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Menu ID required" });
     }
 
-    await query("DELETE FROM menu WHERE menuid = $1", [menuID]);
+    await query("UPDATE menu SET isActive = FALSE WHERE menuID = $1", [menuID]);
+
 
     return res.status(200).json({ success: true });
 
