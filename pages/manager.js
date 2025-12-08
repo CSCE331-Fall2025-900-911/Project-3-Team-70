@@ -2,6 +2,13 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import styles from "./manager.module.css";  // CSS MODULE
 
+function getMonthDay(dateInput) {
+  const d = new Date(dateInput);
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${month}-${day}`;
+}
+
 export default function ManagerPage() {
 	const [activeTab, setActiveTab] = useState("sales");
 	const [query, setQuery] = useState("");
@@ -9,6 +16,28 @@ export default function ManagerPage() {
 	const [sales, setSales] = useState([]);
 
 	const [menuItems, setMenuItems] = useState([]);
+  const ALWAYS_INCLUDED_INGREDIENTS = [28, 29, 30, 31, 32];
+  // ===== ADD MENU ITEM MODAL STATE =====
+  const [showAddMenuModal, setShowAddMenuModal] = useState(false);
+
+  const [newCategoryInput, setNewCategoryInput] = useState("");
+  const [newMenuName, setNewMenuName] = useState("");
+  const [newMenuCategory, setNewMenuCategory] = useState("");
+  const [newMenuPrice, setNewMenuPrice] = useState("");
+  const [newMenuStart, setNewMenuStart] = useState("2025-01-01");
+  const [newMenuEnd, setNewMenuEnd] = useState("2025-12-31");
+
+  // Ingredients (not used yet)
+  const [newMenuIngredients, setNewMenuIngredients] = useState([]);
+
+  // Build category list from existing menu items
+  const categories = useMemo(() => {
+      const set = new Set();
+      menuItems.forEach(m => {
+          if (m.category) set.add(m.category);
+      });
+      return Array.from(set);
+  }, [menuItems]);
 
 	useEffect(() => {
 	async function fetchMenuItems() {
@@ -61,14 +90,6 @@ export default function ManagerPage() {
 			})
 		);
 
-		// helper function
-		function getMonthDay(dateInput) {
-			const d = new Date(dateInput);
-			const month = String(d.getMonth() + 1).padStart(2, "0");
-			const day   = String(d.getDate()).padStart(2, "0");
-			return `${month}-${day}`;
-		}
-
 		} catch (err) {
 			console.error("Failed to load menu:", err);
 		}
@@ -78,11 +99,8 @@ export default function ManagerPage() {
 }, []);
 
 
-	const [inventory, setInventory] = useState([
-		{ id: 1, name: "Tapioca Pearls", quantity: 120, restockMin: 50 },
-		{ id: 2, name: "Tea Leaves", quantity: 60, restockMin: 30 },
-		{ id: 3, name: "Cups", quantity: 300, restockMin: 100 },
-	]);
+const [inventory, setInventory] = useState([]);
+
 
 	// NEW — Report State =======================================
 	const [xReportRows, setXReportRows] = useState([]);
@@ -142,6 +160,33 @@ function generateXReport() {
 
 		setSales(transformed);
 	}, []);
+
+  useEffect(() => {
+    async function loadInventory() {
+      try {
+        const invRes = await fetch("/api/inventory");
+        if (!invRes.ok) return;
+
+        const invJson = await invRes.json();
+
+        const normalized = invJson.map(i => ({
+          id: i.inventoryid,
+          name: i.inventoryname,
+          quantity: Number(i.quantityavailable || 0),
+          restockMin: Number(i.restockmin || 0),
+          unit: i.unit
+        }));
+
+        setInventory(normalized);
+      } catch (err) {
+        console.error("Error loading inventory:", err);
+      }
+    }
+
+    loadInventory();
+  }, []);
+
+
 
   // === LOAD INVENTORY FROM DATABASE ===
 useEffect(() => {
@@ -214,11 +259,133 @@ useEffect(() => {
   }, [query, inventory]);
 
   // Event Handlers ===================================================
-  function handleAddMenuItem() { console.log("Add menu item"); }
+  function handleAddMenuItem() {
+    // Pre-load auto-included ingredients
+    setNewMenuIngredients(
+        ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
+            inventoryID: id,
+            quantity: 1   // Or 0 if you prefer
+        }))
+    );
+
+    setShowAddMenuModal(true);
+  }
   function handleUpdateMenuItem() { console.log("Update menu item"); }
   function handleAddInventory() { console.log("Add inventory"); }
   function handleUpdateInventory() { console.log("Update inventory"); }
   function handleOrderRestock(item) { console.log("Restock ordered:", item.name); }
+  async function submitNewMenuItem() {
+    if (newMenuIngredients.length === 0) {
+      if (!confirm("This item has NO ingredients. Continue?")) {
+          return;
+      }
+  }
+    let categoryToSave = newMenuCategory;
+
+    if (categoryToSave === "__new__") {
+        if (!newCategoryInput.trim()) {
+            alert("Please enter a new category name.");
+            return;
+        }
+        categoryToSave = newCategoryInput.trim();
+    }
+      try {
+          const payload = {
+              name: newMenuName,
+              category: categoryToSave,
+              price: parseFloat(newMenuPrice),
+              seasonalStart: `${newMenuStart} 00:00:00`,
+              seasonalEnd: `${newMenuEnd} 23:59:59`,
+              ingredients: newMenuIngredients
+          };
+
+          const res = await fetch("/api/menu/create", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+              alert("Error adding menu item.");
+              return;
+          }
+
+          alert("Menu item added!");
+          setShowAddMenuModal(false);
+
+          // Reload menu after adding
+          const refreshed = await fetch("/api/menu");
+          const updatedData = await refreshed.json();
+          setMenuItems(
+            updatedData.map(item => {
+              const startMD = item.seasonalstart ? getMonthDay(item.seasonalstart) : null;
+              const endMD   = item.seasonalend   ? getMonthDay(item.seasonalend)   : null;
+
+              let seasonalDisplay = "All Year";
+
+              if (startMD && endMD) {
+                const isAllYear =
+                  startMD === "01-01" &&
+                  endMD === "12-31";
+
+                if (!isAllYear) {
+                  const startStr = new Date(item.seasonalstart).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric"
+                  });
+
+                  const endStr = new Date(item.seasonalend).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric"
+                  });
+
+                  seasonalDisplay = `${startStr} - ${endStr}`;
+                }
+              }
+
+              return {
+                id: item.menuid,
+                name: item.menuname,
+                category: item.category,
+                price: Number(item.price),    // <-- prevents .toFixed crash
+                seasonal: seasonalDisplay,
+                seasonalStart: item.seasonalstart,
+                seasonalEnd: item.seasonalend
+              };
+            })
+          );
+
+
+      } catch (err) {
+          console.error("Failed to add menu item:", err);
+      }
+  }
+
+  function toggleIngredient(id, checked) {
+    if (checked) {
+      // Add if not present
+      setNewMenuIngredients(prev => [
+        ...prev,
+        { inventoryID: id, quantity: 0 }
+      ]);
+    } else {
+      // Remove it
+      setNewMenuIngredients(prev =>
+        prev.filter(i => i.inventoryID !== id)
+      );
+    }
+  }
+
+  function updateIngredientQty(id, qty) {
+    setNewMenuIngredients(prev =>
+      prev.map(i =>
+        i.inventoryID === id ? { ...i, quantity: qty } : i
+      )
+    );
+  }
+
 
   // TAB COMPONENTS ===================================================
 // ===== SALES TAB =====
@@ -560,6 +727,144 @@ useEffect(() => {
           <Link className={styles.link} href="/kiosk">Kiosk</Link>
         </nav>
       </header>
+
+     {showAddMenuModal && (
+      <div className={styles.modalBackdrop}>
+        <div className={styles.modal}>
+
+          {/* === TOP FORM BOX (narrower) === */}
+          <div className={styles.topBox}>
+            <h2>Add Menu Item</h2>
+
+            <div className={styles.modalField}>
+              <label>Name</label>
+              <input
+                type="text"
+                value={newMenuName}
+                onChange={(e) => setNewMenuName(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.modalField}>
+              <label>Category</label>
+              <select
+                value={newMenuCategory}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setNewMenuCategory(value);
+
+                  // If they choose “Add New Category”, clear the input
+                  if (value === "__new__") {
+                    setNewCategoryInput("");
+                  }
+                }}
+              >
+                <option value="">Select category...</option>
+                {categories.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+                <option value="__new__">+ Add New Category</option>
+              </select>
+
+              {/* Text box appears AND stays visible */}
+              {newMenuCategory === "__new__" && (
+                <input
+                  type="text"
+                  placeholder="Enter new category"
+                  style={{ marginTop: "8px" }}
+                  value={newCategoryInput}
+                  onChange={(e) => setNewCategoryInput(e.target.value)}
+                />
+              )}
+
+            </div>
+
+            <div className={styles.modalField}>
+              <label>Price ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={newMenuPrice}
+                onChange={(e) => setNewMenuPrice(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.modalRow}>
+              <div className={styles.modalField}>
+                <label>Seasonal Start</label>
+                <input
+                  type="date"
+                  value={newMenuStart}
+                  onChange={(e) => setNewMenuStart(e.target.value)}
+                />
+              </div>
+
+              <div className={styles.modalField}>
+                <label>Seasonal End</label>
+                <input
+                  type="date"
+                  value={newMenuEnd}
+                  onChange={(e) => setNewMenuEnd(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+
+          {/* === INGREDIENT PANEL (full width, separate box) === */}
+          <div className={styles.ingredientBox}>
+            <h3>Ingredients</h3>
+
+            <div className={styles.ingredientGrid}>
+              {inventory
+                .filter(inv => !ALWAYS_INCLUDED_INGREDIENTS.includes(inv.id))
+                .map(inv => {
+                const selected = newMenuIngredients.find(i => i.inventoryID === inv.id);
+
+                return (
+                  <div key={inv.id} className={styles.ingredientCell}>
+                    <label className={styles.ingredientLabel}>
+                      <input
+                        type="checkbox"
+                        checked={!!selected}
+                        onChange={(e) =>
+                          toggleIngredient(inv.id, e.target.checked)
+                        }
+                      />
+                      {inv.name} ({inv.unit})
+                    </label>
+
+                    {selected && (
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className={styles.qtyInput}
+                        value={selected.quantity}
+                        onChange={(e) =>
+                          updateIngredientQty(inv.id, Number(e.target.value))
+                        }
+                        placeholder="Qty"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+
+          {/* ACTION BUTTONS */}
+          <div className={styles.modalButtons}>
+            <button onClick={() => setShowAddMenuModal(false)}>Cancel</button>
+            <button className={styles.primary} onClick={submitNewMenuItem}>Add Item</button>
+          </div>
+
+        </div>
+
+              </div>
+    )}
+
 
       <main className={styles.layout}>
         <aside className={styles.sidebar}>

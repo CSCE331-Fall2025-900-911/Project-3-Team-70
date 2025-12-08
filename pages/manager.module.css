@@ -214,3 +214,163 @@
   border: 1px solid #ddd;
   padding: 8px;
 }
+
+.modal {
+  /* REMOVE white background + padding */
+  background: none !important;
+  padding: 0 !important;
+
+  width: 95%;
+  max-width: 1100px;
+  margin: 40px auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+  box-shadow: none !important;  /* remove border effect */
+}
+
+.topBox {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 60%;                  /* <-- smaller form area */
+  margin: 0 auto;              /* center it */
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+}
+
+.ingredientBox {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 95%;                  /* <-- full width for ingredients */
+  margin: 0 auto;
+  border: 1px solid var(--border);
+}
+
+
+.modalTop {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* Full-width ingredient block separated visually */
+.ingredientBlock {
+  width: 100%;
+  padding: 16px;
+  background: #f8f8f8;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
+
+.ingredientGrid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px 20px;
+  margin-top: 10px;
+
+  max-height: none;
+  overflow: visible;
+}
+
+
+
+
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.modalRow {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.modal input {
+  padding: 8px;
+  font-size: 14px;
+}
+
+.modalButtons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.ingredientSection {
+  width: 100%;
+  margin-top: 10px;
+}
+
+
+.ingredientCell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+
+  height: 56px;              /* Standard height for every row */
+  box-sizing: border-box;
+}
+
+
+.ingredientLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;     /* allow wrapping */
+  line-height: 1.2;
+  max-height: 2.4em;       /* allow up to 2 lines */
+}
+
+
+
+
+.qtyInput {
+  width: 70px;
+}
+
+
+.ingredientList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.ingredientRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.qtyInput {
+  width: 70px;
+  margin-left: 12px;
+}
+
+
+
+.qtyInput {
+  width: 70px;
+}
