@@ -663,7 +663,13 @@ const DrinkDetailsPage = () => {
 };
 
 
-      const CartScreen = ({ accessibilityMode }) => {
+      const CartScreen = ({ accessibilityMode, speak, narrationOn, language }) => {
+
+        // 🔊 Narrate upon entering the cart page
+        useEffect(() => {
+        if (narrationOn) speak("You are now on the cart page. Review your items.", language);
+      }, []);
+
       const removeItem = (indexToRemove) => {
         setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
       };
@@ -1232,8 +1238,16 @@ const DrinkDetailsPage = () => {
   if (screen === "details") 
     return <DrinkDetailsPage accessibilityMode={accessibilityMode} />;
 
-  if (screen === "cart") 
-    return <CartScreen accessibilityMode={accessibilityMode} />;
+  if (screen === "cart")
+  return (
+    <CartScreen
+      accessibilityMode={accessibilityMode}
+      speak={speak}
+      narrationOn={narrationOn}
+      language={language}
+    />
+  );
+
 
   if (screen === "checkout") 
     return <CheckoutScreen accessibilityMode={accessibilityMode} />;
