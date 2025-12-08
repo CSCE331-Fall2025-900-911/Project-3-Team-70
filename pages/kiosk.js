@@ -217,6 +217,7 @@ export default function KioskPage() {
     "Non-Caffeinated",
   ];
 
+
   const [accessibilityLabel, setAccessibilityLabel] = useState({
     on: "Accessibility Mode: ON",
     off: "Accessibility Mode: OFF",
@@ -1532,9 +1533,8 @@ export default function KioskPage() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: accessibilityMode
-                        ? "repeat(auto-fit, minmax(300px, 1fr))"
-                        : "repeat(auto-fit, minmax(220px, 1fr))",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                      justifyItems: "center",
                       gap: accessibilityMode ? "40px" : "25px",
                       marginTop: "20px",
                       marginBottom: "30px",
@@ -1582,21 +1582,34 @@ export default function KioskPage() {
                               userSelect: "none",
                             }}
                           >
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              onError={(e) => {
-                                e.target.src =
-                                  "/Images/default.png";
-                              }}
+                            <div
                               style={{
                                 width: "100%",
-                                height: "200px",
-                                objectFit: "cover",
+                                height: "180px",           
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                overflow: "hidden",
+                                backgroundColor: "#f5f5f5",
                                 borderRadius: "15px",
                                 marginBottom: "15px",
                               }}
-                            />
+                            >
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                onError={(e) => {
+                                  e.target.src = "/Images/default.png";
+                                }}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",   
+                                }}
+                              />
+                            </div>
+
+
                             <h3
                               style={{
                                 fontSize: accessibilityMode
@@ -1628,6 +1641,23 @@ export default function KioskPage() {
                                 {item.description}
                               </p>
                             )}
+                              {/* ALLERGY ICONS */}
+                              {item.allergies && item.allergies.length > 0 && (
+                                <div style={{ marginTop: "10px", display: "flex", gap: "8px" }}>
+                                  {item.allergies.includes("Dairy") && (
+                                    <span style={{ fontSize: "20px" }}>🥛</span>
+                                  )}
+                                  {item.allergies.includes("Nuts") && (
+                                    <span style={{ fontSize: "20px" }}>🥜</span>
+                                  )}
+                                  {item.allergies.includes("Soy") && (
+                                    <span style={{ fontSize: "20px" }}>🌱</span>
+                                  )}
+                                  {item.allergies.includes("Gluten") && (
+                                    <span style={{ fontSize: "20px" }}>🌾</span>
+                                  )}
+                                </div>
+                              )}
                           </div>
                         );
                       })}
