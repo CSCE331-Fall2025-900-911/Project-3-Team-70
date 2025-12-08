@@ -3,26 +3,24 @@ import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { QRCodeCanvas } from "qrcode.react";
 
-// === SEND ORDERS TO BACKEND ===
-async function sendOrderToSystem(order, session) {
-  const rawItems = Array.isArray(order)
-    ? order
-    : (order && order.items) || [];
-
+// === SEND ORDERS TO BACKEND (uses DB-backed orderID) ===
+async function sendOrderToSystem(cart, source = "kiosk", orderLocation = "Kiosk") {
   try {
-    const items = rawItems.map((i) => ({
-      menuID: i.menuid,                      // FIXED
-      quantity: Number(i.quantity || 1),     // matches kiosk
-      priceAtPurchase: Number(i.price || 0),
-      size: null,
+    if (!cart || cart.length === 0) return null;
+
+    const items = cart.map((item) => ({
+      menuID: item.id,
+      quantity: 1,
+      priceAtPurchase: Number(item.finalPrice || item.price || 0),
+      size: item.size ?? null, // if you add sizes later
     }));
 
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        source: "kiosk",
-        orderLocation: "Kiosk",
+        source,
+        orderLocation,
         customerEmail: session?.user?.email || null,   // ★ REQUIRED
         items,
       }),
@@ -416,6 +414,27 @@ const DrinkDetailsPage = () => {
   const [size, setSize] = useState("Medium");
 
   if (!detailsItem) return null;
+
+    // Normalize toppings from DB to a consistent shape
+    const effectiveToppings = (toppings || []).map((t, idx) => ({
+      // primary id
+      id: t.inventoryid ?? t.id ?? idx,
+      // name field
+      name:
+        t.inventoryname ??
+        t.inventoryName ??
+        t.name ??
+        "Topping",
+      // price
+      price: Number(
+        t.addonprice ??
+        t.addOnPrice ??
+        t.price ??
+        0
+      ),
+      // allergy label
+      allergy: t.allergy ?? "None",
+    }));
 
   // Match by ID, not object reference
   const toggleTopping = (topping) => {
@@ -1140,16 +1159,180 @@ const DrinkDetailsPage = () => {
     );
   };
 
-  const SuccessScreen = () => (
-      <div style={{ padding: "40px", textAlign: "center" }}>
-        <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
-        <p style={{ fontSize: "24px", marginTop: "20px" }}>
-          Thank you for your order.
-        </p>
+  // === SUCCESS / RECEIPT SCREEN ===
+  // === SUCCESS / RECEIPT SCREEN ===
+const SuccessScreen = ({ accessibilityMode, orderId }) => {
+  const total = cart.reduce(
+    (sum, item) => sum + Number(item.finalPrice || item.price || 0),
+    0
+  );
+  const now = new Date();
+
+  // Email of signed-in user (via NextAuth)
+  const userEmail = session?.user?.email || null;
+
+  // "idle" | "sending" | "sent" | "error"
+  const [emailStatus, setEmailStatus] = useState("idle");
+
+  const canEmail = !!userEmail && !!orderId;
+
+  const handleEmailReceipt = async () => {
+    if (!canEmail || emailStatus === "sending") return;
+
+    try {
+      setEmailStatus("sending");
+
+      const res = await fetch("/api/email-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          email: userEmail,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Email receipt failed:", await res.text());
+        setEmailStatus("error");
+        return;
+      }
+
+      setEmailStatus("sent");
+    } catch (err) {
+      console.error("Error emailing receipt:", err);
+      setEmailStatus("error");
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: "40px",
+        textAlign: "center",
+        backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
+        color: accessibilityMode ? "#fff" : "#000",
+        minHeight: "100vh",
+      }}
+    >
+      <h1 style={{ fontSize: "48px", marginBottom: "10px" }}>
+        Payment Successful!
+      </h1>
+      <p style={{ fontSize: "24px", marginBottom: "30px" }}>
+        Thank you for your order.
+      </p>
+
+      {/* Receipt */}
+      <div
+        style={{
+          maxWidth: "480px",
+          margin: "0 auto",
+          textAlign: "left",
+          backgroundColor: "#fff",
+          color: "#000",
+          borderRadius: "16px",
+          padding: "24px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "28px",
+            marginBottom: "8px",
+            borderBottom: "1px solid #ddd",
+            paddingBottom: "8px",
+          }}
+        >
+          Receipt
+        </h2>
+
+        <div
+          style={{
+            fontSize: "14px",
+            marginBottom: "12px",
+            color: "#555",
+          }}
+        >
+          <div>
+            Order ID: <strong>{orderId}</strong>
+          </div>
+          <div>
+            Date:{" "}
+            {now.toLocaleDateString()}{" "}
+            {now.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        </div>
+
+        {/* QR code for this order → /receipt?orderid=... */}
+        {orderId && (
+          <div style={{ textAlign: "center", margin: "20px 0" }}>
+            <p style={{ fontSize: "14px", marginBottom: "8px" }}>
+              Scan to view your order:
+            </p>
+            <QRCodeCanvas
+              value={
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/receipt?orderid=${orderId}`
+                  : `/receipt?orderid=${orderId}`
+              }
+              size={160}
+              includeMargin={true}
+              fgColor="#000000"
+              bgColor="#FFFFFF"
+              style={{ borderRadius: "8px" }}
+            />
+          </div>
+        )}
+
+        <div
+          style={{
+            borderTop: "1px dashed #ccc",
+            paddingTop: "10px",
+            marginTop: "10px",
+            maxHeight: "260px",
+            overflowY: "auto",
+          }}
+        >
+          {cart.map((item, idx) => (
+            <div
+              key={`${item.id}-${idx}`}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "6px",
+                fontSize: "16px",
+              }}
+            >
+              <span>{item.name}</span>
+              <span>
+                ${Number(item.finalPrice || item.price || 0).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            marginTop: "12px",
+            paddingTop: "12px",
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: "18px",
+            fontWeight: "bold",
+          }}
+        >
+          <span>Total</span>
+          <span>${total.toFixed(2)}</span>
+        </div>
+      </div>
 
         <button
           onClick={async () => {
-            await sendOrderToSystem(cart, session);
+            const ok = await sendOrderToSystem(cart);
+            if (!ok) return;
             setCart([]);
             setScreen("menu");
           }}
@@ -1159,7 +1342,7 @@ const DrinkDetailsPage = () => {
             border: "none",
             borderRadius: "10px",
             fontSize: "24px",
-            marginTop: "30px",
+            marginTop: "40px",
             cursor: "pointer",
           }}
         >
@@ -1167,83 +1350,7 @@ const DrinkDetailsPage = () => {
         </button>
       </div>
     );
-
-    const AllergyFilterPanel = () => {
-      const allergens = ["Dairy", "Nuts"]; // from DB
-
-      const toggleAllergen = (a) => {
-        setExcludedAllergies((prev) =>
-          prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
-        );
-      };
-
-      return (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.75)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 9999,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "30px",
-              borderRadius: "14px",
-              width: "90%",
-              maxWidth: "400px",
-              textAlign: "center",
-              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-            }}
-          >
-            <h2 style={{ marginBottom: "20px" }}>Select Allergies to Avoid</h2>
-
-            {allergens.map((a) => (
-              <label
-                key={a}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "12px 0",
-                  borderBottom: "1px solid #ddd",
-                  fontSize: "18px",
-                }}
-              >
-                <span>{a}</span>
-                <input
-                  type="checkbox"
-                  checked={excludedAllergies.includes(a)}
-                  onChange={() => toggleAllergen(a)}
-                />
-              </label>
-            ))}
-
-            <button
-              onClick={() => setAllergyFilterOpen(false)}
-              style={{
-                marginTop: "20px",
-                padding: "12px 20px",
-                backgroundColor: "#500000",
-                color: "#fff",
-                borderRadius: "10px",
-                border: "none",
-                fontSize: "18px",
-                cursor: "pointer",
-              }}
-            >
-              Apply Filters
-            </button>
-          </div>
-        </div>
-      );
-    };
+  };
 
 
   // === MAIN RENDER SWITCH ===
@@ -1264,6 +1371,16 @@ const DrinkDetailsPage = () => {
   if (screen === "payment")
     return <PaymentScreen accessibilityMode={accessibilityMode} />;
 
+  if (screen === "success") {
+    return (
+      <SuccessScreen
+        accessibilityMode={accessibilityMode}
+        orderId={lastOrderId}
+      />
+    );
+  }
+
+  // === MAIN MENU SCREEN ===
   if (screen === "success") {
     return (
       <SuccessScreen
