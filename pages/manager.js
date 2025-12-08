@@ -9,6 +9,11 @@ function getMonthDay(dateInput) {
   return `${month}-${day}`;
 }
 
+function toLocal(ts) {
+  const d = new Date(ts);   // leave the Z, JS knows what to do
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+}
+
 export default function ManagerPage() {
 	const [activeTab, setActiveTab] = useState("sales");
 	const [query, setQuery] = useState("");
@@ -107,59 +112,55 @@ const [inventory, setInventory] = useState([]);
 	const [zReportRows, setZReportRows] = useState([]);
 
 	// NEW — X REPORT ============================================
-function generateXReport() {
-    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const today = new Date().toISOString().slice(0, 10);
+  async function generateXReport() {
+    try {
+      const res = await fetch("/api/sales");
+      if (!res.ok) throw new Error("Failed to load sales");
 
-    const todaysOrders = orders.filter(o => o.time.startsWith(today));
+      const data = await res.json();
+      const orders = data.orders || [];
 
-    const rows = [];
+      const today = new Date().toLocaleDateString("en-CA");  
 
-    todaysOrders.forEach(order => {
-        const dateTime = new Date(order.time);
-        const formatted = `${dateTime.toLocaleDateString()} ${dateTime.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit"
-        })}`;
+      const todaysOrders = orders.filter(o => {
+        if (!o.orderdate) return false;
 
-        order.items.forEach(item => {
-            rows.push({
-                time: formatted,
-                item: item.name,
-                price: Number(item.price),
-                totalRow: false
-            });
+        const tsLocal = toLocal(o.orderdate);
+        const dateOnly = tsLocal.toLocaleDateString("en-CA");  
+
+        return dateOnly === today;
+      });
+
+      const rows = [];
+
+      todaysOrders.forEach(order => {
+        const tsLocal = toLocal(order.orderdate);
+
+        const formatted = tsLocal.toLocaleString([], {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
         });
 
         rows.push({
-            time: "",
-            item: "Order Total",
-            price: order.total,
-            totalRow: true
+          time: formatted,
+          item: `Order #${order.orderid}`,
+          price: Number(order.ordertotal),
+          totalRow: false
         });
-    });
+      });
 
-    setZReportRows([]);
-    setXReportRows(rows);
-}
+      setZReportRows([]);
+      setXReportRows(rows);
+    } catch (err) {
+      console.error("Error generating X-Report:", err);
+    }
+  }
+
 
   	// === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
-	useEffect(() => {
-		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-
-		// Convert kiosk order objects - rows for Sales table
-		const transformed = orders.flatMap(order =>
-			order.items.map(item => ({
-			id: `${order.id}-${item.name}`,
-			date: order.time.slice(0, 10),
-			item: item.name,
-			qty: 1,
-			total: Number(item.price)
-			}))
-		);
-
-		setSales(transformed);
-	}, []);
 
   useEffect(() => {
     async function loadInventory() {
@@ -216,25 +217,42 @@ useEffect(() => {
 
 
   // NEW — Z REPORT (End of Day Reset) =========================
-	function generateZReport() {
-		const orders = JSON.parse(localStorage.getItem("orders") || "[]");
-		const today = new Date().toISOString().slice(0, 10);
+async function generateZReport() {
+  try {
+    const res = await fetch("/api/sales");
+    if (!res.ok) throw new Error("Failed to load sales");
 
-		const todaysOrders = orders.filter(o => o.time.startsWith(today));
+    const data = await res.json();
+    const orders = data.orders || [];
 
-		// Calculate grand total for the day
-		const grandTotal = todaysOrders.reduce((acc, order) => acc + order.total, 0);
+    // Local date for today (YYYY-MM-DD)
+    const today = new Date().toLocaleDateString("en-CA");
 
-		setXReportRows([]);
+    // Select only today's orders (LOCAL time)
+    const todaysOrders = orders.filter(o => {
+      if (!o.orderdate) return false;
 
-		// Store one row containing only the total
-		setZReportRows([
-			{
-			label: "Total Revenue",
-			total: grandTotal
-			}
-		]);
-	} 
+      const tsLocal = toLocal(o.orderdate);  // convert UTC → local
+      const dateOnly = tsLocal.toLocaleDateString("en-CA");
+
+      return dateOnly === today;
+    });
+
+    // Compute total revenue
+    const totalRevenue = todaysOrders.reduce(
+      (sum, o) => sum + Number(o.ordertotal),
+      0
+    );
+
+    setXReportRows([]);
+    setZReportRows([{ label: "Total Revenue", total: totalRevenue }]);
+
+  } catch (err) {
+    console.error("Error generating Z-Report:", err);
+  }
+}
+
+
 
 
   // Filtering =========================================================
