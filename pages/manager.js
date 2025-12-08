@@ -21,11 +21,20 @@ export default function ManagerPage() {
 	const [sales, setSales] = useState([]);
 
 	const [menuItems, setMenuItems] = useState([]);
-  const [selectedMenuId, setSelectedMenuId] = useState(null);
-
   const ALWAYS_INCLUDED_INGREDIENTS = [28, 29, 30, 31, 32];
   // ===== ADD MENU ITEM MODAL STATE =====
   const [showAddMenuModal, setShowAddMenuModal] = useState(false);
+
+  // ===== INVENTORY MODAL STATE =====
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [isEditingInventory, setIsEditingInventory] = useState(false);
+
+  const [invID, setInvID] = useState(null);
+  const [invName, setInvName] = useState("");
+  const [invQty, setInvQty] = useState("");
+  const [invUnit, setInvUnit] = useState("");
+  const [invMin, setInvMin] = useState("");
+  const [invAllergy, setInvAllergy] = useState("");
 
   const [newCategoryInput, setNewCategoryInput] = useState("");
   const [newMenuName, setNewMenuName] = useState("");
@@ -178,7 +187,9 @@ const [inventory, setInventory] = useState([]);
           name: i.inventoryname,
           quantity: Number(i.quantityavailable || 0),
           restockMin: Number(i.restockmin || 0),
-          unit: i.unit
+          unit: i.unit,
+          restockOrdered: Number(i.restockordered || 0)
+
         }));
 
         setInventory(normalized);
@@ -189,34 +200,6 @@ const [inventory, setInventory] = useState([]);
 
     loadInventory();
   }, []);
-
-
-
-  // === LOAD INVENTORY FROM DATABASE ===
-useEffect(() => {
-  async function loadInventory() {
-    try {
-      const invRes = await fetch("/api/inventory");
-      if (!invRes.ok) return;
-
-      const invJson = await invRes.json();
-
-      const normalized = invJson.map(i => ({
-        id: i.inventoryid,
-        name: i.inventoryname,
-        quantity: Number(i.quantityavailable || 0),
-        restockMin: Number(i.restockmin || 0),
-        unit: i.unit
-      }));
-
-      setInventory(normalized);
-    } catch (err) {
-      console.error("Error loading inventory:", err);
-    }
-  }
-
-  loadInventory();
-}, []);
 
 
   // NEW — Z REPORT (End of Day Reset) =========================
@@ -280,56 +263,6 @@ async function generateZReport() {
   }, [query, inventory]);
 
   // Event Handlers ===================================================
-  async function handleDeleteMenuItem() {
-
-    if (!selectedMenuId) {
-      alert("Please select a menu item to delete.");
-      return;
-    }
-
-    const ok = confirm("Are you sure you want to delete this menu item?");
-    if (!ok) return;
-
-    try {
-      const res = await fetch("/api/menu/delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ menuID: selectedMenuId })
-      });
-
-      if (!res.ok) {
-        alert("Failed to delete item.");
-        return;
-      }
-
-      alert("Menu item deleted.");
-
-      // Reload list
-      const refreshed = await fetch("/api/menu");
-      const updatedData = await refreshed.json();
-
-      setMenuItems(
-        updatedData.map(item => ({
-          id: item.menuid,
-          name: item.menuname,
-          category: item.category,
-          price: Number(item.price),
-          seasonal: item.seasonalstart && item.seasonalend
-            ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
-            : "All Year",
-          seasonalStart: item.seasonalstart,
-          seasonalEnd: item.seasonalend
-        }))
-      );
-
-      setSelectedMenuId(null);
-
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert("Error deleting menu item.");
-    }
-  }
-
   function handleAddMenuItem() {
     // Pre-load auto-included ingredients
     setNewMenuIngredients(
@@ -342,9 +275,81 @@ async function generateZReport() {
     setShowAddMenuModal(true);
   }
   function handleUpdateMenuItem() { console.log("Update menu item"); }
-  function handleAddInventory() { console.log("Add inventory"); }
-  function handleUpdateInventory() { console.log("Update inventory"); }
-  function handleOrderRestock(item) { console.log("Restock ordered:", item.name); }
+  function handleAddInventory() {
+    setIsEditingInventory(false);
+
+    setInvID(null);
+    setInvName("");
+    setInvQty("");
+    setInvUnit("");
+    setInvMin("");
+    setInvAllergy("");
+
+    setShowInventoryModal(true);
+  }
+
+  function handleUpdateInventory() {
+    alert("Click an inventory row first to update it.");
+  }
+
+  async function handleOrderRestock(item) {
+    const amount = prompt(`How many ${item.unit} of ${item.name}?`);
+    if (!amount || isNaN(amount) || amount <= 0) return;
+
+    const newAmount = item.restockOrdered + Number(amount);
+
+    const res = await fetch("/api/inventory", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        restockMin: item.restockMin,
+        unit: item.unit,
+        allergy: item.allergy,
+        restockOrdered: newAmount   // <--- MUST send this
+      }),
+    });
+
+    refreshInventory();
+  }
+
+  async function completeRestock(item) {
+    const amount = item.restockOrdered;
+    if (amount <= 0) return;
+
+    const res = await fetch("/api/inventory", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, amount }),
+    });
+
+    if (!res.ok) {
+      alert("Failed to complete restock.");
+      return;
+    }
+
+    refreshInventory();
+  }
+
+  async function refreshInventory() {
+    const invRes = await fetch("/api/inventory");
+    const invJson = await invRes.json();
+
+    const normalized = invJson.map(i => ({
+      id: i.inventoryid,
+      name: i.inventoryname,
+      quantity: Number(i.quantityavailable || 0),
+      restockMin: Number(i.restockmin || 0),
+      unit: i.unit,
+      allergy: i.allergy,
+      restockOrdered: Number(i.restockordered || 0)
+    }));
+
+    setInventory(normalized);
+  }
+
   async function submitNewMenuItem() {
     if (newMenuIngredients.length === 0) {
       if (!confirm("This item has NO ingredients. Continue?")) {
@@ -435,6 +440,47 @@ async function generateZReport() {
           console.error("Failed to add menu item:", err);
       }
   }
+
+  async function submitInventoryChanges() {
+    const payload = {
+      id: invID,
+      name: invName,
+      quantity: Number(invQty),
+      restockMin: Number(invMin),
+      unit: invUnit,
+      allergy: invAllergy || null,
+      restockOrdered: isEditingInventory ? inventory.find(x => x.id === invID)?.restockOrdered || 0 : 0
+    };
+
+    const method = isEditingInventory ? "PUT" : "POST";
+
+    const res = await fetch("/api/inventory", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      alert("Error saving inventory.");
+      return;
+    }
+
+    setShowInventoryModal(false);
+
+    const refreshed = await fetch("/api/inventory");
+    const updated = await refreshed.json();
+
+    setInventory(
+      updated.map((i) => ({
+        id: i.inventoryid,
+        name: i.inventoryname,
+        quantity: Number(i.quantityavailable || 0),
+        restockMin: Number(i.restockmin || 0),
+        unit: i.unit,
+        allergy: i.allergy,
+      }))
+    );
+  } 
 
   function toggleIngredient(id, checked) {
     if (checked) {
@@ -605,9 +651,8 @@ useEffect(() => {
 		<div className={styles.panelHeader}>
 		<h2>Menu Items</h2>
 		<div className={styles.actions}>
-      <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
-      <button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
-      <button className={`${styles.btn} ${styles.danger}`} onClick={handleDeleteMenuItem}>Delete</button>
+			<button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
+			<button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
 		</div>
 		</div>
 
@@ -628,12 +673,7 @@ useEffect(() => {
 			</thead>
 			<tbody>
 			{filteredMenu.map((m) => (
-				  <tr
-            key={m.id}
-            onClick={() => setSelectedMenuId(m.id)}
-            className={selectedMenuId === m.id ? styles.selectedRow : ""}
-            style={{ cursor: "pointer" }}
-          >
+				<tr key={m.id}>
 				<td>{m.name}</td>
 				<td>{m.category}</td>
 				<td>{m.price.toFixed(2)}</td>
@@ -677,7 +717,20 @@ useEffect(() => {
         </thead>
           <tbody>
             {filteredInventory.map((i) => (
-              <tr key={i.id}>
+              <tr
+                key={i.id}
+                onClick={() => {
+                  setIsEditingInventory(true);
+                  setInvID(i.id);
+                  setInvName(i.name);
+                  setInvQty(i.quantity);
+                  setInvUnit(i.unit);
+                  setInvMin(i.restockMin);
+                  setInvAllergy(i.allergy || "");
+                  setShowInventoryModal(true);
+                }}
+                style={{ cursor: "pointer" }}
+              >
                 <td>{i.name}</td>
                 <td>{i.quantity}</td>
                 <td>{i.unit}</td>
@@ -704,16 +757,39 @@ useEffect(() => {
               <span className={styles.restockMeta}>
                 Current: {i.quantity} {i.unit} | Min: {i.restockMin} {i.unit}
               </span>
+
+              {i.restockOrdered > 0 && (
+                <span className={styles.restockPending}>
+                  Pending Restock: {i.restockOrdered} {i.unit}
+                </span>
+              )}
             </div>
-            <button className={`${styles.btn} ${styles.success}`}
-              onClick={() => handleOrderRestock(i)}>
-              Order
-            </button>
+
+            <div className={styles.restockButtons}>
+              {/* ORDER MORE */}
+              <button
+                className={`${styles.btn} ${styles.success}`}
+                onClick={() => handleOrderRestock(i)}
+              >
+                Order
+              </button>
+
+              {/* COMPLETE RESTOCK (Only if pending) */}
+              {i.restockOrdered > 0 && (
+                <button
+                  className={`${styles.btn} ${styles.primary}`}
+                  onClick={() => completeRestock(i)}
+                >
+                  Complete
+                </button>
+              )}
+            </div>
           </li>
         ))}
       </ul>
     </section>
   );
+
 
   // NEW — REPORTS TAB ============================================
   const ReportsTab = (
@@ -955,6 +1031,99 @@ useEffect(() => {
               </div>
     )}
 
+    {showInventoryModal && (
+      <div className={styles.modalBackdrop}>
+        <div className={styles.modal}>
+
+          <h2>{isEditingInventory ? "Update Inventory Item" : "Add Inventory Item"}</h2>
+
+          <div className={styles.modalField}>
+            <label>Name</label>
+            <input
+              type="text"
+              value={invName}
+              onChange={(e) => setInvName(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.modalField}>
+            <label>Quantity</label>
+            <input
+              type="number"
+              value={invQty}
+              onChange={(e) => setInvQty(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.modalField}>
+            <label>Unit</label>
+            <input
+              type="text"
+              value={invUnit}
+              onChange={(e) => setInvUnit(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.modalField}>
+            <label>Restock Minimum</label>
+            <input
+              type="number"
+              value={invMin}
+              onChange={(e) => setInvMin(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.modalField}>
+            <label>Allergy (optional)</label>
+            <div style={{ display: "flex", gap: "20px", marginTop: "8px" }}>
+              {/* DAIRY */}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={invAllergy?.includes("Dairy")}
+                  onChange={(e) => {
+                    let a = invAllergy ? invAllergy.split(",") : [];
+                    if (e.target.checked) {
+                      if (!a.includes("Dairy")) a.push("Dairy");
+                    } else {
+                      a = a.filter((x) => x !== "Dairy");
+                    }
+                    setInvAllergy(a.join(","));
+                  }}
+                />
+                Dairy
+              </label>
+                
+              {/* NUTS */}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={invAllergy?.includes("Nuts")}
+                  onChange={(e) => {
+                    let a = invAllergy ? invAllergy.split(",") : [];
+                    if (e.target.checked) {
+                      if (!a.includes("Nuts")) a.push("Nuts");
+                    } else {
+                      a = a.filter((x) => x !== "Nuts");
+                    }
+                    setInvAllergy(a.join(","));
+                  }}
+                />
+                Nuts
+              </label>
+            </div>
+          </div>
+
+          <div className={styles.modalButtons}>
+            <button onClick={() => setShowInventoryModal(false)}>Cancel</button>
+            <button className={styles.primary} onClick={submitInventoryChanges}>
+              {isEditingInventory ? "Update" : "Add"}
+            </button>
+          </div>
+
+        </div>
+      </div>
+    )}
 
       <main className={styles.layout}>
         <aside className={styles.sidebar}>
