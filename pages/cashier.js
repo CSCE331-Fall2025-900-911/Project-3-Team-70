@@ -32,6 +32,7 @@ export default function CashierPage() {
   const [modTarget, setModTarget] = useState(null);
   const [modToppings, setModToppings] = useState([]);
   const [toppingOptions, setToppingOptions] = useState([]);
+  const [modSize, setModSize] = useState("Medium");
 
   // Fetch and normalize menu data from API
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function CashierPage() {
             : x
         );
       }
-      return [...prev, { ...item, qty: 1 }];
+      return [...prev, { ...item, qty: 1, price: item.price }];
     });
   };
 
@@ -136,7 +137,9 @@ export default function CashierPage() {
       const items = order.map((i) => ({
         menuID: i.id, // using normalized id
         quantity: i.qty,
-        priceAtPurchase: Number(i.price || 0),
+        priceAtPurchase: Number(
+          i.price || i.modifications?.finalPrice || 0
+        ),
         modifications: i.modifications || null,
       }));
 
@@ -173,6 +176,7 @@ export default function CashierPage() {
   const handleOpenModifier = (item) => {
     setModTarget(item);
     setModToppings([]);
+    setModSize("Medium");
     setShowModifier(true);
   };
 
@@ -182,11 +186,27 @@ export default function CashierPage() {
       setShowModifier(false);
       return;
     }
-    const modifications = { toppings: modToppings };
+
+    // Base price from menu
+    let finalPrice = Number(modTarget.price || 0);
+
+    // SIZE PRICE ADJUSTMENT
+    if (modSize === "Small") finalPrice -= 0.5;
+    if (modSize === "Large") finalPrice += 0.5;
+
+    // Build modifications package
+    const modifications = {
+      toppings: modToppings,
+      size: modSize,
+      finalPrice,
+    };
+
     addToOrder({
       ...modTarget,
       modifications,
+      price: finalPrice, // replace display price
     });
+
     setShowModifier(false);
   };
 
@@ -289,6 +309,11 @@ export default function CashierPage() {
                 >
                   <div className="name">
                     {line.name}
+                    {line.modifications?.size && (
+                      <div className="mods">
+                        Size: {line.modifications.size}
+                      </div>
+                    )}
                     {line.modifications?.toppings &&
                       line.modifications.toppings.length > 0 && (
                         <div className="mods">
@@ -300,9 +325,7 @@ export default function CashierPage() {
                   <div className="qty">x{line.qty}</div>
                   <div className="subtotal">
                     $
-                    {(
-                      Number(line.price || 0) * line.qty
-                    ).toFixed(2)}
+                    {(Number(line.price || 0) * line.qty).toFixed(2)}
                   </div>
                 </div>
               ))
@@ -348,6 +371,21 @@ export default function CashierPage() {
                   </label>
                 ))
               )}
+            </div>
+
+            {/* SIZE SELECTION */}
+            <div className="mod-section">
+              <p>Select size:</p>
+              <select
+                value={modSize}
+                onChange={(e) => setModSize(e.target.value)}
+                className="search"
+                style={{ padding: "8px", borderRadius: "8px" }}
+              >
+                <option value="Small">Small (-$0.50)</option>
+                <option value="Medium">Medium</option>
+                <option value="Large">Large (+$0.50)</option>
+              </select>
             </div>
 
             <div className="modal-actions">
@@ -614,4 +652,3 @@ export default function CashierPage() {
     </div>
   );
 }
-

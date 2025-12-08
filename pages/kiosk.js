@@ -279,7 +279,7 @@ export default function KioskPage() {
           return {
             id,
             name: item.menuname ?? item.name,
-            price: item.price,
+            price: item.finalPrice || item.price,
             description: item.menudescription ?? item.description,
             category: item.category,
             image: `/Images/${id}.png`,
@@ -371,7 +371,7 @@ export default function KioskPage() {
 
     if (narrationOn) {
       speak(
-        `${item.name}. Price ${item.price} dollars. ${
+        `${item.name}. Price ${item.finalPrice || item.price} dollars. ${
           item.description || ""
         }`,
         language
@@ -403,244 +403,265 @@ export default function KioskPage() {
   };
   
   // === CUSTOMIZATION UI ===
-  const DrinkDetailsPage = () => {
-    const [selectedToppings, setSelectedToppings] = useState([]);
-    const [sweetness, setSweetness] = useState("100%");
-    const [iceLevel, setIceLevel] = useState("Regular Ice");
-    const [allergyFilterOpen, setAllergyFilterOpen] = useState(false);
-    const [excludedAllergies, setExcludedAllergies] = useState([]);
+const DrinkDetailsPage = () => {
+  const [selectedToppings, setSelectedToppings] = useState([]);
+  const [sweetness, setSweetness] = useState("100%");
+  const [iceLevel, setIceLevel] = useState("Regular Ice");
+  const [allergyFilterOpen, setAllergyFilterOpen] = useState(false);
+  const [excludedAllergies, setExcludedAllergies] = useState([]);
+  const [size, setSize] = useState("Medium");
+
+  if (!detailsItem) return null;
+
+  // Match by ID, not object reference
+  const toggleTopping = (topping) => {
+    setSelectedToppings((prev) =>
+      prev.some((t) => t.id === topping.id)
+        ? prev.filter((t) => t.id !== topping.id)
+        : [...prev, topping]
+    );
+  };
+
+  const totalPrice = Number(detailsItem.price) + selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
 
 
-    if (!detailsItem) return null;
+  // === SIZE PRICE ADJUSTMENT ===
+  let finalPrice = totalPrice;
+  if (size === "Small") finalPrice -= 0.50;
+  if (size === "Large") finalPrice += 0.50;
 
-    // Match by ID, not object reference
-    const toggleTopping = (topping) => {
-      setSelectedToppings((prev) =>
-        prev.some((t) => t.id === topping.id)
-          ? prev.filter((t) => t.id !== topping.id)
-          : [...prev, topping]
-      );
-    };
+  const finalize = () => {
+    addToCart({
+      ...detailsItem,
+      toppings: selectedToppings,
+      sweetness,
+      iceLevel,
+      size,
+      finalPrice,
+    });
 
-    const totalPrice =
-      Number(detailsItem.price) +
-      selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
+    setScreen("menu");
+  };
 
-    const finalize = () => {
-      addToCart({
-        ...detailsItem,
-        toppings: selectedToppings,
-        sweetness,
-        iceLevel,
-        finalPrice: totalPrice
-      });
-
-      setScreen("menu");
-    };
-
-    return (
-      <div
+  return (
+    <div
+      style={{
+        width: "100%",
+        minHeight: "100vh",
+        backgroundColor: accessibilityMode ? "#000" : "#fff",
+        color: accessibilityMode ? "#fff" : "#000",
+        padding: "20px",
+        textAlign: "center",
+        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+      }}
+    >
+      <button
+        onClick={() => setScreen("menu")}
         style={{
-          width: "100%",
-          minHeight: "100vh",
-          backgroundColor: accessibilityMode ? "#000" : "#fff",
-          color: accessibilityMode ? "#fff" : "#000",
-          padding: "20px",
-          textAlign: "center",
+          position: "absolute",
+          top: "20px",
+          left: "20px",
+          padding: "10px 20px",
+          backgroundColor: "#500000",
+          color: "#fff",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "18px",
+          cursor: "pointer",
           fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
-        <button
-          onClick={() => setScreen("menu")}
-          style={{
-            position: "absolute",
-            top: "20px",
-            left: "20px",
-            padding: "10px 20px",
-            backgroundColor: "#500000",
-            color: "#fff",
-            border: "none",
-            borderRadius: "10px",
-            fontSize: "18px",
-            cursor: "pointer",
-            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-          }}
-        >
-          ← Back
-        </button>
+        ← Back
+      </button>
 
-        <img
-          src={detailsItem.image}
-          alt={detailsItem.name}
-          onError={(e) => {
-             e.target.src = "/Images/default.png";
-            }}
-          style={{
-            width: "60%",
-            maxWidth: "400px",
-            borderRadius: "20px",
-            marginTop: "60px",
-            marginBottom: "20px",
-          }}
-        />
+      <img
+        src={detailsItem.image}
+        alt={detailsItem.name}
+        onError={(e) => {
+          e.target.src = "/Images/default.png";
+        }}
+        style={{
+          width: "60%",
+          maxWidth: "400px",
+          borderRadius: "20px",
+          marginTop: "60px",
+          marginBottom: "20px",
+        }}
+      />
 
-        <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
+      <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
 
-        <p style={{ fontSize: "24px", opacity: 0.9 }}>
-          Base Price: ${Number(detailsItem.price).toFixed(2)}
-        </p>
+      <p style={{ fontSize: "24px", opacity: 0.9 }}>
+        Base Price: ${Number(detailsItem.price).toFixed(2)}
+      </p>
 
-        {/* TOPPINGS */}
-        <h2 style={{ fontSize: "30px", marginTop: "20px" }}>Toppings</h2>
+      {/* TOPPINGS */}
+      <h2 style={{ fontSize: "30px", marginTop: "20px" }}>Toppings</h2>
 
+      <div
+        style={{
+          width: "80%",
+          margin: "0 auto",
+          marginBottom: "40px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+        }}
+      >
+        {detailsItem.description}
+      </div>
+
+      {/* Toppings selection */}
+      {toppings.length > 0 && (
         <div
           style={{
+            margin: "20px auto",
             width: "80%",
-            margin: "0 auto",
-            marginBottom: "40px",
+            textAlign: "left",
             fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
-          {detailsItem.description}
-        </div>
+          <h3 style={{ fontSize: "24px", marginBottom: "10px" }}>
+            Customize your drink
+          </h3>
 
-        {/* Toppings selection */}
-        {toppings.length > 0 && (
-          <div
-            style={{
-              margin: "20px auto",
-              width: "80%",
-              textAlign: "left",
-              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-            }}
-          >
-            <h3 style={{ fontSize: "24px", marginBottom: "10px" }}>
-              Customize your drink
-            </h3>
+          {toppings.map((top) => {
+            const checked = selectedToppings.some((t) => t.id === top.id);
 
-            {toppings.map((top) => {
-              const checked = selectedToppings.some((t) => t.id === top.id);
-
-              return (
-                <div key={top.id} style={{ marginBottom: "10px" }}>
+            return (
+              <div key={top.id} style={{ marginBottom: "10px" }}>
+                <label
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid #eee",
+                    fontSize: "18px",
+                    fontFamily:
+                      "'Helvetica Neue', Helvetica, Arial, sans-serif",
+                  }}
+                >
                   <label
                     style={{
                       display: "flex",
-                      justifyContent: "space-between",
                       alignItems: "center",
-                      padding: "8px 0",
-                      borderBottom: "1px solid #eee",
-                      fontSize: "18px",
-                      fontFamily:
-                        "'Helvetica Neue', Helvetica, Arial, sans-serif",
+                      gap: "10px",
+                      fontSize: accessibilityMode ? "26px" : "20px",
                     }}
                   >
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        fontSize: accessibilityMode ? "26px" : "20px",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleTopping(top)}
-                        style={{ width: "25px", height: "25px" }}
-                      />
-                      {top.name}
-                    </label>
-
-                    <span
-                      style={{
-                        fontSize: accessibilityMode ? "22px" : "18px",
-                      }}
-                    >
-                      + ${Number(top.price).toFixed(2)}
-                    </span>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleTopping(top)}
+                      style={{ width: "25px", height: "25px" }}
+                    />
+                    {top.name}
                   </label>
 
-                  {/* Allergy Warning */}
-                  {top.allergy && top.allergy !== "None" && (
-                    <p
-                      style={{
-                        fontSize: accessibilityMode ? "22px" : "16px",
-                        fontWeight: "bold",
-                        color: "red",
-                        marginTop: "5px",
-                      }}
-                    >
-                      ⚠ Contains {top.allergy}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  <span
+                    style={{
+                      fontSize: accessibilityMode ? "22px" : "18px",
+                    }}
+                  >
+                    + ${Number(top.price).toFixed(2)}
+                  </span>
+                </label>
 
+                {top.allergy && top.allergy !== "None" && (
+                  <p
+                    style={{
+                      fontSize: accessibilityMode ? "22px" : "16px",
+                      fontWeight: "bold",
+                      color: "red",
+                      marginTop: "5px",
+                    }}
+                  >
+                    ⚠ Contains {top.allergy}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-        {/* SWEETNESS */}
-        <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
-        <select
-          value={sweetness}
-          onChange={(e) => setSweetness(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "20px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-          }}
-        >
-          <option>0%</option>
-          <option>25%</option>
-          <option>50%</option>
-          <option>75%</option>
-          <option>100%</option>
-        </select>
+      {/* SWEETNESS */}
+      <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
+      <select
+        value={sweetness}
+        onChange={(e) => setSweetness(e.target.value)}
+        style={{
+          padding: "10px",
+          fontSize: "20px",
+          borderRadius: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <option>0%</option>
+        <option>25%</option>
+        <option>50%</option>
+        <option>75%</option>
+        <option>100%</option>
+      </select>
 
-        {/* ICE LEVEL */}
-        <h2>Ice Level</h2>
-        <select
-          value={iceLevel}
-          onChange={(e) => setIceLevel(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "20px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-          }}
-        >
-          <option>Regular Ice</option>
-          <option>Less Ice</option>
-          <option>No Ice</option>
-          <option>Extra Ice</option>
-        </select>
+      {/* ICE LEVEL */}
+      <h2>Ice Level</h2>
+      <select
+        value={iceLevel}
+        onChange={(e) => setIceLevel(e.target.value)}
+        style={{
+          padding: "10px",
+          fontSize: "20px",
+          borderRadius: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <option>Regular Ice</option>
+        <option>Less Ice</option>
+        <option>No Ice</option>
+        <option>Extra Ice</option>
+      </select>
 
-        {/* FINAL TOTAL */}
-        <h2 style={{ marginTop: "30px", fontSize: "30px" }}>
-          Total: ${totalPrice.toFixed(2)}
-        </h2>
+      {/* SIZE */}
+      <h2 style={{ marginTop: "20px" }}>Size</h2>
+      <select
+        value={size}
+        onChange={(e) => setSize(e.target.value)}
+        style={{
+          padding: "10px",
+          fontSize: "20px",
+          borderRadius: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <option value="Small">Small (-$0.50)</option>
+        <option value="Medium">Medium</option>
+        <option value="Large">Large (+$0.50)</option>
+      </select>
 
-        <button
-          onClick={finalize}
-          style={{
-            padding: "20px 40px",
-            backgroundColor: "#FFD700",
-            color: "#000",
-            border: "none",
-            borderRadius: "15px",
-            fontSize: "26px",
-            cursor: "pointer",
-            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-          }}
-        >
-          Add to Cart
-        </button>
-      </div>
-    );
-  };
+      {/* FINAL TOTAL */}
+      <h2 style={{ marginTop: "30px", fontSize: "30px" }}>
+        Total: ${finalPrice.toFixed(2)}
+      </h2>
+
+      <button
+        onClick={finalize}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          color: "#000",
+          border: "none",
+          borderRadius: "15px",
+          fontSize: "26px",
+          cursor: "pointer",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+        }}
+      >
+        Add to Cart
+      </button>
+    </div>
+  );
+};
+
 
       const CartScreen = ({ accessibilityMode }) => {
       const removeItem = (indexToRemove) => {
@@ -648,7 +669,7 @@ export default function KioskPage() {
       };
 
       const cartTotal = cart.reduce(
-        (sum, item) => sum + Number(item.finalPrice || item.price),
+        (sum, item) => sum + Number(item.finalPrice || item.finalPrice || item.price),
         0
       );
 
@@ -714,7 +735,7 @@ export default function KioskPage() {
                   marginBottom: "10px",
                 }}
               >
-                {item.name} — ${(item.finalPrice || item.price).toFixed(2)}
+                {item.name} — ${(item.finalPrice || item.finalPrice || item.price).toFixed(2)}
               </p>
 
               {/* SWEETNESS */}
@@ -803,7 +824,7 @@ export default function KioskPage() {
 
       const CheckoutScreen = () => {
       const total = cart.reduce(
-        (sum, item) => sum + Number(item.price),
+        (sum, item) => sum + Number(item.finalPrice || item.price),
         0
       );
 
@@ -857,7 +878,7 @@ export default function KioskPage() {
               }}
             >
               <div>
-                <div>{item.name} — ${Number(item.price).toFixed(2)}</div>
+                <div>{item.name} — ${Number(item.finalPrice || item.price).toFixed(2)}</div>
                 {item.toppings && item.toppings.length > 0 && (
                   <div style={{ fontSize: "16px", opacity: 0.8, marginTop: "4px" }}>
                     Toppings: {item.toppings.map((t) => t.name).join(", ")}
@@ -1627,7 +1648,7 @@ export default function KioskPage() {
                                   : "18px",
                               }}
                             >
-                              ${Number(item.price).toFixed(2)}
+                              ${Number(item.finalPrice || item.price).toFixed(2)}
                             </p>
                             {item.description && (
                               <p
