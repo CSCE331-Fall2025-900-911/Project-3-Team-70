@@ -39,8 +39,15 @@ export default function MenuBoard() {
   const [grouped, setGrouped] = useState({});
   const [categories, setCategories] = useState([]);
   const [recs, setRecs] = useState([]);
-  const [mode, setMode] = useState("default"); // "hot" | "cold" | "late" | "default"
+  const [mode, setMode] = useState("default");
   const [currentRecIndex, setCurrentRecIndex] = useState(0);
+
+  // hydration-safe timestamp
+  const [clientTime, setClientTime] = useState("");
+
+  useEffect(() => {
+    setClientTime(new Date().toLocaleString());
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -80,11 +87,9 @@ export default function MenuBoard() {
         newMode = "cold";
       }
 
-      // Choose up to 5 recommendations
       const picks = [];
       const maxRecs = 5;
 
-      // 1) Prefer items from preferred categories
       for (const cat of pref) {
         for (const item of m) {
           if (item.category === cat) {
@@ -97,7 +102,6 @@ export default function MenuBoard() {
         if (picks.length >= maxRecs) break;
       }
 
-      // 2) Fill remaining slots with any other items
       if (picks.length < maxRecs) {
         for (const item of m) {
           if (!picks.some((p) => p.id === item.id)) {
@@ -115,7 +119,6 @@ export default function MenuBoard() {
     load();
   }, []);
 
-  // Cycle through recommendations
   useEffect(() => {
     if (!recs || recs.length === 0) return;
 
@@ -153,7 +156,7 @@ export default function MenuBoard() {
             {tempF && `${Math.round(tempF)}°F • ${desc}`}
           </div>
           <div style={{ color: "#bbb", fontSize: "13px" }}>
-            {new Date().toLocaleString()}
+            {clientTime}
           </div>
         </div>
       </div>
@@ -166,15 +169,15 @@ export default function MenuBoard() {
             const drinks = grouped[cat] || [];
             let span = "";
 
-            if (i === 0) span = styles.wide; // Milky
-            if (i === 1) span = styles.wide; // Fresh Brew
+            if (i === 0) span = styles.wide;
+            if (i === 1) span = styles.wide;
 
-            if (i === 2) span = styles.medium; // Fruity
-            if (i === 3) span = styles.medium; // Ice-Blended
-            if (i === 4) span = styles.medium; // Non-Caffeinated
+            if (i === 2) span = styles.medium;
+            if (i === 3) span = styles.medium;
+            if (i === 4) span = styles.medium;
 
-            if (i === 5) span = styles.medium; // New Matcha
-            if (i === 6) span = styles.small; // Valentine's Day
+            if (i === 5) span = styles.medium;
+            if (i === 6) span = styles.small;
 
             return (
               <div key={cat} className={`${styles.categoryBox} ${span}`}>
@@ -193,12 +196,11 @@ export default function MenuBoard() {
           })}
         </div>
 
-       {/* RIGHT: RECOMMENDED DRINK SLIDER */}
+        {/* RIGHT: RECOMMENDED DRINKS */}
         <div className={styles.rightPanel}>
-            <div className={styles.recommendHeader}>Recommended Drinks</div>
+          <div className={styles.recommendHeader}>Recommended Drinks</div>
 
-            <div className={styles.recommendSlider}>
-
+          <div className={styles.recommendSlider}>
             {currentRec ? (
               <div className={styles.recommendImageWrapper}>
                 <img src={recImageSrc} alt={currentRec.name} />
