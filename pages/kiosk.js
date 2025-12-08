@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 
 // === SEND ORDERS TO BACKEND ===
-async function sendOrderToSystem(order) {
+async function sendOrderToSystem(order, session) {
   const rawItems = Array.isArray(order)
     ? order
     : (order && order.items) || [];
@@ -22,6 +22,7 @@ async function sendOrderToSystem(order) {
       body: JSON.stringify({
         source: "kiosk",
         orderLocation: "Kiosk",
+        customerEmail: session?.user?.email || null,   // ★ REQUIRED
         items,
       }),
     });
@@ -193,6 +194,18 @@ export default function KioskPage() {
   const [toppings, setToppings] = useState([]);
   const [toppingsError, setToppingsError] = useState(null);
   const [selectedToppings, setSelectedToppings] = useState([]);
+
+  const [allergyFilterOpen, setAllergyFilterOpen] = useState(false);
+  const [excludedAllergies, setExcludedAllergies] = useState([]);
+  const [filteredMenuItems, setFilteredMenuItems] = useState([]);
+
+  useEffect(() => {
+  const newFiltered = filterByAllergies(menuItems, excludedAllergies);
+  setFilteredMenuItems(newFiltered);
+}, [menuItems, excludedAllergies]);
+
+
+
   
 
 
@@ -214,6 +227,18 @@ export default function KioskPage() {
   const [loyaltyPoints, setLoyaltyPoints] = useState(null);
   const [pointsError, setPointsError] = useState(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
+
+  function filterByAllergies(items, excludedAllergies) {
+  if (excludedAllergies.length === 0) return items;
+
+  return items.filter(item => {
+    if (!item.allergies || item.allergies.length === 0) return true;
+
+    // If ANY allergen in the item matches one the user wants to avoid → hide it
+    return !item.allergies.some(a => excludedAllergies.includes(a));
+  });
+}
+
   
     // Load rewards points for logged-in customers
   useEffect(() => {
@@ -257,10 +282,13 @@ export default function KioskPage() {
             description: item.menudescription ?? item.description,
             category: item.category,
             image: `/Images/${id}.png`,
+            allergies: item.allergies || [],   // ★ NEW
           };
         });
 
+
         setMenuItems(formatted);
+        setFilteredMenuItems(formatted);
       } catch (err) {
         console.error("Error fetching menu:", err);
         setError("Failed to load menu items.");
@@ -378,6 +406,9 @@ export default function KioskPage() {
     const [selectedToppings, setSelectedToppings] = useState([]);
     const [sweetness, setSweetness] = useState("100%");
     const [iceLevel, setIceLevel] = useState("Regular Ice");
+    const [allergyFilterOpen, setAllergyFilterOpen] = useState(false);
+    const [excludedAllergies, setExcludedAllergies] = useState([]);
+
 
     if (!detailsItem) return null;
 
@@ -769,211 +800,163 @@ export default function KioskPage() {
     );
   };
 
-  const CheckoutScreen = () => {
-  const total = cart.reduce(
-    (sum, item) => sum + Number(item.price),
-    0
-  );
+      const CheckoutScreen = () => {
+      const total = cart.reduce(
+        (sum, item) => sum + Number(item.price),
+        0
+      );
 
-  // Points/discount (we’ll wire this up in 2.3)
-  const maxRedeemable =
-    typeof loyaltyPoints === "number"
-      ? Math.min(loyaltyPoints, Math.floor(total))
-      : 0;
-  const applied = Math.min(
-    pointsToRedeem || 0,
-    maxRedeemable
-  );
-  const finalTotal = total - applied;
+      const maxRedeemable =
+        typeof loyaltyPoints === "number"
+          ? Math.min(loyaltyPoints, Math.floor(total))
+          : 0;
 
-    return (
-      <div
-        style={{
-          padding: accessibilityMode ? "40px" : "20px",
-          backgroundColor: accessibilityMode ? "#000" : "#fff",
-          color: accessibilityMode ? "#fff" : "#000",
-          minHeight: "100vh",
-          transition: "all 0.3s ease",
-        }}
-      >
-        <h2 style={{ fontSize: accessibilityMode ? "48px" : "36px" }}>
-          Order Summary
-        </h2>
+      const applied = Math.min(pointsToRedeem || 0, maxRedeemable);
+      const finalTotal = total - applied;
 
-      {cart.map((item, index) => (
+      // ===========================
+      // Redeem points when continuing
+      // ===========================
+      async function redeemPointsIfNeeded() {
+        if (applied > 0 && session?.user?.email) {
+          await fetch("/api/rewards", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ points: applied }),
+          });
+        }
+      }
+
+      return (
         <div
-        key={index}
-        style={{
-          fontSize: accessibilityMode ? "32px" : "22px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          style={{
+            padding: accessibilityMode ? "40px" : "20px",
+            backgroundColor: accessibilityMode ? "#000" : "#fff",
+            color: accessibilityMode ? "#fff" : "#000",
+            minHeight: "100vh",
+            transition: "all 0.3s ease",
+          }}
+        >
+          <h2 style={{ fontSize: accessibilityMode ? "48px" : "36px" }}>
+            Order Summary
+          </h2>
 
-          // More padding for accessibility
-          padding: accessibilityMode ? "24px" : "12px",
+          {/* ITEMS */}
+          {cart.map((item, index) => (
+            <div
+              key={index}
+              style={{
+                fontSize: accessibilityMode ? "28px" : "22px",
+                padding: "12px",
+                margin: "10px 0",
+                borderRadius: "10px",
+                backgroundColor: accessibilityMode ? "#111" : "#f3f4f6",
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <div>{item.name} — ${Number(item.price).toFixed(2)}</div>
+                {item.toppings && item.toppings.length > 0 && (
+                  <div style={{ fontSize: "16px", opacity: 0.8, marginTop: "4px" }}>
+                    Toppings: {item.toppings.map((t) => t.name).join(", ")}
+                  </div>
+                )}
+              </div>
 
-          // High-contrast modes
-          backgroundColor: accessibilityMode ? "#111" : "#fafafa",
-          color: accessibilityMode ? "#fff" : "#000",
-
-          // Larger spacing
-          margin: accessibilityMode ? "16px 0" : "8px 0",
-
-          border: accessibilityMode ? "2px solid #FFD700" : "1px solid #ccc",
-          borderRadius: "12px",
-
-          // Stronger visual structure
-          boxShadow: accessibilityMode
-            ? "0 0 12px rgba(255,215,0,0.4)"
-            : "0 2px 6px rgba(0,0,0,0.1)",
-
-          transition: "all 0.25s ease",
-
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-        }}
-      >
-
-          <div>
-            <div>
-              {item.name} — ${Number(item.price).toFixed(2)}
-            </div>
-            {item.toppings && item.toppings.length > 0 && (
-              <div
+              <button
+                onClick={() => removeFromCart(index)}
                 style={{
-                  fontSize: "16px",
-                  opacity: 0.8,
-                  marginTop: "4px",
+                  padding: "8px 14px",
+                  backgroundColor: "#b91c1c",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
                 }}
               >
-                Toppings:{" "}
-                {item.toppings
-                  .map((t) => t.inventoryName)
-                  .join(", ")}
-              </div>
-            )}
-          </div>
+                Remove
+              </button>
+            </div>
+          ))}
+
+          {/* POINTS UI */}
+          {typeof loyaltyPoints === "number" && (
+            <div
+              style={{
+                marginTop: "20px",
+                padding: "12px",
+                borderRadius: "10px",
+                backgroundColor: accessibilityMode ? "#222" : "#f3f4f6",
+                color: accessibilityMode ? "#fff" : "#000",
+              }}
+            >
+              <p>Available points: {loyaltyPoints}</p>
+              <label>
+                Apply points (max {maxRedeemable}):
+                <input
+                  type="number"
+                  min="0"
+                  max={maxRedeemable}
+                  value={pointsToRedeem}
+                  onChange={(e) =>
+                    setPointsToRedeem(
+                      Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0))
+                    )
+                  }
+                  style={{
+                    marginLeft: "10px",
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    width: "80px",
+                  }}
+                />
+              </label>
+
+              <p>Discount: ${applied.toFixed(2)}</p>
+            </div>
+          )}
+
+          {/* TOTAL */}
+          <h3 style={{ fontSize: "28px", marginTop: "20px", textAlign: "right" }}>
+            Total: ${finalTotal.toFixed(2)}
+          </h3>
+
           <button
-            onClick={() => removeFromCart(index)}
+            onClick={async () => {
+              await redeemPointsIfNeeded();
+              setScreen("payment");
+            }}
             style={{
-              padding: "8px 14px",
-              backgroundColor: "#b91c1c",
-              color: "#fff",
+              padding: "20px 40px",
+              backgroundColor: "#FFD700",
               border: "none",
-              borderRadius: "8px",
-              fontSize: "16px",
+              borderRadius: "10px",
+              fontSize: "24px",
+              marginTop: "20px",
               cursor: "pointer",
-              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            }}
+            disabled={cart.length === 0}
+          >
+            Continue to Payment
+          </button>
+
+          <button
+            onClick={() => setScreen("cart")}
+            style={{
+              padding: "15px 30px",
+              backgroundColor: "#ccc",
+              borderRadius: "10px",
+              border: "none",
+              marginLeft: "20px",
             }}
           >
-            Remove
+            Back
           </button>
         </div>
-      ))}
+      );
+    };
 
-      {/* Points / discount section */}
-      {cart.length > 0 && typeof loyaltyPoints === "number" && (
-        <div
-        style={{
-          marginTop: "20px",
-          padding: accessibilityMode ? "20px" : "12px",
-          borderRadius: "12px",
-
-          // High contrast support:
-          backgroundColor: accessibilityMode ? "#111" : "#f3f4f6",
-          color: accessibilityMode ? "#fff" : "#000",
-
-          border: accessibilityMode ? "2px solid #FFD700" : "1px solid #ddd",
-          boxShadow: accessibilityMode
-            ? "0 0 10px rgba(255,215,0,0.3)"
-            : "0 2px 6px rgba(0,0,0,0.1)",
-
-          transition: "all 0.25s ease",
-        }}
-      >
-
-          <p style={{ fontSize: "18px", marginBottom: "6px" }}>
-            Available points: {loyaltyPoints}
-          </p>
-          <label style={{ fontSize: "16px" }}>
-            Apply points (max {maxRedeemable}):
-            <input
-              type="number"
-              min="0"
-              max={maxRedeemable}
-              value={pointsToRedeem}
-              onChange={(e) =>
-                setPointsToRedeem(
-                  Math.max(
-                    0,
-                    Math.min(
-                      maxRedeemable,
-                      Number(e.target.value) || 0
-                    )
-                  )
-                )
-              }
-              style={{
-                marginLeft: "10px",
-                padding: "4px 8px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-                width: "80px",
-              }}
-            />
-          </label>
-          <p style={{ fontSize: "16px", marginTop: "6px" }}>
-            Discount: ${applied.toFixed(2)}
-          </p>
-        </div>
-      )}
-
-        {/* TOTAL */}
-        <h3
-          style={{
-            fontSize: accessibilityMode ? "40px" : "28px",
-            marginTop: "20px",
-            textAlign: "right",
-            paddingRight: "10px",
-          }}
-        >
-          Total: ${total.toFixed(2)}
-        </h3>
-
-      <button
-        onClick={() => setScreen("payment")}
-        style={{
-          padding: accessibilityMode ? "30px 60px" : "20px 40px",
-          backgroundColor: "#FFD700",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: accessibilityMode ? "32px" : "24px",
-          marginTop: "20px",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-        }}
-        disabled={cart.length === 0}
-      >
-        Continue to Payment
-      </button>
-
-        {/* BACK BUTTON */}
-        <button
-          onClick={() => setScreen("cart")}
-          style={{
-            padding: accessibilityMode ? "22px 40px" : "15px 30px",
-            backgroundColor: accessibilityMode ? "#555" : "#ccc",
-            borderRadius: "10px",
-            border: "none",
-            fontSize: accessibilityMode ? "28px" : "20px",
-            marginLeft: "20px",
-            color: accessibilityMode ? "#fff" : "#000",
-            cursor: "pointer",
-          }}
-        >
-          Back
-        </button>
-      </div>
-    );
-  };
 
 
 
@@ -1118,32 +1101,110 @@ export default function KioskPage() {
   };
 
   const SuccessScreen = () => (
-  <div style={{ padding: "40px", textAlign: "center" }}>
-    <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
-    <p style={{ fontSize: "24px", marginTop: "20px" }}>
-      Thank you for your order.
-    </p>
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
+        <p style={{ fontSize: "24px", marginTop: "20px" }}>
+          Thank you for your order.
+        </p>
 
-    <button
-      onClick={async () => {
-        await sendOrderToSystem(cart);
-        setCart([]);
-        setScreen("menu");
-      }}
-      style={{
-        padding: "20px 40px",
-        backgroundColor: "#FFD700",
-        border: "none",
-        borderRadius: "10px",
-        fontSize: "24px",
-        marginTop: "30px",
-        cursor: "pointer",
-      }}
-    >
-      Done
-    </button>
-  </div>
-);
+        <button
+          onClick={async () => {
+            await sendOrderToSystem(cart, session);
+            setCart([]);
+            setScreen("menu");
+          }}
+          style={{
+            padding: "20px 40px",
+            backgroundColor: "#FFD700",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "24px",
+            marginTop: "30px",
+            cursor: "pointer",
+          }}
+        >
+          Done
+        </button>
+      </div>
+    );
+
+    const AllergyFilterPanel = () => {
+      const allergens = ["Dairy", "Nuts"]; // from DB
+
+      const toggleAllergen = (a) => {
+        setExcludedAllergies((prev) =>
+          prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
+        );
+      };
+
+      return (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.75)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "30px",
+              borderRadius: "14px",
+              width: "90%",
+              maxWidth: "400px",
+              textAlign: "center",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            }}
+          >
+            <h2 style={{ marginBottom: "20px" }}>Select Allergies to Avoid</h2>
+
+            {allergens.map((a) => (
+              <label
+                key={a}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "12px 0",
+                  borderBottom: "1px solid #ddd",
+                  fontSize: "18px",
+                }}
+              >
+                <span>{a}</span>
+                <input
+                  type="checkbox"
+                  checked={excludedAllergies.includes(a)}
+                  onChange={() => toggleAllergen(a)}
+                />
+              </label>
+            ))}
+
+            <button
+              onClick={() => setAllergyFilterOpen(false)}
+              style={{
+                marginTop: "20px",
+                padding: "12px 20px",
+                backgroundColor: "#500000",
+                color: "#fff",
+                borderRadius: "10px",
+                border: "none",
+                fontSize: "18px",
+                cursor: "pointer",
+              }}
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+      );
+    };
+
 
   // === MAIN RENDER SWITCH ===
   if (screen === "details") 
@@ -1175,6 +1236,8 @@ export default function KioskPage() {
       }}
     >
       <WeatherWidget accessibilityMode={accessibilityMode} />
+      {allergyFilterOpen && <AllergyFilterPanel />}
+
 
       {/* NEW: simple sign-in bar for rewards */}
       <div
@@ -1357,36 +1420,54 @@ export default function KioskPage() {
         ))}
       </div>
 
-      <button
-        onClick={() => setAccessibilityMode(!accessibilityMode)}
-        aria-pressed={accessibilityMode}
-        aria-label="Toggle Accessibility Mode"
+      <div
         style={{
-          padding: accessibilityMode ? "18px 30px" : "10px 20px",
-          fontSize: accessibilityMode ? "20px" : "18px",
-          borderRadius: "10px",
-          backgroundColor: accessibilityMode ? "#FFD700" : "#500000",
-          color: accessibilityMode ? "#000" : "#fff",
-          border: "none",
-          cursor: "pointer",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: accessibilityMode ? "25px" : "15px",
           marginBottom: accessibilityMode ? "40px" : "25px",
-          transition: "all 0.2s ease",
         }}
       >
-        <span
-          id="label-off"
-          style={{ display: accessibilityMode ? "none" : "inline" }}
+        {/* Accessibility Toggle */}
+        <button
+          onClick={() => setAccessibilityMode(!accessibilityMode)}
+          aria-pressed={accessibilityMode}
+          aria-label="Toggle Accessibility Mode"
+          style={{
+            padding: accessibilityMode ? "18px 30px" : "10px 20px",
+            fontSize: accessibilityMode ? "20px" : "18px",
+            borderRadius: "10px",
+            backgroundColor: accessibilityMode ? "#FFD700" : "#500000",
+            color: accessibilityMode ? "#000" : "#fff",
+            border: "none",
+            cursor: "pointer",
+            width: "220px",
+            transition: "all 0.2s ease",
+          }}
         >
-          Accessibility Mode: OFF
-        </span>
+          {accessibilityMode ? "Accessibility Mode: ON" : "Accessibility Mode: OFF"}
+        </button>
 
-        <span
-          id="label-on"
-          style={{ display: accessibilityMode ? "inline" : "none" }}
+        {/* Allergy Filter Button */}
+        <button
+          onClick={() => setAllergyFilterOpen(true)}
+          aria-label="Open Allergy Filter"
+          style={{
+            padding: accessibilityMode ? "18px 30px" : "10px 20px",
+            fontSize: accessibilityMode ? "20px" : "18px",
+            borderRadius: "10px",
+            backgroundColor: accessibilityMode ? "#FFD700" : "#800000",
+            color: accessibilityMode ? "#000" : "#fff",
+            border: "none",
+            cursor: "pointer",
+            width: "220px",
+            transition: "all 0.2s ease",
+          }}
         >
-          Accessibility Mode: ON
-        </span>
-      </button>
+          Allergy Filter
+        </button>
+      </div>
 
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
@@ -1459,9 +1540,10 @@ export default function KioskPage() {
                       marginBottom: "30px",
                     }}
                   >
-                    {menuItems
-                      .filter((item) => item.category === cat)
-                      .map((item) => {
+                    {filteredMenuItems
+                        .filter((item) => item.category === cat)
+                        .map((item) => {
+
                         const isPressed =
                           selectedItem === item.id;
                         return (
