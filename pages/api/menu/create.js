@@ -17,11 +17,10 @@ export default async function handler(req, res) {
       ingredients
     } = req.body;
 
-    // 1️⃣ Get the next menuID manually
     const result = await query(`SELECT COALESCE(MAX(menuid), 0) + 1 AS nextid FROM menu;`);
     const nextMenuID = result.rows[0].nextid;
 
-    // 2️⃣ Insert new menu item WITH explicit ID
+
     await query(
       `
         INSERT INTO menu (menuid, menuname, category, price, seasonalstart, seasonalend)
@@ -30,7 +29,7 @@ export default async function handler(req, res) {
       [nextMenuID, name, category, price, seasonalStart, seasonalEnd]
     );
 
-    // 3️⃣ Insert ingredient rows
+
     for (const item of ingredients) {
       await query(
         `
