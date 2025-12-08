@@ -374,3 +374,7 @@
 .qtyInput {
   width: 70px;
 }
+
+.selectedRow {
+  background-color: #ffe3e3;
+}

@@ -21,6 +21,8 @@ export default function ManagerPage() {
 	const [sales, setSales] = useState([]);
 
 	const [menuItems, setMenuItems] = useState([]);
+  const [selectedMenuId, setSelectedMenuId] = useState(null);
+
   const ALWAYS_INCLUDED_INGREDIENTS = [28, 29, 30, 31, 32];
   // ===== ADD MENU ITEM MODAL STATE =====
   const [showAddMenuModal, setShowAddMenuModal] = useState(false);
@@ -277,6 +279,56 @@ async function generateZReport() {
   }, [query, inventory]);
 
   // Event Handlers ===================================================
+  async function handleDeleteMenuItem() {
+
+    if (!selectedMenuId) {
+      alert("Please select a menu item to delete.");
+      return;
+    }
+
+    const ok = confirm("Are you sure you want to delete this menu item?");
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/menu/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ menuID: selectedMenuId })
+      });
+
+      if (!res.ok) {
+        alert("Failed to delete item.");
+        return;
+      }
+
+      alert("Menu item deleted.");
+
+      // Reload list
+      const refreshed = await fetch("/api/menu");
+      const updatedData = await refreshed.json();
+
+      setMenuItems(
+        updatedData.map(item => ({
+          id: item.menuid,
+          name: item.menuname,
+          category: item.category,
+          price: Number(item.price),
+          seasonal: item.seasonalstart && item.seasonalend
+            ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
+            : "All Year",
+          seasonalStart: item.seasonalstart,
+          seasonalEnd: item.seasonalend
+        }))
+      );
+
+      setSelectedMenuId(null);
+
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Error deleting menu item.");
+    }
+  }
+
   function handleAddMenuItem() {
     // Pre-load auto-included ingredients
     setNewMenuIngredients(
@@ -550,8 +602,9 @@ useEffect(() => {
 		<div className={styles.panelHeader}>
 		<h2>Menu Items</h2>
 		<div className={styles.actions}>
-			<button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
-			<button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
+      <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddMenuItem}>Add</button>
+      <button className={styles.btn} onClick={handleUpdateMenuItem}>Update</button>
+      <button className={`${styles.btn} ${styles.danger}`} onClick={handleDeleteMenuItem}>Delete</button>
 		</div>
 		</div>
 
@@ -572,7 +625,12 @@ useEffect(() => {
 			</thead>
 			<tbody>
 			{filteredMenu.map((m) => (
-				<tr key={m.id}>
+				  <tr
+            key={m.id}
+            onClick={() => setSelectedMenuId(m.id)}
+            className={selectedMenuId === m.id ? styles.selectedRow : ""}
+            style={{ cursor: "pointer" }}
+          >
 				<td>{m.name}</td>
 				<td>{m.category}</td>
 				<td>{m.price.toFixed(2)}</td>
