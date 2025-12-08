@@ -1,27 +1,26 @@
 // pages/kiosk.js
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { QRCodeCanvas } from "qrcode.react";
 
-// === SEND ORDERS TO BACKEND ===
-async function sendOrderToSystem(order) {
-  const rawItems = Array.isArray(order)
-    ? order
-    : (order && order.items) || [];
-
+// === SEND ORDERS TO BACKEND (uses DB-backed orderID) ===
+async function sendOrderToSystem(cart, source = "kiosk", orderLocation = "Kiosk") {
   try {
-    const items = rawItems.map((i) => ({
-      menuID: i.id,
-      quantity: 1, // kiosk items are one each
-      priceAtPurchase: Number(i.finalPrice || i.price || 0),
-      size: null,
+    if (!cart || cart.length === 0) return null;
+
+    const items = cart.map((item) => ({
+      menuID: item.id,
+      quantity: 1,
+      priceAtPurchase: Number(item.finalPrice || item.price || 0),
+      size: item.size ?? null, // if you add sizes later
     }));
 
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        source: "kiosk",
-        orderLocation: "Kiosk",
+        source,
+        orderLocation,
         items,
       }),
     });
@@ -30,14 +29,19 @@ async function sendOrderToSystem(order) {
       const data = await res.json().catch(() => ({}));
       console.error("Order submission failed:", data.error);
       alert("Sorry, we couldn't process your order. Please try again.");
-      return false;
+      return null;
     }
 
-    return true;
+    const data = await res.json();
+    // API returns { success, orderID, orderTotal }
+    return {
+      orderID: data.orderID,
+      orderTotal: data.orderTotal,
+    };
   } catch (err) {
     console.error("Error sending order:", err);
     alert("Sorry, we couldn't process your order. Please try again.");
-    return false;
+    return null;
   }
 }
 
@@ -180,12 +184,11 @@ export default function KioskPage() {
   const [language, setLanguage] = useState("en");
   const [activeCategory, setActiveCategory] = useState(null);
 
+  const [lastOrderId, setLastOrderId] = useState(null);
+
   const [screen, setScreen] = useState("menu");
   const [detailsItem, setDetailsItem] = useState(null);
   const [cart, setCart] = useState([]);
-  const removeFromCart = (indexToRemove) => {
-    setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
-  };
   const [toppings, setToppings] = useState([]);
   const [toppingsError, setToppingsError] = useState(null);
 
@@ -364,30 +367,25 @@ export default function KioskPage() {
     if (!detailsItem) return null;
 
     // Normalize toppings from DB to a consistent shape
-    // inside DrinkDetailsPage in kiosk.js
-  const effectiveToppings = (toppings || []).map((t, idx) => ({
-    // use inventoryid as the primary id
-    id: t.inventoryid ?? t.id ?? idx,
-
-    // prefer inventoryname from the DB
-    name:
-      t.inventoryname ??
-      t.inventoryName ?? // just in case you aliased it
-      t.name ??
-      "Topping",
-
-    // price comes from addOnPrice / addonprice
-    price: Number(
-      t.addonprice ?? // from node-postgres (lowercased)
-      t.addOnPrice ?? // if you aliased in SQL
-      t.price ??
-      0
-    ),
-
-    // allergy column is already in your inventory table
-    allergy: t.allergy ?? "None",
-  }));
-
+    const effectiveToppings = (toppings || []).map((t, idx) => ({
+      // primary id
+      id: t.inventoryid ?? t.id ?? idx,
+      // name field
+      name:
+        t.inventoryname ??
+        t.inventoryName ??
+        t.name ??
+        "Topping",
+      // price
+      price: Number(
+        t.addonprice ??
+        t.addOnPrice ??
+        t.price ??
+        0
+      ),
+      // allergy label
+      allergy: t.allergy ?? "None",
+    }));
 
     const toggleTopping = (topping) => {
       setSelectedToppings((prev) =>
@@ -778,6 +776,14 @@ export default function KioskPage() {
     const [confirmMethod, setConfirmMethod] = useState(null);
     const paymentMethods = ["Card", "Tap to Pay", "Mobile Wallet", "Cash"];
 
+    const handlePayment = async () => {
+      const result = await sendOrderToSystem(cart, "kiosk", "Kiosk");
+      if (!result) return;
+
+      setLastOrderId(result.orderID);
+      setScreen("success");
+    };
+
     if (!accessibilityMode) {
       return (
         <div style={{ padding: "20px" }}>
@@ -788,7 +794,7 @@ export default function KioskPage() {
           {paymentMethods.map((method) => (
             <button
               key={method}
-              onClick={() => setScreen("success")}
+              onClick={handlePayment}
               style={{
                 display: "block",
                 width: "80%",
@@ -822,6 +828,7 @@ export default function KioskPage() {
       );
     }
 
+    // Accessibility mode: double-tap confirm behavior
     return (
       <div
         style={{
@@ -854,7 +861,8 @@ export default function KioskPage() {
                 return;
               }
 
-              setScreen("success");
+              // Second tap = confirm and pay
+              handlePayment();
             }}
             style={{
               width: "90%",
@@ -905,140 +913,236 @@ export default function KioskPage() {
   };
 
   // === SUCCESS / RECEIPT SCREEN ===
-  const SuccessScreen = ({ accessibilityMode }) => {
-    const total = cart.reduce(
-      (sum, item) => sum + Number(item.finalPrice || item.price || 0),
-      0
-    );
-    const now = new Date();
-    const orderId = Math.floor(now.getTime() / 1000);
+  // === SUCCESS / RECEIPT SCREEN ===
+const SuccessScreen = ({ accessibilityMode, orderId }) => {
+  const total = cart.reduce(
+    (sum, item) => sum + Number(item.finalPrice || item.price || 0),
+    0
+  );
+  const now = new Date();
 
-    return (
+  // Email of signed-in user (via NextAuth)
+  const userEmail = session?.user?.email || null;
+
+  // "idle" | "sending" | "sent" | "error"
+  const [emailStatus, setEmailStatus] = useState("idle");
+
+  const canEmail = !!userEmail && !!orderId;
+
+  const handleEmailReceipt = async () => {
+    if (!canEmail || emailStatus === "sending") return;
+
+    try {
+      setEmailStatus("sending");
+
+      const res = await fetch("/api/email-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          email: userEmail,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Email receipt failed:", await res.text());
+        setEmailStatus("error");
+        return;
+      }
+
+      setEmailStatus("sent");
+    } catch (err) {
+      console.error("Error emailing receipt:", err);
+      setEmailStatus("error");
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: "40px",
+        textAlign: "center",
+        backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
+        color: accessibilityMode ? "#fff" : "#000",
+        minHeight: "100vh",
+      }}
+    >
+      <h1 style={{ fontSize: "48px", marginBottom: "10px" }}>
+        Payment Successful!
+      </h1>
+      <p style={{ fontSize: "24px", marginBottom: "30px" }}>
+        Thank you for your order.
+      </p>
+
+      {/* Receipt */}
       <div
         style={{
-          padding: "40px",
-          textAlign: "center",
-          backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
-          color: accessibilityMode ? "#fff" : "#000",
-          minHeight: "100vh",
+          maxWidth: "480px",
+          margin: "0 auto",
+          textAlign: "left",
+          backgroundColor: "#fff",
+          color: "#000",
+          borderRadius: "16px",
+          padding: "24px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
         }}
       >
-        <h1 style={{ fontSize: "48px", marginBottom: "10px" }}>
-          Payment Successful!
-        </h1>
-        <p style={{ fontSize: "24px", marginBottom: "30px" }}>
-          Thank you for your order.
-        </p>
-
-        {/* Receipt */}
-        <div
+        <h2
           style={{
-            maxWidth: "480px",
-            margin: "0 auto",
-            textAlign: "left",
-            backgroundColor: "#fff",
-            color: "#000",
-            borderRadius: "16px",
-            padding: "24px",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+            fontSize: "28px",
+            marginBottom: "8px",
+            borderBottom: "1px solid #ddd",
+            paddingBottom: "8px",
           }}
         >
-          <h2
-            style={{
-              fontSize: "28px",
-              marginBottom: "8px",
-              borderBottom: "1px solid #ddd",
-              paddingBottom: "8px",
-            }}
-          >
-            Receipt
-          </h2>
+          Receipt
+        </h2>
 
-          <div
-            style={{
-              fontSize: "14px",
-              marginBottom: "12px",
-              color: "#555",
-            }}
-          >
-            <div>
-              Order ID: <strong>{orderId}</strong>
-            </div>
-            <div>
-              Date:{" "}
-              {now.toLocaleDateString()}{" "}
-              {now.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </div>
+        <div
+          style={{
+            fontSize: "14px",
+            marginBottom: "12px",
+            color: "#555",
+          }}
+        >
+          <div>
+            Order ID: <strong>{orderId}</strong>
           </div>
-
-          <div
-            style={{
-              borderTop: "1px dashed #ccc",
-              paddingTop: "10px",
-              marginTop: "10px",
-              maxHeight: "260px",
-              overflowY: "auto",
-            }}
-          >
-            {cart.map((item, idx) => (
-              <div
-                key={`${item.id}-${idx}`}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "6px",
-                  fontSize: "16px",
-                }}
-              >
-                <span>{item.name}</span>
-                <span>
-                  ${Number(item.finalPrice || item.price || 0).toFixed(2)}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div
-            style={{
-              borderTop: "1px solid #000",
-              marginTop: "12px",
-              paddingTop: "12px",
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "18px",
-              fontWeight: "bold",
-            }}
-          >
-            <span>Total</span>
-            <span>${total.toFixed(2)}</span>
+          <div>
+            Date:{" "}
+            {now.toLocaleDateString()}{" "}
+            {now.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </div>
         </div>
 
-        <button
-          onClick={async () => {
-            const ok = await sendOrderToSystem(cart);
-            if (!ok) return;
-            setCart([]);
-            setScreen("menu");
-          }}
+        {/* QR code for this order → /receipt?orderid=... */}
+        {orderId && (
+          <div style={{ textAlign: "center", margin: "20px 0" }}>
+            <p style={{ fontSize: "14px", marginBottom: "8px" }}>
+              Scan to view your order:
+            </p>
+            <QRCodeCanvas
+              value={
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/receipt?orderid=${orderId}`
+                  : `/receipt?orderid=${orderId}`
+              }
+              size={160}
+              includeMargin={true}
+              fgColor="#000000"
+              bgColor="#FFFFFF"
+              style={{ borderRadius: "8px" }}
+            />
+          </div>
+        )}
+
+        <div
           style={{
-            padding: "20px 40px",
-            backgroundColor: "#FFD700",
-            border: "none",
-            borderRadius: "10px",
-            fontSize: "24px",
-            marginTop: "40px",
-            cursor: "pointer",
+            borderTop: "1px dashed #ccc",
+            paddingTop: "10px",
+            marginTop: "10px",
+            maxHeight: "260px",
+            overflowY: "auto",
           }}
         >
-          Done
-        </button>
+          {cart.map((item, idx) => (
+            <div
+              key={`${item.id}-${idx}`}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "6px",
+                fontSize: "16px",
+              }}
+            >
+              <span>{item.name}</span>
+              <span>
+                ${Number(item.finalPrice || item.price || 0).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            marginTop: "12px",
+            paddingTop: "12px",
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: "18px",
+            fontWeight: "bold",
+          }}
+        >
+          <span>Total</span>
+          <span>${total.toFixed(2)}</span>
+        </div>
       </div>
-    );
-  };
+
+      {/* Email receipt button */}
+      <div style={{ marginTop: "24px" }}>
+        <button
+          onClick={handleEmailReceipt}
+          disabled={!canEmail || emailStatus === "sending"}
+          style={{
+            padding: "14px 24px",
+            backgroundColor: canEmail ? "#500000" : "#aaa",
+            color: "#fff",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "18px",
+            cursor:
+              !canEmail || emailStatus === "sending"
+                ? "not-allowed"
+                : "pointer",
+            opacity:
+              !canEmail || emailStatus === "sending" ? 0.6 : 1,
+            marginRight: "16px",
+          }}
+        >
+          {emailStatus === "idle" &&
+            (canEmail
+              ? "Email me this receipt"
+              : "Sign in to email receipt")}
+          {emailStatus === "sending" && "Sending..."}
+          {emailStatus === "sent" && "Receipt emailed!"}
+          {emailStatus === "error" && "Error – try again"}
+        </button>
+
+        {userEmail && (
+          <span style={{ fontSize: "14px", color: "#555" }}>
+            Sending to: <strong>{userEmail}</strong>
+          </span>
+        )}
+      </div>
+
+      <button
+        onClick={() => {
+          setCart([]);
+          setScreen("menu");
+        }}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "24px",
+          marginTop: "20px",
+          cursor: "pointer",
+          display: "block",
+          marginLeft: "auto",
+          marginRight: "auto",
+        }}
+      >
+        Done
+      </button>
+    </div>
+  );
+};
+
 
   // === MAIN RENDER SWITCH ===
   if (screen === "details")
@@ -1050,9 +1154,16 @@ export default function KioskPage() {
   if (screen === "payment")
     return <PaymentScreen accessibilityMode={accessibilityMode} />;
 
-  if (screen === "success")
-    return <SuccessScreen accessibilityMode={accessibilityMode} />;
+  if (screen === "success") {
+    return (
+      <SuccessScreen
+        accessibilityMode={accessibilityMode}
+        orderId={lastOrderId}
+      />
+    );
+  }
 
+  // === MAIN MENU SCREEN ===
   return (
     <div
       style={{
