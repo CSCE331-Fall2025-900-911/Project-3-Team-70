@@ -34,12 +34,8 @@ async function handleCreateOrder(req, res) {
       source = "kiosk",
       orderLocation = "Kiosk",
       items = [],
-<<<<<<< HEAD
       employeeID = null,         // cashier can send this later if desired
       customerEmail = null,      // optional; used for rewards, etc.
-=======
-      employeeID = null,
->>>>>>> origin/manager
     } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -81,33 +77,17 @@ async function handleCreateOrder(req, res) {
     const params = [];
 
     for (const item of items) {
-<<<<<<< HEAD
-      // Normalize/convert size for DB
-      const normalizedSize = mapSizeToInt(item.size);
-
-      // Build one row: (orderItemID, menuID, priceAtPurchase, quantityPurchased, orderID, orderSize)
-=======
->>>>>>> origin/manager
       valueStrings.push(
         `($${params.length + 1}, $${params.length + 2}, $${params.length + 3}, $${params.length + 4}, $${params.length + 5}, $${params.length + 6})`
       );
 
       params.push(
-<<<<<<< HEAD
-        nextOrderItemID++,                 // orderItemID
-        item.menuID,                       // menuID
-        Number(item.priceAtPurchase || 0), // priceAtPurchase
-        Number(item.quantity || 0),        // quantityPurchased
-        orderID,                           // orderID (FK to ordertest)
-        normalizedSize                     // orderSize as integer or null
-=======
         nextOrderItemID++,                 
         item.menuID,
         Number(item.priceAtPurchase || 0),
         Number(item.quantity || 0),
         orderID,
         item.size ?? null
->>>>>>> origin/manager
       );
     }
 
