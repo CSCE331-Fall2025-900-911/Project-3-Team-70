@@ -33,6 +33,9 @@ export default function CashierPage() {
   const [modToppings, setModToppings] = useState([]);
   const [toppingOptions, setToppingOptions] = useState([]);
   const [modSize, setModSize] = useState("Medium");
+  const [modSweetness, setModSweetness] = useState("100%");
+  const [modIce, setModIce] = useState("Regular Ice");
+  const [modTemp, setModTemp] = useState("Cold");
 
   // Fetch and normalize menu data from API
   useEffect(() => {
@@ -173,42 +176,52 @@ export default function CashierPage() {
     .toFixed(2);
 
   // When user clicks "Add" on a menu item
+    // When user clicks "Add" on a menu item
   const handleOpenModifier = (item) => {
     setModTarget(item);
     setModToppings([]);
+    setModSweetness("100%");
+    setModIce("Regular Ice");
+    setModTemp("Cold");
     setModSize("Medium");
     setShowModifier(true);
   };
 
-  // When user confirms in modal
+  
   const handleConfirmModifier = () => {
     if (!modTarget) {
       setShowModifier(false);
       return;
     }
 
-    // Base price from menu
     let finalPrice = Number(modTarget.price || 0);
 
     // SIZE PRICE ADJUSTMENT
     if (modSize === "Small") finalPrice -= 0.5;
     if (modSize === "Large") finalPrice += 0.5;
 
+    // $1 PER TOPPING
+    finalPrice += modToppings.length * 1;
+
     // Build modifications package
     const modifications = {
       toppings: modToppings,
       size: modSize,
+      sweetness: modSweetness,
+      ice: modIce,
+      temperature: modTemp,
       finalPrice,
     };
 
     addToOrder({
       ...modTarget,
       modifications,
-      price: finalPrice, // replace display price
+      price: finalPrice, // override menu price
     });
 
     setShowModifier(false);
   };
+
 
   return (
     <div className="cashier-root">
@@ -290,54 +303,80 @@ export default function CashierPage() {
           </div>
         </section>
 
-        {/* RIGHT: ORDER */}
-        <aside className="panel">
-          <div className="order-header">
-            <h2>Current Order</h2>
-            <button className="btn danger" onClick={removeItem}>
-              Remove Item
-            </button>
-          </div>
-          <div className="order-list">
-            {order.length === 0 ? (
-              <p style={{ padding: "8px 0" }}>No items yet.</p>
-            ) : (
-              order.map((line, idx) => (
-                <div
-                  key={line.id + "_" + idx}
-                  className="order-item"
-                >
-                  <div className="name">
-                    {line.name}
-                    {line.modifications?.size && (
+      {/* RIGHT: ORDER */}
+      <aside className="panel">
+        <div className="order-header">
+          <h2>Current Order</h2>
+          <button className="btn danger" onClick={removeItem}>
+            Remove Item
+          </button>
+        </div>
+
+        <div className="order-list">
+          {order.length === 0 ? (
+            <p style={{ padding: "8px 0" }}>No items yet.</p>
+          ) : (
+            order.map((line, idx) => (
+              <div key={line.id + "_" + idx} className="order-item">
+                <div className="name">
+                  <strong>{line.name}</strong>
+
+                  {/* SIZE */}
+                  {line.modifications?.size && (
+                    <div className="mods">
+                      Size: {line.modifications.size}
+                    </div>
+                  )}
+
+                  {/* SWEETNESS */}
+                  {line.modifications?.sweetness !== undefined && (
+                    <div className="mods">
+                      Sweetness: {line.modifications.sweetness}
+                    </div>
+                  )}
+
+                  {/* ICE LEVEL */}
+                  {line.modifications?.ice && (
+                    <div className="mods">
+                      Ice: {line.modifications.ice}
+                    </div>
+                  )}
+
+                  {/* HOT / COLD */}
+                  {line.modifications?.temperature && (
+                    <div className="mods">
+                      Temp: {line.modifications.temperature}
+                    </div>
+                  )}
+
+                  {/* TOPPINGS */}
+                  {line.modifications?.toppings &&
+                    line.modifications.toppings.length > 0 && (
                       <div className="mods">
-                        Size: {line.modifications.size}
+                        Toppings:{" "}
+                        {line.modifications.toppings
+                          .map((t) => `${t} (+$1)`)
+                          .join(", ")}
                       </div>
                     )}
-                    {line.modifications?.toppings &&
-                      line.modifications.toppings.length > 0 && (
-                        <div className="mods">
-                          Toppings:{" "}
-                          {line.modifications.toppings.join(", ")}
-                        </div>
-                      )}
-                  </div>
-                  <div className="qty">x{line.qty}</div>
-                  <div className="subtotal">
-                    $
-                    {(Number(line.price || 0) * line.qty).toFixed(2)}
-                  </div>
                 </div>
-              ))
-            )}
-          </div>
-          <div className="order-footer">
-            <div className="total">Total: ${total}</div>
-            <button className="btn success" onClick={submitOrder}>
-              Submit Order
-            </button>
-          </div>
-        </aside>
+
+                <div className="qty">x{line.qty}</div>
+                <div className="subtotal">
+                  ${ (Number(line.price || 0) * line.qty).toFixed(2) }
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="order-footer">
+          <div className="total">Total: ${total}</div>
+          <button className="btn success" onClick={submitOrder}>
+            Submit Order
+          </button>
+        </div>
+      </aside>
       </main>
 
       {/* MODIFIER POPUP */}
@@ -346,8 +385,10 @@ export default function CashierPage() {
           <div className="modal">
             <h2>Customize {modTarget?.name}</h2>
 
+            {/* TOPPINGS */}
             <div className="mod-section">
               <p>Select ingredients / toppings:</p>
+
               {toppingOptions.length === 0 ? (
                 <p className="mods-empty">
                   No ingredients configured in inventory.
@@ -357,7 +398,7 @@ export default function CashierPage() {
                   <label key={t} className="checkbox-row">
                     <input
                       type="checkbox"
-                      checked={modToppings.includes(t)}
+                      checked={modToppings.includes(t)} 
                       onChange={(e) => {
                         setModToppings((prev) => {
                           if (e.target.checked) {
@@ -367,10 +408,56 @@ export default function CashierPage() {
                         });
                       }}
                     />
-                    {t}
+                    {t} — <strong>+$1.00</strong>
                   </label>
                 ))
               )}
+            </div>
+
+            {/* SWEETNESS */}
+            <div className="mod-section">
+              <p>Sweetness Level:</p>
+              <select
+                value={modSweetness}
+                onChange={(e) => setModSweetness(e.target.value)}
+                className="search"
+                style={{ padding: "8px", borderRadius: "8px" }}
+              >
+                <option>None</option>
+                <option>Easy</option>
+                <option>Regular</option>
+                <option>Extra</option>
+              </select>
+            </div>
+
+            {/* ICE LEVEL */}
+            <div className="mod-section">
+              <p>Ice Level:</p>
+              <select
+                value={modIce}
+                onChange={(e) => setModIce(e.target.value)}
+                className="search"
+                style={{ padding: "8px", borderRadius: "8px" }}
+              >
+                <option>No Ice</option>
+                <option>Easy Ice</option>
+                <option>Regular Ice</option>
+                <option>Extra Ice</option>
+              </select>
+            </div>
+
+            {/* HOT / COLD */}
+            <div className="mod-section">
+              <p>Temperature:</p>
+              <select
+                value={modTemp}
+                onChange={(e) => setModTemp(e.target.value)}
+                className="search"
+                style={{ padding: "8px", borderRadius: "8px" }}
+              >
+                <option>Cold</option>
+                <option>Hot</option>
+              </select>
             </div>
 
             {/* SIZE SELECTION */}
@@ -388,6 +475,7 @@ export default function CashierPage() {
               </select>
             </div>
 
+            {/* ACTIONS */}
             <div className="modal-actions">
               <button
                 className="btn danger"
@@ -395,6 +483,7 @@ export default function CashierPage() {
               >
                 Cancel
               </button>
+
               <button
                 className="btn success"
                 onClick={handleConfirmModifier}
@@ -405,6 +494,7 @@ export default function CashierPage() {
           </div>
         </div>
       )}
+
 
       {/* PAGE + MODAL STYLES */}
       <style jsx>{`

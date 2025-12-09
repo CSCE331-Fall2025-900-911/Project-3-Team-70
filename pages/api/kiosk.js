@@ -3,24 +3,26 @@ import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { QRCodeCanvas } from "qrcode.react";
 
-// === SEND ORDERS TO BACKEND (uses DB-backed orderID) ===
-async function sendOrderToSystem(cart, source = "kiosk", orderLocation = "Kiosk") {
-  try {
-    if (!cart || cart.length === 0) return null;
+// === SEND ORDERS TO BACKEND ===
+async function sendOrderToSystem(order, session) {
+  const rawItems = Array.isArray(order)
+    ? order
+    : (order && order.items) || [];
 
-    const items = cart.map((item) => ({
-      menuID: item.id,
-      quantity: 1,
-      priceAtPurchase: Number(item.finalPrice || item.price || 0),
-      size: item.size ?? null, // if you add sizes later
+  try {
+    const items = rawItems.map((i) => ({
+      menuID: i.menuid,                      // FIXED
+      quantity: Number(i.quantity || 1),     // matches kiosk
+      priceAtPurchase: Number(i.price || 0),
+      size: null,
     }));
 
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        source,
-        orderLocation,
+        source: "kiosk",
+        orderLocation: "Kiosk",
         customerEmail: session?.user?.email || null,   // ★ REQUIRED
         items,
       }),
@@ -226,6 +228,7 @@ export default function KioskPage() {
     off: "Accessibility Mode: OFF",
   });
 
+  // Single source of truth for session (for rewards + sign-in)
   const { data: session } = useSession();
 
   const [loyaltyPoints, setLoyaltyPoints] = useState(null);
@@ -338,8 +341,7 @@ export default function KioskPage() {
       new window.google.translate.TranslateElement(
         {
           pageLanguage: "en",
-          layout:
-            window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
         },
         "google_translate_element"
       );
@@ -414,27 +416,6 @@ const DrinkDetailsPage = () => {
   const [size, setSize] = useState("Medium");
 
   if (!detailsItem) return null;
-
-    // Normalize toppings from DB to a consistent shape
-    const effectiveToppings = (toppings || []).map((t, idx) => ({
-      // primary id
-      id: t.inventoryid ?? t.id ?? idx,
-      // name field
-      name:
-        t.inventoryname ??
-        t.inventoryName ??
-        t.name ??
-        "Topping",
-      // price
-      price: Number(
-        t.addonprice ??
-        t.addOnPrice ??
-        t.price ??
-        0
-      ),
-      // allergy label
-      allergy: t.allergy ?? "None",
-    }));
 
   // Match by ID, not object reference
   const toggleTopping = (topping) => {
@@ -549,6 +530,20 @@ const DrinkDetailsPage = () => {
           {toppings.map((top) => {
             const checked = selectedToppings.some((t) => t.id === top.id);
 
+            // Determine if valid allergen info exists
+            const hasAllergen =
+              top.allergy &&
+              top.allergy.trim() !== "" &&
+              top.allergy.trim().toLowerCase() !== "none";
+
+            // Split allergens cleanly (supports "Dairy, Nuts")
+            const cleanAllergies = hasAllergen
+              ? top.allergy
+                  .split(",")
+                  .map((a) => a.trim())
+                  .filter((a) => a && a.toLowerCase() !== "none")
+              : [];
+
             return (
               <div key={top.id} style={{ marginBottom: "10px" }}>
                 <label
@@ -559,8 +554,6 @@ const DrinkDetailsPage = () => {
                     padding: "8px 0",
                     borderBottom: "1px solid #eee",
                     fontSize: "18px",
-                    fontFamily:
-                      "'Helvetica Neue', Helvetica, Arial, sans-serif",
                   }}
                 >
                   <label
@@ -579,17 +572,13 @@ const DrinkDetailsPage = () => {
                     />
                     {top.name}
                   </label>
-
-                  <span
-                    style={{
-                      fontSize: accessibilityMode ? "22px" : "18px",
-                    }}
-                  >
+                  
+                  <span style={{ fontSize: accessibilityMode ? "22px" : "18px" }}>
                     + ${Number(top.price).toFixed(2)}
                   </span>
                 </label>
-
-                {top.allergy && top.allergy !== "None" && (
+                  
+                {cleanAllergies.length > 0 && (
                   <p
                     style={{
                       fontSize: accessibilityMode ? "22px" : "16px",
@@ -598,7 +587,7 @@ const DrinkDetailsPage = () => {
                       marginTop: "5px",
                     }}
                   >
-                    ⚠ Contains {top.allergy}
+                    ⚠ Contains {cleanAllergies.join(", ")}
                   </p>
                 )}
               </div>
@@ -606,7 +595,6 @@ const DrinkDetailsPage = () => {
           })}
         </div>
       )}
-
       {/* SWEETNESS */}
       <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
       <select
@@ -717,7 +705,11 @@ const DrinkDetailsPage = () => {
         </h2>
 
         {cart.length === 0 ? (
-          <p style={{ fontSize: accessibilityMode ? "28px" : "22px" }}>
+          <p
+            style={{
+              fontSize: accessibilityMode ? "28px" : "22px",
+            }}
+          >
             Your cart is empty.
           </p>
         ) : (
@@ -732,7 +724,9 @@ const DrinkDetailsPage = () => {
                   : "1px solid #ccc",
                 borderRadius: "12px",
                 fontSize: accessibilityMode ? "26px" : "20px",
-                backgroundColor: accessibilityMode ? "#111" : "#fafafa",
+                backgroundColor: accessibilityMode
+                  ? "#111"
+                  : "#fafafa",
                 color: accessibilityMode ? "#fff" : "#000",
                 position: "relative",
               }}
@@ -746,7 +740,9 @@ const DrinkDetailsPage = () => {
                   backgroundColor: "#b00000",
                   color: "white",
                   border: "none",
-                  padding: accessibilityMode ? "12px 18px" : "8px 14px",
+                  padding: accessibilityMode
+                    ? "12px 18px"
+                    : "8px 14px",
                   borderRadius: "8px",
                   fontSize: accessibilityMode ? "20px" : "16px",
                   cursor: "pointer",
@@ -790,7 +786,8 @@ const DrinkDetailsPage = () => {
                   >
                     {item.toppings.map((t, idx) => (
                       <li key={idx}>
-                        {t.name} (+${t.price.toFixed(2)})
+                        {t.name} (+$
+                        {Number(t.price).toFixed(2)})
                       </li>
                     ))}
                   </ul>
@@ -1159,180 +1156,16 @@ const DrinkDetailsPage = () => {
     );
   };
 
-  // === SUCCESS / RECEIPT SCREEN ===
-  // === SUCCESS / RECEIPT SCREEN ===
-const SuccessScreen = ({ accessibilityMode, orderId }) => {
-  const total = cart.reduce(
-    (sum, item) => sum + Number(item.finalPrice || item.price || 0),
-    0
-  );
-  const now = new Date();
-
-  // Email of signed-in user (via NextAuth)
-  const userEmail = session?.user?.email || null;
-
-  // "idle" | "sending" | "sent" | "error"
-  const [emailStatus, setEmailStatus] = useState("idle");
-
-  const canEmail = !!userEmail && !!orderId;
-
-  const handleEmailReceipt = async () => {
-    if (!canEmail || emailStatus === "sending") return;
-
-    try {
-      setEmailStatus("sending");
-
-      const res = await fetch("/api/email-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId,
-          email: userEmail,
-        }),
-      });
-
-      if (!res.ok) {
-        console.error("Email receipt failed:", await res.text());
-        setEmailStatus("error");
-        return;
-      }
-
-      setEmailStatus("sent");
-    } catch (err) {
-      console.error("Error emailing receipt:", err);
-      setEmailStatus("error");
-    }
-  };
-
-  return (
-    <div
-      style={{
-        padding: "40px",
-        textAlign: "center",
-        backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
-        color: accessibilityMode ? "#fff" : "#000",
-        minHeight: "100vh",
-      }}
-    >
-      <h1 style={{ fontSize: "48px", marginBottom: "10px" }}>
-        Payment Successful!
-      </h1>
-      <p style={{ fontSize: "24px", marginBottom: "30px" }}>
-        Thank you for your order.
-      </p>
-
-      {/* Receipt */}
-      <div
-        style={{
-          maxWidth: "480px",
-          margin: "0 auto",
-          textAlign: "left",
-          backgroundColor: "#fff",
-          color: "#000",
-          borderRadius: "16px",
-          padding: "24px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "28px",
-            marginBottom: "8px",
-            borderBottom: "1px solid #ddd",
-            paddingBottom: "8px",
-          }}
-        >
-          Receipt
-        </h2>
-
-        <div
-          style={{
-            fontSize: "14px",
-            marginBottom: "12px",
-            color: "#555",
-          }}
-        >
-          <div>
-            Order ID: <strong>{orderId}</strong>
-          </div>
-          <div>
-            Date:{" "}
-            {now.toLocaleDateString()}{" "}
-            {now.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </div>
-        </div>
-
-        {/* QR code for this order → /receipt?orderid=... */}
-        {orderId && (
-          <div style={{ textAlign: "center", margin: "20px 0" }}>
-            <p style={{ fontSize: "14px", marginBottom: "8px" }}>
-              Scan to view your order:
-            </p>
-            <QRCodeCanvas
-              value={
-                typeof window !== "undefined"
-                  ? `${window.location.origin}/receipt?orderid=${orderId}`
-                  : `/receipt?orderid=${orderId}`
-              }
-              size={160}
-              includeMargin={true}
-              fgColor="#000000"
-              bgColor="#FFFFFF"
-              style={{ borderRadius: "8px" }}
-            />
-          </div>
-        )}
-
-        <div
-          style={{
-            borderTop: "1px dashed #ccc",
-            paddingTop: "10px",
-            marginTop: "10px",
-            maxHeight: "260px",
-            overflowY: "auto",
-          }}
-        >
-          {cart.map((item, idx) => (
-            <div
-              key={`${item.id}-${idx}`}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "6px",
-                fontSize: "16px",
-              }}
-            >
-              <span>{item.name}</span>
-              <span>
-                ${Number(item.finalPrice || item.price || 0).toFixed(2)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            marginTop: "12px",
-            paddingTop: "12px",
-            display: "flex",
-            justifyContent: "space-between",
-            fontSize: "18px",
-            fontWeight: "bold",
-          }}
-        >
-          <span>Total</span>
-          <span>${total.toFixed(2)}</span>
-        </div>
-      </div>
+  const SuccessScreen = () => (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
+        <p style={{ fontSize: "24px", marginTop: "20px" }}>
+          Thank you for your order.
+        </p>
 
         <button
           onClick={async () => {
-            const ok = await sendOrderToSystem(cart);
-            if (!ok) return;
+            await sendOrderToSystem(cart, session);
             setCart([]);
             setScreen("menu");
           }}
@@ -1342,7 +1175,7 @@ const SuccessScreen = ({ accessibilityMode, orderId }) => {
             border: "none",
             borderRadius: "10px",
             fontSize: "24px",
-            marginTop: "40px",
+            marginTop: "30px",
             cursor: "pointer",
           }}
         >
@@ -1350,12 +1183,90 @@ const SuccessScreen = ({ accessibilityMode, orderId }) => {
         </button>
       </div>
     );
-  };
+
+    const AllergyFilterPanel = () => {
+      const allergens = ["Dairy", "Nuts"]; // from DB
+
+      const toggleAllergen = (a) => {
+        setExcludedAllergies((prev) =>
+          prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
+        );
+      };
+
+      return (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.75)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "30px",
+              borderRadius: "14px",
+              width: "90%",
+              maxWidth: "400px",
+              textAlign: "center",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            }}
+          >
+            <h2 style={{ marginBottom: "20px" }}>Select Allergies to Avoid</h2>
+
+            {allergens.map((a) => (
+              <label
+                key={a}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "12px 0",
+                  borderBottom: "1px solid #ddd",
+                  fontSize: "18px",
+                }}
+              >
+                <span>{a}</span>
+                <input
+                  type="checkbox"
+                  checked={excludedAllergies.includes(a)}
+                  onChange={() => toggleAllergen(a)}
+                />
+              </label>
+            ))}
+
+            <button
+              onClick={() => setAllergyFilterOpen(false)}
+              style={{
+                marginTop: "20px",
+                padding: "12px 20px",
+                backgroundColor: "#500000",
+                color: "#fff",
+                borderRadius: "10px",
+                border: "none",
+                fontSize: "18px",
+                cursor: "pointer",
+              }}
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+      );
+    };
 
 
   // === MAIN RENDER SWITCH ===
   if (screen === "details")
-    return <DrinkDetailsPage accessibilityMode={accessibilityMode} />;
+    return (
+      <DrinkDetailsPage accessibilityMode={accessibilityMode} />
+    );
 
   if (screen === "cart")
   return (
@@ -1371,16 +1282,6 @@ const SuccessScreen = ({ accessibilityMode, orderId }) => {
   if (screen === "payment")
     return <PaymentScreen accessibilityMode={accessibilityMode} />;
 
-  if (screen === "success") {
-    return (
-      <SuccessScreen
-        accessibilityMode={accessibilityMode}
-        orderId={lastOrderId}
-      />
-    );
-  }
-
-  // === MAIN MENU SCREEN ===
   if (screen === "success") {
     return (
       <SuccessScreen
@@ -1674,11 +1575,15 @@ const SuccessScreen = ({ accessibilityMode, orderId }) => {
                     padding: "20px",
                     borderRadius: "12px",
                     backgroundColor:
-                      activeCategory === cat ? "#FFD700" : "#500000",
+                      activeCategory === cat
+                        ? "#FFD700"
+                        : "#500000",
                     color: "#fff",
                     border: "none",
                     cursor: "pointer",
-                    fontSize: accessibilityMode ? "28px" : "24px",
+                    fontSize: accessibilityMode
+                      ? "28px"
+                      : "22px",
                     textAlign: "left",
                     transition: "all 0.2s ease",
                   }}
@@ -1856,7 +1761,8 @@ const SuccessScreen = ({ accessibilityMode, orderId }) => {
             height: "90px",
             fontSize: "32px",
             border: "none",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            boxShadow:
+              "0 4px 12px rgba(0,0,0,0.3)",
             cursor: "pointer",
             zIndex: 2000,
           }}
@@ -1881,7 +1787,8 @@ const SuccessScreen = ({ accessibilityMode, orderId }) => {
           border: "none",
           fontSize: "20px",
           fontWeight: "600",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          boxShadow:
+            "0 4px 12px rgba(0,0,0,0.3)",
           cursor: "pointer",
           zIndex: 2000,
         }}
