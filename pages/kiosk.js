@@ -490,9 +490,21 @@ export default function KioskPage() {
             const checked = selectedToppings.some(
               (t) => t.id === topping.id
             );
+          
+            // TRUE if allergy exists AND not equal to "None"
             const hasAllergen =
-              topping.allergy && topping.allergy !== "None";
-
+              topping.allergy &&
+              topping.allergy.trim() !== "" &&
+              topping.allergy.trim().toLowerCase() !== "none";
+          
+            // Split multiple allergens if needed
+            const cleanAllergies = hasAllergen
+              ? topping.allergy
+                  .split(",")
+                  .map((a) => a.trim())
+                  .filter((a) => a && a.toLowerCase() !== "none")
+              : [];
+          
             return (
               <div
                 key={topping.id}
@@ -529,7 +541,7 @@ export default function KioskPage() {
                     />
                     {topping.name}
                   </label>
-
+                  
                   <span
                     style={{
                       fontSize: accessibilityMode ? "22px" : "18px",
@@ -538,8 +550,8 @@ export default function KioskPage() {
                     + ${Number(topping.price).toFixed(2)}
                   </span>
                 </div>
-
-                {hasAllergen && (
+                  
+                {cleanAllergies.length > 0 && (
                   <p
                     style={{
                       fontSize: accessibilityMode ? "22px" : "16px",
@@ -548,7 +560,7 @@ export default function KioskPage() {
                       marginTop: "5px",
                     }}
                   >
-                    ⚠ Contains {topping.allergy}
+                    ⚠ Contains {cleanAllergies.join(", ")}
                   </p>
                 )}
               </div>
