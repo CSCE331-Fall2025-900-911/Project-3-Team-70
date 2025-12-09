@@ -100,15 +100,17 @@ export default function ManagerPage() {
 					}
 				}
 
-				return {
-					id: item.menuid,
-					name: item.menuname,
-					category: item.category,
-					price: Number(item.price),
-					seasonal: seasonalDisplay,
-					seasonalStart: item.seasonalstart,
-					seasonalEnd: item.seasonalend
-				};
+        return {
+          id: item.id,                // FIX
+          name: item.name,            // FIX
+          category: item.category,
+          price: Number(item.price),
+          description: item.description,  // OPTIONAL but recommended
+          seasonal: seasonalDisplay,
+          seasonalStart: item.seasonalstart,
+          seasonalEnd: item.seasonalend,
+          allergies: item.allergies       // OPTIONAL
+        };
 			})
 		);
 
@@ -551,15 +553,16 @@ async function generateZReport() {
                   seasonalDisplay = `${startStr} - ${endStr}`;
                 }
               }
-
               return {
-                id: item.menuid,
-                name: item.menuname,
+                id: item.id,                // FIX
+                name: item.name,            // FIX
                 category: item.category,
-                price: Number(item.price),    // <-- prevents .toFixed crash
+                price: Number(item.price),
+                description: item.description,  // OPTIONAL but recommended
                 seasonal: seasonalDisplay,
                 seasonalStart: item.seasonalstart,
-                seasonalEnd: item.seasonalend
+                seasonalEnd: item.seasonalend,
+                allergies: item.allergies       // OPTIONAL
               };
             })
           );
