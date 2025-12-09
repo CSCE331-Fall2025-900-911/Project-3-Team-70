@@ -348,18 +348,15 @@ async function generateZReport() {
 
       setMenuItems(
         updatedData.map(item => ({
-          id: item.menuid,
-          name: item.menuname,
+          id: item.id,
+          name: item.name,
           category: item.category,
           price: Number(item.price),
-          seasonal:
-            item.seasonalstart && item.seasonalend
-              ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(
-                  item.seasonalend
-                ).toLocaleDateString()}`
-              : "All Year",
           seasonalStart: item.seasonalstart,
-          seasonalEnd: item.seasonalend
+          seasonalEnd: item.seasonalend,
+          seasonal: item.seasonalstart && item.seasonalend
+            ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
+            : "All Year"
         }))
       );
 
@@ -489,17 +486,16 @@ async function generateZReport() {
 
           setMenuItems(
             updated.map(item => ({
-              id: item.menuid,
-              name: item.menuname,
+              id: item.id,
+              name: item.name,
               category: item.category,
               price: Number(item.price),
-              seasonal:
-                item.seasonalstart && item.seasonalend
-                  ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
-                  : "All Year",
               seasonalStart: item.seasonalstart,
               seasonalEnd: item.seasonalend,
-              description: item.menudescription || ""
+              seasonal: item.seasonalstart && item.seasonalend
+                ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
+                : "All Year",
+              description: item.description
             }))
           );
 
@@ -531,38 +527,27 @@ async function generateZReport() {
               const endMD   = item.seasonalend   ? getMonthDay(item.seasonalend)   : null;
 
               let seasonalDisplay = "All Year";
-
               if (startMD && endMD) {
-                const isAllYear =
-                  startMD === "01-01" &&
-                  endMD === "12-31";
-
+                const isAllYear = startMD === "01-01" && endMD === "12-31";
                 if (!isAllYear) {
                   const startStr = new Date(item.seasonalstart).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric"
+                    month: "short", day: "numeric", year: "numeric"
                   });
-
                   const endStr = new Date(item.seasonalend).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric"
+                    month: "short", day: "numeric", year: "numeric"
                   });
-
                   seasonalDisplay = `${startStr} - ${endStr}`;
                 }
               }
+
               return {
-                id: item.id,                // FIX
-                name: item.name,            // FIX
+                id: item.id,
+                name: item.name,
                 category: item.category,
                 price: Number(item.price),
-                description: item.description,  // OPTIONAL but recommended
                 seasonal: seasonalDisplay,
                 seasonalStart: item.seasonalstart,
-                seasonalEnd: item.seasonalend,
-                allergies: item.allergies       // OPTIONAL
+                seasonalEnd: item.seasonalend
               };
             })
           );
