@@ -8,4 +8,5 @@ node_modules
 # in case someone incorrectly adds a .env file
 env
 ENV
+.vercel
 .env.local
