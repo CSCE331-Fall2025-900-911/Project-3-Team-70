@@ -22,6 +22,10 @@ export async function getServerSideProps(ctx) {
 export default function CashierPage() {
   const [menuItems, setMenuItems] = useState([]);
   const [order, setOrder] = useState([]);
+
+  // NEW — track which order line is selected
+  const [selectedIndex, setSelectedIndex] = useState(null);
+
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -33,8 +37,11 @@ export default function CashierPage() {
   const [modToppings, setModToppings] = useState([]);
   const [toppingOptions, setToppingOptions] = useState([]);
   const [modSize, setModSize] = useState("Medium");
+  const [modSweetness, setModSweetness] = useState("100%");
+  const [modIce, setModIce] = useState("Regular Ice");
+  const [modTemp, setModTemp] = useState("Cold");
 
-  // Fetch and normalize menu data from API
+  // Fetch and normalize menu data
   useEffect(() => {
     async function fetchMenu() {
       try {
@@ -73,7 +80,7 @@ export default function CashierPage() {
     fetchMenu();
   }, []);
 
-  // Fetch toppings/ingredients from DB
+  // Fetch toppings
   useEffect(() => {
     async function fetchToppings() {
       try {
@@ -88,7 +95,7 @@ export default function CashierPage() {
     fetchToppings();
   }, []);
 
-  // Filtering logic (case-safe)
+  // Filter logic
   const filteredMenu = menuItems.filter((item) => {
     const name = (item.name || "").toLowerCase();
     const cat = (item.category || "").toLowerCase();
@@ -104,7 +111,7 @@ export default function CashierPage() {
     return matchCat && matchQuery;
   });
 
-  // Add to order (takes modifications into account)
+  // Add to order
   const addToOrder = (item) => {
     setOrder((prev) => {
       const existing = prev.find(
@@ -123,8 +130,12 @@ export default function CashierPage() {
             : x
         );
       }
+
       return [...prev, { ...item, qty: 1, price: item.price }];
     });
+
+    // NEW — clear selected index (so removed doesn't mismatch)
+    setSelectedIndex(null);
   };
 
   const submitOrder = async () => {
@@ -135,11 +146,9 @@ export default function CashierPage() {
 
     try {
       const items = order.map((i) => ({
-        menuID: i.id, // using normalized id
+        menuID: i.id,
         quantity: i.qty,
-        priceAtPurchase: Number(
-          i.price || i.modifications?.finalPrice || 0
-        ),
+        priceAtPurchase: Number(i.price || 0),
         modifications: i.modifications || null,
       }));
 
@@ -159,6 +168,7 @@ export default function CashierPage() {
       }
 
       setOrder([]);
+      setSelectedIndex(null);
       alert("Order submitted!");
     } catch (err) {
       console.error("Error submitting order:", err);
@@ -166,45 +176,59 @@ export default function CashierPage() {
     }
   };
 
-  const removeItem = () => setOrder((prev) => prev.slice(0, -1));
+  // 🔥 NEW — remove selected item instead of last item
+  const removeItem = () => {
+    if (selectedIndex === null || selectedIndex < 0 || selectedIndex >= order.length) {
+      alert("Select an item to remove.");
+      return;
+    }
 
+    setOrder((prev) => prev.filter((_, i) => i !== selectedIndex));
+    setSelectedIndex(null);
+  };
+
+  // Calculate total
   const total = order
     .reduce((acc, i) => acc + Number(i.price || 0) * i.qty, 0)
     .toFixed(2);
 
-  // When user clicks "Add" on a menu item
+  // Open modifier popup
   const handleOpenModifier = (item) => {
     setModTarget(item);
     setModToppings([]);
+    setModSweetness("100%");
+    setModIce("Regular Ice");
+    setModTemp("Cold");
     setModSize("Medium");
     setShowModifier(true);
   };
 
-  // When user confirms in modal
   const handleConfirmModifier = () => {
     if (!modTarget) {
       setShowModifier(false);
       return;
     }
 
-    // Base price from menu
     let finalPrice = Number(modTarget.price || 0);
 
-    // SIZE PRICE ADJUSTMENT
     if (modSize === "Small") finalPrice -= 0.5;
     if (modSize === "Large") finalPrice += 0.5;
 
-    // Build modifications package
+    finalPrice += modToppings.length * 1;
+
     const modifications = {
       toppings: modToppings,
       size: modSize,
+      sweetness: modSweetness,
+      ice: modIce,
+      temperature: modTemp,
       finalPrice,
     };
 
     addToOrder({
       ...modTarget,
       modifications,
-      price: finalPrice, // replace display price
+      price: finalPrice,
     });
 
     setShowModifier(false);
@@ -222,7 +246,7 @@ export default function CashierPage() {
       </header>
 
       <main className="cashier-wrap">
-        {/* LEFT: MENU */}
+        {/* LEFT SIDE — MENU */}
         <section className="panel">
           <div className="menu-header">
             <input
@@ -232,6 +256,7 @@ export default function CashierPage() {
               onChange={(e) => setQuery(e.target.value)}
               className="search"
             />
+
             <div className="category-tabs">
               {[
                 "all",
@@ -243,9 +268,7 @@ export default function CashierPage() {
               ].map((cat) => (
                 <button
                   key={cat}
-                  className={`tab ${
-                    filter === cat ? "active" : ""
-                  }`}
+                  className={`tab ${filter === cat ? "active" : ""}`}
                   onClick={() => setFilter(cat)}
                 >
                   {cat}
@@ -270,12 +293,15 @@ export default function CashierPage() {
                         e.target.src = "/images/default.png";
                       }}
                     />
+
                     <div className="title">{item.name}</div>
                     <div className="desc">{item.description}</div>
+
                     <div className="row">
                       <div className="price">
                         ${Number(item.price || 0).toFixed(2)}
                       </div>
+
                       <button
                         className="btn primary"
                         onClick={() => handleOpenModifier(item)}
@@ -290,14 +316,17 @@ export default function CashierPage() {
           </div>
         </section>
 
-        {/* RIGHT: ORDER */}
+        {/* RIGHT SIDE — ORDER */}
         <aside className="panel">
           <div className="order-header">
             <h2>Current Order</h2>
+
+            {/* Remove selected item */}
             <button className="btn danger" onClick={removeItem}>
               Remove Item
             </button>
           </div>
+
           <div className="order-list">
             {order.length === 0 ? (
               <p style={{ padding: "8px 0" }}>No items yet.</p>
@@ -305,32 +334,60 @@ export default function CashierPage() {
               order.map((line, idx) => (
                 <div
                   key={line.id + "_" + idx}
-                  className="order-item"
+                  className={`order-item ${
+                    idx === selectedIndex ? "selected" : ""
+                  }`}
+                  onClick={() => setSelectedIndex(idx)} // NEW
+                  style={{
+                    cursor: "pointer",
+                    border:
+                      idx === selectedIndex
+                        ? "2px solid #500000"
+                        : "1px solid var(--border)",
+                  }}
                 >
                   <div className="name">
-                    {line.name}
+                    <strong>{line.name}</strong>
+
                     {line.modifications?.size && (
                       <div className="mods">
                         Size: {line.modifications.size}
                       </div>
                     )}
-                    {line.modifications?.toppings &&
-                      line.modifications.toppings.length > 0 && (
-                        <div className="mods">
-                          Toppings:{" "}
-                          {line.modifications.toppings.join(", ")}
-                        </div>
-                      )}
+                    {line.modifications?.sweetness !== undefined && (
+                      <div className="mods">
+                        Sweetness: {line.modifications.sweetness}
+                      </div>
+                    )}
+                    {line.modifications?.ice && (
+                      <div className="mods">
+                        Ice: {line.modifications.ice}
+                      </div>
+                    )}
+                    {line.modifications?.temperature && (
+                      <div className="mods">
+                        Temp: {line.modifications.temperature}
+                      </div>
+                    )}
+                    {line.modifications?.toppings?.length > 0 && (
+                      <div className="mods">
+                        Toppings:{" "}
+                        {line.modifications.toppings
+                          .map((t) => `${t} (+$1)`)
+                          .join(", ")}
+                      </div>
+                    )}
                   </div>
+
                   <div className="qty">x{line.qty}</div>
                   <div className="subtotal">
-                    $
-                    {(Number(line.price || 0) * line.qty).toFixed(2)}
+                    ${(Number(line.price || 0) * line.qty).toFixed(2)}
                   </div>
                 </div>
               ))
             )}
           </div>
+
           <div className="order-footer">
             <div className="total">Total: ${total}</div>
             <button className="btn success" onClick={submitOrder}>
@@ -346,8 +403,10 @@ export default function CashierPage() {
           <div className="modal">
             <h2>Customize {modTarget?.name}</h2>
 
+            {/* TOPPINGS */}
             <div className="mod-section">
               <p>Select ingredients / toppings:</p>
+
               {toppingOptions.length === 0 ? (
                 <p className="mods-empty">
                   No ingredients configured in inventory.
@@ -359,21 +418,66 @@ export default function CashierPage() {
                       type="checkbox"
                       checked={modToppings.includes(t)}
                       onChange={(e) => {
-                        setModToppings((prev) => {
-                          if (e.target.checked) {
-                            return [...prev, t];
-                          }
-                          return prev.filter((x) => x !== t);
-                        });
+                        setModToppings((prev) =>
+                          e.target.checked
+                            ? [...prev, t]
+                            : prev.filter((x) => x !== t)
+                        );
                       }}
                     />
-                    {t}
+                    {t} — <strong>+$1.00</strong>
                   </label>
                 ))
               )}
             </div>
 
-            {/* SIZE SELECTION */}
+            {/* SWEETNESS */}
+            <div className="mod-section">
+              <p>Sweetness Level:</p>
+              <select
+                value={modSweetness}
+                onChange={(e) => setModSweetness(e.target.value)}
+                className="search"
+                style={{ padding: "8px", borderRadius: "8px" }}
+              >
+                <option>None</option>
+                <option>Easy</option>
+                <option>Regular</option>
+                <option>Extra</option>
+              </select>
+            </div>
+
+            {/* ICE */}
+            <div className="mod-section">
+              <p>Ice Level:</p>
+              <select
+                value={modIce}
+                onChange={(e) => setModIce(e.target.value)}
+                className="search"
+                style={{ padding: "8px", borderRadius: "8px" }}
+              >
+                <option>No Ice</option>
+                <option>Easy Ice</option>
+                <option>Regular Ice</option>
+                <option>Extra Ice</option>
+              </select>
+            </div>
+
+            {/* TEMP */}
+            <div className="mod-section">
+              <p>Temperature:</p>
+              <select
+                value={modTemp}
+                onChange={(e) => setModTemp(e.target.value)}
+                className="search"
+                style={{ padding: "8px", borderRadius: "8px" }}
+              >
+                <option>Cold</option>
+                <option>Hot</option>
+              </select>
+            </div>
+
+            {/* SIZE */}
             <div className="mod-section">
               <p>Select size:</p>
               <select
@@ -406,7 +510,7 @@ export default function CashierPage() {
         </div>
       )}
 
-      {/* PAGE + MODAL STYLES */}
+      {/* CSS */}
       <style jsx>{`
         :root {
           --bg: #f7f7fb;
@@ -419,9 +523,11 @@ export default function CashierPage() {
           --danger: #ef4444;
           --radius: 16px;
         }
+
         * {
           box-sizing: border-box;
         }
+
         body,
         html,
         .cashier-root {
@@ -430,6 +536,7 @@ export default function CashierPage() {
           background: var(--bg);
           font-family: system-ui, sans-serif;
         }
+
         .cashier-topbar {
           display: flex;
           justify-content: space-between;
@@ -438,9 +545,11 @@ export default function CashierPage() {
           background: var(--panel);
           border-bottom: 1px solid var(--border);
         }
+
         .cashier-title {
           font-weight: 700;
         }
+
         .cashier-wrap {
           display: grid;
           grid-template-columns: 1.2fr 1fr;
@@ -448,6 +557,7 @@ export default function CashierPage() {
           height: calc(100vh - 60px);
           padding: 16px;
         }
+
         .panel {
           background: var(--panel);
           border: 1px solid var(--border);
@@ -456,6 +566,7 @@ export default function CashierPage() {
           flex-direction: column;
           overflow: hidden;
         }
+
         .menu-header {
           display: flex;
           gap: 8px;
@@ -463,16 +574,19 @@ export default function CashierPage() {
           padding: 12px;
           border-bottom: 1px solid var(--border);
         }
+
         .search {
           border: 1px solid var(--border);
           border-radius: 10px;
           padding: 8px 10px;
         }
+
         .category-tabs {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
         }
+
         .tab {
           padding: 6px 10px;
           border-radius: 999px;
@@ -481,15 +595,18 @@ export default function CashierPage() {
           cursor: pointer;
           font-size: 13px;
         }
+
         .tab.active {
           background: #eef2ff;
           border-color: #c7d2fe;
           color: #3730a3;
         }
+
         .menu-scroll {
           overflow: auto;
           padding: 14px;
         }
+
         .menu-grid {
           display: grid;
           grid-template-columns: repeat(
@@ -498,6 +615,7 @@ export default function CashierPage() {
           );
           gap: 14px;
         }
+
         .menu-card {
           border: 1px solid var(--border);
           border-radius: 12px;
@@ -507,6 +625,7 @@ export default function CashierPage() {
           flex-direction: column;
           gap: 8px;
         }
+
         .menu-card img {
           width: 100%;
           height: 120px;
@@ -514,20 +633,24 @@ export default function CashierPage() {
           border-radius: 8px;
           border: 1px solid var(--border);
         }
+
         .menu-card .title {
           font-weight: 600;
           font-size: 15px;
         }
+
         .menu-card .desc {
           font-size: 13px;
           color: var(--muted);
         }
+
         .menu-card .row {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-top: auto;
         }
+
         .btn {
           border: 1px solid var(--border);
           border-radius: 10px;
@@ -537,31 +660,38 @@ export default function CashierPage() {
           background: #f3f4f6;
           color: #111827;
         }
+
         .btn.primary {
           background: #500000;
-          color: #ffffff;
+          color: white;
           border-color: transparent;
         }
+
         .btn.success {
           background: #16a34a;
           color: white;
           border-color: transparent;
         }
+
         .btn.danger {
           background: #b91c1c;
           color: white;
           border-color: transparent;
         }
+
         .btn.ghost {
           background: transparent;
           color: #374151;
           border-color: #d1d5db;
         }
+
+        /* ORDER SIDE */
         .order-header,
         .order-footer {
           padding: 12px 14px;
           border-bottom: 1px solid var(--border);
         }
+
         .order-footer {
           border-top: 1px solid var(--border);
           margin-top: auto;
@@ -569,6 +699,7 @@ export default function CashierPage() {
           justify-content: space-between;
           align-items: center;
         }
+
         .order-list {
           overflow: auto;
           padding: 8px 14px;
@@ -576,8 +707,8 @@ export default function CashierPage() {
           flex-direction: column;
           gap: 8px;
         }
+
         .order-item {
-          border: 1px solid var(--border);
           border-radius: 10px;
           padding: 8px 10px;
           display: grid;
@@ -585,27 +716,43 @@ export default function CashierPage() {
           gap: 8px;
           align-items: center;
           background: #fff;
+          transition: 0.15s;
         }
+
+        .order-item.selected {
+          background: #ffe2e2;
+          border: 2px solid #500000 !important;
+        }
+
+        .order-item:hover {
+          background: #f5f5f5;
+        }
+
         .order-item .name {
           font-size: 14px;
         }
+
         .order-item .qty {
           font-size: 14px;
           color: var(--muted);
         }
+
         .order-item .subtotal {
           font-weight: 600;
           font-size: 14px;
         }
+
         .mods {
           font-size: 11px;
           color: #6b7280;
           margin-top: 4px;
         }
+
         .total {
           font-weight: 800;
         }
-        /* Modal styles */
+
+        /* MODAL */
         .modal-backdrop {
           position: fixed;
           inset: 0;
@@ -615,6 +762,7 @@ export default function CashierPage() {
           align-items: center;
           z-index: 2000;
         }
+
         .modal {
           background: #ffffff;
           padding: 20px;
@@ -626,6 +774,7 @@ export default function CashierPage() {
           gap: 14px;
           box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
         }
+
         .mod-section {
           display: flex;
           flex-direction: column;
@@ -633,16 +782,19 @@ export default function CashierPage() {
           max-height: 260px;
           overflow: auto;
         }
+
         .mods-empty {
           font-size: 13px;
           color: #6b7280;
         }
+
         .checkbox-row {
           display: flex;
           gap: 8px;
           align-items: center;
           font-size: 14px;
         }
+
         .modal-actions {
           display: flex;
           justify-content: space-between;
