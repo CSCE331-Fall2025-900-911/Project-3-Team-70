@@ -1,18 +1,19 @@
 // pages/kiosk.js
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { QRCodeCanvas } from "qrcode.react";
 
 // === SEND ORDERS TO BACKEND ===
-async function sendOrderToSystem(order) {
+async function sendOrderToSystem(order, session) {
   const rawItems = Array.isArray(order)
     ? order
     : (order && order.items) || [];
 
   try {
     const items = rawItems.map((i) => ({
-      menuID: i.id,
-      quantity: 1, // kiosk items are one each
-      priceAtPurchase: Number(i.finalPrice || i.price || 0),
+      menuID: i.menuid,                      // FIXED
+      quantity: Number(i.quantity || 1),     // matches kiosk
+      priceAtPurchase: Number(i.price || 0),
       size: null,
     }));
 
@@ -22,6 +23,7 @@ async function sendOrderToSystem(order) {
       body: JSON.stringify({
         source: "kiosk",
         orderLocation: "Kiosk",
+        customerEmail: session?.user?.email || null,   // ★ REQUIRED
         items,
       }),
     });
@@ -30,16 +32,24 @@ async function sendOrderToSystem(order) {
       const data = await res.json().catch(() => ({}));
       console.error("Order submission failed:", data.error);
       alert("Sorry, we couldn't process your order. Please try again.");
-      return false;
+      return null;
     }
 
-    return true;
+    const data = await res.json();
+    // API returns { success, orderID, orderTotal }
+    return {
+      orderID: data.orderID,
+      orderTotal: data.orderTotal,
+    };
   } catch (err) {
     console.error("Error sending order:", err);
     alert("Sorry, we couldn't process your order. Please try again.");
-    return false;
+    return null;
   }
 }
+
+
+
 
 // === Narration helper with language support ===
 const narrationVoices = {
@@ -155,6 +165,7 @@ function WeatherWidget({ accessibilityMode }) {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
       }}
     >
       <div style={{ fontSize: accessibilityMode ? "28px" : "24px" }}>
@@ -180,14 +191,28 @@ export default function KioskPage() {
   const [language, setLanguage] = useState("en");
   const [activeCategory, setActiveCategory] = useState(null);
 
+  const [lastOrderId, setLastOrderId] = useState(null);
+
   const [screen, setScreen] = useState("menu");
   const [detailsItem, setDetailsItem] = useState(null);
   const [cart, setCart] = useState([]);
-  const removeFromCart = (indexToRemove) => {
-    setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
-  };
   const [toppings, setToppings] = useState([]);
   const [toppingsError, setToppingsError] = useState(null);
+  const [selectedToppings, setSelectedToppings] = useState([]);
+
+  const [allergyFilterOpen, setAllergyFilterOpen] = useState(false);
+  const [excludedAllergies, setExcludedAllergies] = useState([]);
+  const [filteredMenuItems, setFilteredMenuItems] = useState([]);
+
+  useEffect(() => {
+  const newFiltered = filterByAllergies(menuItems, excludedAllergies);
+  setFilteredMenuItems(newFiltered);
+}, [menuItems, excludedAllergies]);
+
+
+
+  
+
 
   const categories = [
     "Ice-Blended",
@@ -196,6 +221,7 @@ export default function KioskPage() {
     "Milky Series",
     "Non-Caffeinated",
   ];
+
 
   const [accessibilityLabel, setAccessibilityLabel] = useState({
     on: "Accessibility Mode: ON",
@@ -206,9 +232,21 @@ export default function KioskPage() {
 
   const [loyaltyPoints, setLoyaltyPoints] = useState(null);
   const [pointsError, setPointsError] = useState(null);
-  const [pointsToRedeem, setPointsToRedeem] = useState(0); // placeholder if you use later
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
-  // Load rewards points for logged-in customers
+  function filterByAllergies(items, excludedAllergies) {
+  if (excludedAllergies.length === 0) return items;
+
+  return items.filter(item => {
+    if (!item.allergies || item.allergies.length === 0) return true;
+
+    // If ANY allergen in the item matches one the user wants to avoid → hide it
+    return !item.allergies.some(a => excludedAllergies.includes(a));
+  });
+}
+
+  
+    // Load rewards points for logged-in customers
   useEffect(() => {
     if (!session?.user?.email) {
       setLoyaltyPoints(null);
@@ -244,14 +282,17 @@ export default function KioskPage() {
           return {
             id,
             name: item.menuname ?? item.name,
-            price: item.price,
+            price: item.finalPrice || item.price,
             description: item.menudescription ?? item.description,
             category: item.category,
-            image: `/images/${id}.png`,
+            image: `/Images/${id}.png`,
+            allergies: item.allergies || [],   // ★ NEW
           };
         });
 
+
         setMenuItems(formatted);
+        setFilteredMenuItems(formatted);
       } catch (err) {
         console.error("Error fetching menu:", err);
         setError("Failed to load menu items.");
@@ -269,7 +310,16 @@ export default function KioskPage() {
         const res = await fetch("/api/toppings");
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
-        setToppings(data || []);
+
+        // Convert API shape → UI shape
+        const formatted = data.map((t) => ({
+          id: t.inventoryID,
+          name: t.inventoryName,
+          price: Number(t.addOnPrice),
+          allergy: t.allergy,
+        }));
+
+        setToppings(formatted);
       } catch (err) {
         console.error("Error loading toppings:", err);
         setToppingsError("Could not load toppings");
@@ -277,6 +327,7 @@ export default function KioskPage() {
     }
     fetchToppings();
   }, []);
+
 
   // language widget
   useEffect(() => {
@@ -324,7 +375,7 @@ export default function KioskPage() {
 
     if (narrationOn) {
       speak(
-        `${item.name}. Price ${item.price} dollars. ${
+        `${item.name}. Price ${item.finalPrice || item.price} dollars. ${
           item.description || ""
         }`,
         language
@@ -354,175 +405,155 @@ export default function KioskPage() {
       speak(`${item.name} added to cart.`, language);
     }
   };
-
+  
   // === CUSTOMIZATION UI ===
-  const DrinkDetailsPage = () => {
-    const [selectedToppings, setSelectedToppings] = useState([]);
-    const [sweetness, setSweetness] = useState("100%");
-    const [iceLevel, setIceLevel] = useState("Regular Ice");
+const DrinkDetailsPage = () => {
+  const [selectedToppings, setSelectedToppings] = useState([]);
+  const [sweetness, setSweetness] = useState("100%");
+  const [iceLevel, setIceLevel] = useState("Regular Ice");
+  const [allergyFilterOpen, setAllergyFilterOpen] = useState(false);
+  const [excludedAllergies, setExcludedAllergies] = useState([]);
+  const [size, setSize] = useState("Medium");
 
-    if (!detailsItem) return null;
+  if (!detailsItem) return null;
 
-    // Normalize toppings from DB to a consistent shape
-    // inside DrinkDetailsPage in kiosk.js
-  const effectiveToppings = (toppings || []).map((t, idx) => ({
-    // use inventoryid as the primary id
-    id: t.inventoryid ?? t.id ?? idx,
+  // Match by ID, not object reference
+  const toggleTopping = (topping) => {
+    setSelectedToppings((prev) =>
+      prev.some((t) => t.id === topping.id)
+        ? prev.filter((t) => t.id !== topping.id)
+        : [...prev, topping]
+    );
+  };
 
-    // prefer inventoryname from the DB
-    name:
-      t.inventoryname ??
-      t.inventoryName ?? // just in case you aliased it
-      t.name ??
-      "Topping",
-
-    // price comes from addOnPrice / addonprice
-    price: Number(
-      t.addonprice ?? // from node-postgres (lowercased)
-      t.addOnPrice ?? // if you aliased in SQL
-      t.price ??
-      0
-    ),
-
-    // allergy column is already in your inventory table
-    allergy: t.allergy ?? "None",
-  }));
+  const totalPrice = Number(detailsItem.price) + selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
 
 
-    const toggleTopping = (topping) => {
-      setSelectedToppings((prev) =>
-        prev.some((t) => t.id === topping.id)
-          ? prev.filter((t) => t.id !== topping.id)
-          : [...prev, topping]
-      );
-    };
+  // === SIZE PRICE ADJUSTMENT ===
+  let finalPrice = totalPrice;
+  if (size === "Small") finalPrice -= 0.50;
+  if (size === "Large") finalPrice += 0.50;
 
-    const totalPrice =
-      Number(detailsItem.price) +
-      selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
+  const finalize = () => {
+    addToCart({
+      ...detailsItem,
+      toppings: selectedToppings,
+      sweetness,
+      iceLevel,
+      size,
+      finalPrice,
+    });
 
-    const finalize = () => {
-      addToCart({
-        ...detailsItem,
-        toppings: selectedToppings,
-        sweetness,
-        iceLevel,
-        finalPrice: totalPrice,
-      });
+    setScreen("menu");
+  };
 
-      setScreen("menu");
-    };
-
-    return (
-      <div
+  return (
+    <div
+      style={{
+        width: "100%",
+        minHeight: "100vh",
+        backgroundColor: accessibilityMode ? "#000" : "#fff",
+        color: accessibilityMode ? "#fff" : "#000",
+        padding: "20px",
+        textAlign: "center",
+        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+      }}
+    >
+      <button
+        onClick={() => setScreen("menu")}
         style={{
-          width: "100%",
-          minHeight: "100vh",
-          backgroundColor: accessibilityMode ? "#000" : "#fff",
-          color: accessibilityMode ? "#fff" : "#000",
-          padding: "20px",
-          textAlign: "center",
+          position: "absolute",
+          top: "20px",
+          left: "20px",
+          padding: "10px 20px",
+          backgroundColor: "#500000",
+          color: "#fff",
+          border: "none",
+          borderRadius: "10px",
+          fontSize: "18px",
+          cursor: "pointer",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
-        <button
-          onClick={() => setScreen("menu")}
-          style={{
-            position: "absolute",
-            top: "20px",
-            left: "20px",
-            padding: "10px 20px",
-            backgroundColor: "#500000",
-            color: "#fff",
-            border: "none",
-            borderRadius: "10px",
-            fontSize: "18px",
-            cursor: "pointer",
-          }}
-        >
-          ← Back
-        </button>
+        ← Back
+      </button>
 
-        <img
-          src={detailsItem.image}
-          alt={detailsItem.name}
-          onError={(e) => {
-            e.target.src = "/images/default.png";
-          }}
-          style={{
-            width: "60%",
-            maxWidth: "400px",
-            borderRadius: "20px",
-            marginTop: "60px",
-            marginBottom: "20px",
-          }}
-        />
+      <img
+        src={detailsItem.image}
+        alt={detailsItem.name}
+        onError={(e) => {
+          e.target.src = "/Images/default.png";
+        }}
+        style={{
+          width: "60%",
+          maxWidth: "400px",
+          borderRadius: "20px",
+          marginTop: "60px",
+          marginBottom: "20px",
+        }}
+      />
 
-        <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
+      <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
 
-        <p style={{ fontSize: "24px", opacity: 0.9 }}>
-          Base Price: ${Number(detailsItem.price).toFixed(2)}
-        </p>
+      <p style={{ fontSize: "24px", opacity: 0.9 }}>
+        Base Price: ${Number(detailsItem.price).toFixed(2)}
+      </p>
 
-        <h2 style={{ fontSize: "30px", marginTop: "20px" }}>Toppings</h2>
+      {/* TOPPINGS */}
+      <h2 style={{ fontSize: "30px", marginTop: "20px" }}>Toppings</h2>
 
-        {toppingsError && (
-          <p style={{ color: "red", marginBottom: "10px" }}>
-            {toppingsError}
-          </p>
-        )}
+      <div
+        style={{
+          width: "80%",
+          margin: "0 auto",
+          marginBottom: "40px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+        }}
+      >
+        {detailsItem.description}
+      </div>
 
+      {/* Toppings selection */}
+      {toppings.length > 0 && (
         <div
           style={{
+            margin: "20px auto",
             width: "80%",
-            margin: "0 auto",
-            maxHeight: "300px",
-            overflowY: "scroll",
-            border: "1px solid #ccc",
-            borderRadius: "15px",
-            padding: "10px",
+            textAlign: "left",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
-          {effectiveToppings.length === 0 && !toppingsError && (
-            <p>No toppings available.</p>
-          )}
+          <h3 style={{ fontSize: "24px", marginBottom: "10px" }}>
+            Customize your drink
+          </h3>
 
-          {effectiveToppings.map((topping) => {
-            const checked = selectedToppings.some(
-              (t) => t.id === topping.id
-            );
-          
-            // TRUE if allergy exists AND not equal to "None"
+          {toppings.map((top) => {
+            const checked = selectedToppings.some((t) => t.id === top.id);
+
+            // Determine if valid allergen info exists
             const hasAllergen =
-              topping.allergy &&
-              topping.allergy.trim() !== "" &&
-              topping.allergy.trim().toLowerCase() !== "none";
-          
-            // Split multiple allergens if needed
+              top.allergy &&
+              top.allergy.trim() !== "" &&
+              top.allergy.trim().toLowerCase() !== "none";
+
+            // Split allergens cleanly (supports "Dairy, Nuts")
             const cleanAllergies = hasAllergen
-              ? topping.allergy
+              ? top.allergy
                   .split(",")
                   .map((a) => a.trim())
                   .filter((a) => a && a.toLowerCase() !== "none")
               : [];
-          
+
             return (
-              <div
-                key={topping.id}
-                style={{
-                  margin: "10px 0",
-                  padding: "10px",
-                  borderRadius: "10px",
-                  backgroundColor: accessibilityMode ? "#111" : "#f9f9f9",
-                  border: checked
-                    ? "2px solid #FFD700"
-                    : "1px solid #ccc",
-                }}
-              >
-                <div
+              <div key={top.id} style={{ marginBottom: "10px" }}>
+                <label
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid #eee",
+                    fontSize: "18px",
                   }}
                 >
                   <label
@@ -536,20 +567,16 @@ export default function KioskPage() {
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => toggleTopping(topping)}
+                      onChange={() => toggleTopping(top)}
                       style={{ width: "25px", height: "25px" }}
                     />
-                    {topping.name}
+                    {top.name}
                   </label>
                   
-                  <span
-                    style={{
-                      fontSize: accessibilityMode ? "22px" : "18px",
-                    }}
-                  >
-                    + ${Number(topping.price).toFixed(2)}
+                  <span style={{ fontSize: accessibilityMode ? "22px" : "18px" }}>
+                    + ${Number(top.price).toFixed(2)}
                   </span>
-                </div>
+                </label>
                   
                 {cleanAllergies.length > 0 && (
                   <p
@@ -567,78 +594,101 @@ export default function KioskPage() {
             );
           })}
         </div>
+      )}
+      {/* SWEETNESS */}
+      <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
+      <select
+        value={sweetness}
+        onChange={(e) => setSweetness(e.target.value)}
+        style={{
+          padding: "10px",
+          fontSize: "20px",
+          borderRadius: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <option>0%</option>
+        <option>25%</option>
+        <option>50%</option>
+        <option>75%</option>
+        <option>100%</option>
+      </select>
 
-        {/* SWEETNESS */}
-        <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
-        <select
-          value={sweetness}
-          onChange={(e) => setSweetness(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "20px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-          }}
-        >
-          <option>0%</option>
-          <option>25%</option>
-          <option>50%</option>
-          <option>75%</option>
-          <option>100%</option>
-        </select>
+      {/* ICE LEVEL */}
+      <h2>Ice Level</h2>
+      <select
+        value={iceLevel}
+        onChange={(e) => setIceLevel(e.target.value)}
+        style={{
+          padding: "10px",
+          fontSize: "20px",
+          borderRadius: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <option>Regular Ice</option>
+        <option>Less Ice</option>
+        <option>No Ice</option>
+        <option>Extra Ice</option>
+      </select>
 
-        {/* ICE LEVEL */}
-        <h2>Ice Level</h2>
-        <select
-          value={iceLevel}
-          onChange={(e) => setIceLevel(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "20px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-          }}
-        >
-          <option>Regular Ice</option>
-          <option>Less Ice</option>
-          <option>No Ice</option>
-          <option>Extra Ice</option>
-        </select>
+      {/* SIZE */}
+      <h2 style={{ marginTop: "20px" }}>Size</h2>
+      <select
+        value={size}
+        onChange={(e) => setSize(e.target.value)}
+        style={{
+          padding: "10px",
+          fontSize: "20px",
+          borderRadius: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <option value="Small">Small (-$0.50)</option>
+        <option value="Medium">Medium</option>
+        <option value="Large">Large (+$0.50)</option>
+      </select>
 
-        {/* FINAL TOTAL */}
-        <h2 style={{ marginTop: "30px", fontSize: "30px" }}>
-          Total: ${totalPrice.toFixed(2)}
-        </h2>
+      {/* FINAL TOTAL */}
+      <h2 style={{ marginTop: "30px", fontSize: "30px" }}>
+        Total: ${finalPrice.toFixed(2)}
+      </h2>
 
-        <button
-          onClick={finalize}
-          style={{
-            padding: "20px 40px",
-            backgroundColor: "#FFD700",
-            color: "#000",
-            border: "none",
-            borderRadius: "15px",
-            fontSize: "26px",
-            cursor: "pointer",
-            marginTop: "20px",
-          }}
-        >
-          Add to Cart
-        </button>
-      </div>
-    );
-  };
+      <button
+        onClick={finalize}
+        style={{
+          padding: "20px 40px",
+          backgroundColor: "#FFD700",
+          color: "#000",
+          border: "none",
+          borderRadius: "15px",
+          fontSize: "26px",
+          cursor: "pointer",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+        }}
+      >
+        Add to Cart
+      </button>
+    </div>
+  );
+};
 
-  // === CART SCREEN ===
-  const CartScreen = ({ accessibilityMode }) => {
-    const removeItem = (indexToRemove) => {
-      setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
-    };
 
-    const cartTotal = cart.reduce(
-      (sum, item) => sum + Number(item.finalPrice || item.price),
-      0
-    );
+      const CartScreen = ({ accessibilityMode, speak, narrationOn, language }) => {
+
+        // 🔊 Narrate upon entering the cart page
+        useEffect(() => {
+        if (narrationOn) speak("You are now on the cart page. Review your items.", language);
+      }, []);
+
+      const removeItem = (indexToRemove) => {
+        setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
+      };
+
+      const cartTotal = cart.reduce(
+        (sum, item) => sum + Number(item.finalPrice || item.finalPrice || item.price),
+        0
+      );
 
     return (
       <div
@@ -688,6 +738,8 @@ export default function KioskPage() {
                   borderRadius: "8px",
                   fontSize: accessibilityMode ? "20px" : "16px",
                   cursor: "pointer",
+                  marginTop: "10px",
+                  fontSize: "18px",
                 }}
               >
                 Remove
@@ -700,8 +752,7 @@ export default function KioskPage() {
                   marginBottom: "10px",
                 }}
               >
-                {item.name} — $
-                {(item.finalPrice || item.price).toFixed(2)}
+                {item.name} — ${(item.finalPrice || item.finalPrice || item.price).toFixed(2)}
               </p>
 
               {item.sweetness && (
@@ -761,6 +812,7 @@ export default function KioskPage() {
             fontSize: accessibilityMode ? "32px" : "24px",
             marginTop: "20px",
             cursor: "pointer",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           Proceed to Payment
@@ -777,6 +829,7 @@ export default function KioskPage() {
             marginLeft: "20px",
             color: accessibilityMode ? "#fff" : "#000",
             cursor: "pointer",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           Back
@@ -785,22 +838,193 @@ export default function KioskPage() {
     );
   };
 
-  // === PAYMENT SCREEN ===
+      const CheckoutScreen = () => {
+      const total = cart.reduce(
+        (sum, item) => sum + Number(item.finalPrice || item.price),
+        0
+      );
+
+      const maxRedeemable =
+        typeof loyaltyPoints === "number"
+          ? Math.min(loyaltyPoints, Math.floor(total))
+          : 0;
+
+      const applied = Math.min(pointsToRedeem || 0, maxRedeemable);
+      const finalTotal = total - applied;
+
+      // ===========================
+      // Redeem points when continuing
+      // ===========================
+      async function redeemPointsIfNeeded() {
+        if (applied > 0 && session?.user?.email) {
+          await fetch("/api/rewards", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ points: applied }),
+          });
+        }
+      }
+
+      return (
+        <div
+          style={{
+            padding: accessibilityMode ? "40px" : "20px",
+            backgroundColor: accessibilityMode ? "#000" : "#fff",
+            color: accessibilityMode ? "#fff" : "#000",
+            minHeight: "100vh",
+            transition: "all 0.3s ease",
+          }}
+        >
+          <h2 style={{ fontSize: accessibilityMode ? "48px" : "36px" }}>
+            Order Summary
+          </h2>
+
+          {/* ITEMS */}
+          {cart.map((item, index) => (
+            <div
+              key={index}
+              style={{
+                fontSize: accessibilityMode ? "28px" : "22px",
+                padding: "12px",
+                margin: "10px 0",
+                borderRadius: "10px",
+                backgroundColor: accessibilityMode ? "#111" : "#f3f4f6",
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <div>{item.name} — ${Number(item.finalPrice || item.price).toFixed(2)}</div>
+                {item.toppings && item.toppings.length > 0 && (
+                  <div style={{ fontSize: "16px", opacity: 0.8, marginTop: "4px" }}>
+                    Toppings: {item.toppings.map((t) => t.name).join(", ")}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => removeFromCart(index)}
+                style={{
+                  padding: "8px 14px",
+                  backgroundColor: "#b91c1c",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+
+          {/* POINTS UI */}
+          {typeof loyaltyPoints === "number" && (
+            <div
+              style={{
+                marginTop: "20px",
+                padding: "12px",
+                borderRadius: "10px",
+                backgroundColor: accessibilityMode ? "#222" : "#f3f4f6",
+                color: accessibilityMode ? "#fff" : "#000",
+              }}
+            >
+              <p>Available points: {loyaltyPoints}</p>
+              <label>
+                Apply points (max {maxRedeemable}):
+                <input
+                  type="number"
+                  min="0"
+                  max={maxRedeemable}
+                  value={pointsToRedeem}
+                  onChange={(e) =>
+                    setPointsToRedeem(
+                      Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0))
+                    )
+                  }
+                  style={{
+                    marginLeft: "10px",
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    width: "80px",
+                  }}
+                />
+              </label>
+
+              <p>Discount: ${applied.toFixed(2)}</p>
+            </div>
+          )}
+
+          {/* TOTAL */}
+          <h3 style={{ fontSize: "28px", marginTop: "20px", textAlign: "right" }}>
+            Total: ${finalTotal.toFixed(2)}
+          </h3>
+
+          <button
+            onClick={async () => {
+              await redeemPointsIfNeeded();
+              setScreen("payment");
+            }}
+            style={{
+              padding: "20px 40px",
+              backgroundColor: "#FFD700",
+              border: "none",
+              borderRadius: "10px",
+              fontSize: "24px",
+              marginTop: "20px",
+              cursor: "pointer",
+            }}
+            disabled={cart.length === 0}
+          >
+            Continue to Payment
+          </button>
+
+          <button
+            onClick={() => setScreen("cart")}
+            style={{
+              padding: "15px 30px",
+              backgroundColor: "#ccc",
+              borderRadius: "10px",
+              border: "none",
+              marginLeft: "20px",
+            }}
+          >
+            Back
+          </button>
+        </div>
+      );
+    };
+
+
+
+
+  // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED ===
   const PaymentScreen = ({ accessibilityMode }) => {
     const [confirmMethod, setConfirmMethod] = useState(null);
     const paymentMethods = ["Card", "Tap to Pay", "Mobile Wallet", "Cash"];
+
+    const handlePayment = async () => {
+      const result = await sendOrderToSystem(cart, "kiosk", "Kiosk");
+      if (!result) return;
+
+      setLastOrderId(result.orderID);
+      setScreen("success");
+    };
 
     if (!accessibilityMode) {
       return (
         <div style={{ padding: "20px" }}>
           <h2 style={{ fontSize: "36px" }}>Payment</h2>
+          
 
-          <p style={{ fontSize: "22px" }}>Choose a payment method:</p>
+          <p style={{ fontSize: "22px" }}>
+            Choose a payment method:
+          </p>
 
           {paymentMethods.map((method) => (
             <button
               key={method}
-              onClick={() => setScreen("success")}
+              onClick={handlePayment}
               style={{
                 display: "block",
                 width: "80%",
@@ -811,6 +1035,7 @@ export default function KioskPage() {
                 border: "none",
                 borderRadius: "10px",
                 fontSize: "24px",
+                fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
               }}
             >
               {method}
@@ -826,6 +1051,7 @@ export default function KioskPage() {
               border: "none",
               fontSize: "20px",
               marginTop: "20px",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             }}
           >
             Back
@@ -834,6 +1060,7 @@ export default function KioskPage() {
       );
     }
 
+    // Accessibility mode: double-tap confirm behavior
     return (
       <div
         style={{
@@ -842,6 +1069,7 @@ export default function KioskPage() {
           backgroundColor: "#000",
           color: "#fff",
           minHeight: "100vh",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         <h2 style={{ fontSize: "44px" }}>Payment</h2>
@@ -850,6 +1078,7 @@ export default function KioskPage() {
           style={{
             fontSize: "28px",
             marginBottom: "30px",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           Choose a method:
@@ -866,7 +1095,8 @@ export default function KioskPage() {
                 return;
               }
 
-              setScreen("success");
+              // Second tap = confirm and pay
+              handlePayment();
             }}
             style={{
               width: "90%",
@@ -880,6 +1110,7 @@ export default function KioskPage() {
               borderRadius: "14px",
               fontSize: "32px",
               cursor: "pointer",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             }}
           >
             {method}
@@ -916,123 +1147,16 @@ export default function KioskPage() {
     );
   };
 
-  // === SUCCESS / RECEIPT SCREEN ===
-  const SuccessScreen = ({ accessibilityMode }) => {
-    const total = cart.reduce(
-      (sum, item) => sum + Number(item.finalPrice || item.price || 0),
-      0
-    );
-    const now = new Date();
-    const orderId = Math.floor(now.getTime() / 1000);
-
-    return (
-      <div
-        style={{
-          padding: "40px",
-          textAlign: "center",
-          backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
-          color: accessibilityMode ? "#fff" : "#000",
-          minHeight: "100vh",
-        }}
-      >
-        <h1 style={{ fontSize: "48px", marginBottom: "10px" }}>
-          Payment Successful!
-        </h1>
-        <p style={{ fontSize: "24px", marginBottom: "30px" }}>
+  const SuccessScreen = () => (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
+        <p style={{ fontSize: "24px", marginTop: "20px" }}>
           Thank you for your order.
         </p>
 
-        {/* Receipt */}
-        <div
-          style={{
-            maxWidth: "480px",
-            margin: "0 auto",
-            textAlign: "left",
-            backgroundColor: "#fff",
-            color: "#000",
-            borderRadius: "16px",
-            padding: "24px",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "28px",
-              marginBottom: "8px",
-              borderBottom: "1px solid #ddd",
-              paddingBottom: "8px",
-            }}
-          >
-            Receipt
-          </h2>
-
-          <div
-            style={{
-              fontSize: "14px",
-              marginBottom: "12px",
-              color: "#555",
-            }}
-          >
-            <div>
-              Order ID: <strong>{orderId}</strong>
-            </div>
-            <div>
-              Date:{" "}
-              {now.toLocaleDateString()}{" "}
-              {now.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </div>
-          </div>
-
-          <div
-            style={{
-              borderTop: "1px dashed #ccc",
-              paddingTop: "10px",
-              marginTop: "10px",
-              maxHeight: "260px",
-              overflowY: "auto",
-            }}
-          >
-            {cart.map((item, idx) => (
-              <div
-                key={`${item.id}-${idx}`}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "6px",
-                  fontSize: "16px",
-                }}
-              >
-                <span>{item.name}</span>
-                <span>
-                  ${Number(item.finalPrice || item.price || 0).toFixed(2)}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div
-            style={{
-              borderTop: "1px solid #000",
-              marginTop: "12px",
-              paddingTop: "12px",
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "18px",
-              fontWeight: "bold",
-            }}
-          >
-            <span>Total</span>
-            <span>${total.toFixed(2)}</span>
-          </div>
-        </div>
-
         <button
           onClick={async () => {
-            const ok = await sendOrderToSystem(cart);
-            if (!ok) return;
+            await sendOrderToSystem(cart, session);
             setCart([]);
             setScreen("menu");
           }}
@@ -1042,7 +1166,7 @@ export default function KioskPage() {
             border: "none",
             borderRadius: "10px",
             fontSize: "24px",
-            marginTop: "40px",
+            marginTop: "30px",
             cursor: "pointer",
           }}
         >
@@ -1050,21 +1174,113 @@ export default function KioskPage() {
         </button>
       </div>
     );
-  };
+
+    const AllergyFilterPanel = () => {
+      const allergens = ["Dairy", "Nuts"]; // from DB
+
+      const toggleAllergen = (a) => {
+        setExcludedAllergies((prev) =>
+          prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
+        );
+      };
+
+      return (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.75)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "30px",
+              borderRadius: "14px",
+              width: "90%",
+              maxWidth: "400px",
+              textAlign: "center",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            }}
+          >
+            <h2 style={{ marginBottom: "20px" }}>Select Allergies to Avoid</h2>
+
+            {allergens.map((a) => (
+              <label
+                key={a}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "12px 0",
+                  borderBottom: "1px solid #ddd",
+                  fontSize: "18px",
+                }}
+              >
+                <span>{a}</span>
+                <input
+                  type="checkbox"
+                  checked={excludedAllergies.includes(a)}
+                  onChange={() => toggleAllergen(a)}
+                />
+              </label>
+            ))}
+
+            <button
+              onClick={() => setAllergyFilterOpen(false)}
+              style={{
+                marginTop: "20px",
+                padding: "12px 20px",
+                backgroundColor: "#500000",
+                color: "#fff",
+                borderRadius: "10px",
+                border: "none",
+                fontSize: "18px",
+                cursor: "pointer",
+              }}
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+      );
+    };
+
 
   // === MAIN RENDER SWITCH ===
   if (screen === "details")
     return <DrinkDetailsPage accessibilityMode={accessibilityMode} />;
 
   if (screen === "cart")
-    return <CartScreen accessibilityMode={accessibilityMode} />;
+  return (
+    <CartScreen
+      accessibilityMode={accessibilityMode}
+      speak={speak}
+      narrationOn={narrationOn}
+      language={language}
+    />
+  );
+
 
   if (screen === "payment")
     return <PaymentScreen accessibilityMode={accessibilityMode} />;
 
-  if (screen === "success")
-    return <SuccessScreen accessibilityMode={accessibilityMode} />;
+  if (screen === "success") {
+    return (
+      <SuccessScreen
+        accessibilityMode={accessibilityMode}
+        orderId={lastOrderId}
+      />
+    );
+  }
 
+  // === MAIN MENU SCREEN ===
   return (
     <div
       style={{
@@ -1079,38 +1295,54 @@ export default function KioskPage() {
       }}
     >
       <WeatherWidget accessibilityMode={accessibilityMode} />
+      {allergyFilterOpen && <AllergyFilterPanel />}
 
-      {/* Rewards sign-in bubble */}
+
+      {/* NEW: simple sign-in bar for rewards */}
       <div
         style={{
           position: "absolute",
-          top: "20px",
-          right: "120px",
-          backgroundColor: "#ffffff",
+          top: accessibilityMode ? "28px" : "20px",
+          right: accessibilityMode ? "240px" : "200px",
+
+          backgroundColor: accessibilityMode ? "#111" : "#ffffff",
+          color: accessibilityMode ? "#fff" : "#000",
+
           borderRadius: "12px",
-          padding: "8px 12px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-          fontSize: "14px",
+          padding: accessibilityMode ? "12px 16px" : "8px 12px",
+          boxShadow: accessibilityMode
+            ? "none"
+            : "0 2px 8px rgba(0,0,0,0.2)",
+
+          fontSize: accessibilityMode ? "18px" : "14px",
+          fontWeight: accessibilityMode ? "bold" : "normal",
+
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          gap: accessibilityMode ? "12px" : "8px",
+
           zIndex: 12,
+          transition: "all 0.3s ease",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         {!session ? (
           <>
             <span>Sign in for rewards:</span>
+
             <button
               onClick={() =>
                 signIn("google", { callbackUrl: "/kiosk" })
               }
               style={{
-                padding: "6px 10px",
+                padding: accessibilityMode ? "10px 16px" : "6px 10px",
                 borderRadius: "8px",
                 border: "none",
-                backgroundColor: "#500000",
+                backgroundColor: accessibilityMode ? "#b00000" : "#500000",
                 color: "#fff",
                 cursor: "pointer",
+                fontSize: accessibilityMode ? "18px" : "14px",
+                fontWeight: "bold",
               }}
             >
               Sign in
@@ -1135,12 +1367,13 @@ export default function KioskPage() {
         )}
       </div>
 
+
       <button
         onClick={toggleNarration}
         aria-label="Toggle narration mode"
         style={{
           position: "absolute",
-          top: "10%",
+          top: "125px",
           left: "20px",
           transform: "translateY(-50%)",
           backgroundColor: narrationOn
@@ -1206,6 +1439,7 @@ export default function KioskPage() {
         style={{
           fontSize: accessibilityMode ? "48px" : "36px",
           marginBottom: accessibilityMode ? "30px" : "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Sharetea Self-Order Kiosk
@@ -1215,6 +1449,7 @@ export default function KioskPage() {
         style={{
           fontSize: accessibilityMode ? "24px" : "18px",
           marginBottom: accessibilityMode ? "30px" : "20px",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Welcome! Tap a drink to start your order.
@@ -1249,36 +1484,54 @@ export default function KioskPage() {
         ))}
       </div>
 
-      <button
-        onClick={() => setAccessibilityMode(!accessibilityMode)}
-        aria-pressed={accessibilityMode}
-        aria-label="Toggle Accessibility Mode"
+      <div
         style={{
-          padding: accessibilityMode ? "18px 30px" : "10px 20px",
-          fontSize: accessibilityMode ? "20px" : "18px",
-          borderRadius: "10px",
-          backgroundColor: accessibilityMode ? "#FFD700" : "#500000",
-          color: accessibilityMode ? "#000" : "#fff",
-          border: "none",
-          cursor: "pointer",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: accessibilityMode ? "25px" : "15px",
           marginBottom: accessibilityMode ? "40px" : "25px",
-          transition: "all 0.2s ease",
         }}
       >
-        <span
-          id="label-off"
-          style={{ display: accessibilityMode ? "none" : "inline" }}
+        {/* Accessibility Toggle */}
+        <button
+          onClick={() => setAccessibilityMode(!accessibilityMode)}
+          aria-pressed={accessibilityMode}
+          aria-label="Toggle Accessibility Mode"
+          style={{
+            padding: accessibilityMode ? "18px 30px" : "10px 20px",
+            fontSize: accessibilityMode ? "20px" : "18px",
+            borderRadius: "10px",
+            backgroundColor: accessibilityMode ? "#FFD700" : "#500000",
+            color: accessibilityMode ? "#000" : "#fff",
+            border: "none",
+            cursor: "pointer",
+            width: "220px",
+            transition: "all 0.2s ease",
+          }}
         >
-          Accessibility Mode: OFF
-        </span>
+          {accessibilityMode ? "Accessibility Mode: ON" : "Accessibility Mode: OFF"}
+        </button>
 
-        <span
-          id="label-on"
-          style={{ display: accessibilityMode ? "inline" : "none" }}
+        {/* Allergy Filter Button */}
+        <button
+          onClick={() => setAllergyFilterOpen(true)}
+          aria-label="Open Allergy Filter"
+          style={{
+            padding: accessibilityMode ? "18px 30px" : "10px 20px",
+            fontSize: accessibilityMode ? "20px" : "18px",
+            borderRadius: "10px",
+            backgroundColor: accessibilityMode ? "#FFD700" : "#800000",
+            color: accessibilityMode ? "#000" : "#fff",
+            border: "none",
+            cursor: "pointer",
+            width: "220px",
+            transition: "all 0.2s ease",
+          }}
         >
-          Accessibility Mode: ON
-        </span>
-      </button>
+          Allergy Filter
+        </button>
+      </div>
 
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
@@ -1343,17 +1596,17 @@ export default function KioskPage() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: accessibilityMode
-                        ? "repeat(auto-fit, minmax(300px, 1fr))"
-                        : "repeat(auto-fit, minmax(220px, 1fr))",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                      justifyItems: "center",
                       gap: accessibilityMode ? "40px" : "25px",
                       marginTop: "20px",
                       marginBottom: "30px",
                     }}
                   >
-                    {menuItems
-                      .filter((item) => item.category === cat)
-                      .map((item) => {
+                    {filteredMenuItems
+                        .filter((item) => item.category === cat)
+                        .map((item) => {
+
                         const isPressed =
                           selectedItem === item.id;
                         return (
@@ -1392,21 +1645,34 @@ export default function KioskPage() {
                               userSelect: "none",
                             }}
                           >
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              onError={(e) => {
-                                e.target.src =
-                                  "/images/default.png";
-                              }}
+                            <div
                               style={{
                                 width: "100%",
-                                height: "200px",
-                                objectFit: "cover",
+                                height: "180px",           
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                overflow: "hidden",
+                                backgroundColor: "#f5f5f5",
                                 borderRadius: "15px",
                                 marginBottom: "15px",
                               }}
-                            />
+                            >
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                onError={(e) => {
+                                  e.target.src = "/Images/default.png";
+                                }}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",   
+                                }}
+                              />
+                            </div>
+
+
                             <h3
                               style={{
                                 fontSize: accessibilityMode
@@ -1424,7 +1690,7 @@ export default function KioskPage() {
                                   : "18px",
                               }}
                             >
-                              ${Number(item.price).toFixed(2)}
+                              ${Number(item.finalPrice || item.price).toFixed(2)}
                             </p>
                             {item.description && (
                               <p
@@ -1438,6 +1704,23 @@ export default function KioskPage() {
                                 {item.description}
                               </p>
                             )}
+                              {/* ALLERGY ICONS */}
+                              {item.allergies && item.allergies.length > 0 && (
+                                <div style={{ marginTop: "10px", display: "flex", gap: "8px" }}>
+                                  {item.allergies.includes("Dairy") && (
+                                    <span style={{ fontSize: "20px" }}>🥛</span>
+                                  )}
+                                  {item.allergies.includes("Nuts") && (
+                                    <span style={{ fontSize: "20px" }}>🥜</span>
+                                  )}
+                                  {item.allergies.includes("Soy") && (
+                                    <span style={{ fontSize: "20px" }}>🌱</span>
+                                  )}
+                                  {item.allergies.includes("Gluten") && (
+                                    <span style={{ fontSize: "20px" }}>🌾</span>
+                                  )}
+                                </div>
+                              )}
                           </div>
                         );
                       })}
@@ -1478,8 +1761,8 @@ export default function KioskPage() {
           window.location.href = "/";
         }}
         style={{
-          position: "fixed",
-          bottom: "20px",
+          position: "absolute",
+          top: "200px",
           left: "20px",
           padding: "16px 24px",
           backgroundColor: "#500000",
