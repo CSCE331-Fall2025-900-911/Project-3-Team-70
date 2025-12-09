@@ -2,6 +2,7 @@ import { query } from "../../lib/db-connector.js";
 
 export default async function handler(req, res) {
   try {
+<<<<<<< HEAD
     const result = await query(`
       SELECT 
         m.menuID AS id,
@@ -20,6 +21,14 @@ export default async function handler(req, res) {
       GROUP BY m.menuID
       ORDER BY m.menuID;
     `);
+=======
+    const result = await query(
+      `SELECT menuID, menuName, category, price, menuImage, menuDescription,
+              seasonalStart, seasonalEnd
+       FROM menu
+       WHERE isActive = TRUE;`
+    );
+>>>>>>> origin/manager
 
     res.status(200).json(result.rows);
   } catch (err) {
