@@ -26,6 +26,9 @@ export default function ManagerPage() {
   const ALWAYS_INCLUDED_INGREDIENTS = [28, 29, 30, 31, 32];
   // ===== ADD MENU ITEM MODAL STATE =====
   const [showAddMenuModal, setShowAddMenuModal] = useState(false);
+  const [isEditingMenu, setIsEditingMenu] = useState(false);
+  const [selectedMenuItem, setSelectedMenuItem] = useState(null);
+
 
   // ===== INVENTORY MODAL STATE =====
   const [showInventoryModal, setShowInventoryModal] = useState(false);
@@ -266,17 +269,37 @@ async function generateZReport() {
 
   // Event Handlers ===================================================
   function handleAddMenuItem() {
-    // Pre-load auto-included ingredients
-    setNewMenuIngredients(
-        ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
-            inventoryID: id,
-            quantity: 1   // Or 0 if you prefer
-        }))
-    );
+      // Pre-load auto-included ingredients
+      setNewMenuIngredients(
+          ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
+              inventoryID: id,
+              quantity: 1   // Or 0 if you prefer
+          }))
+      );
 
+      setShowAddMenuModal(true);
+    }
+    function handleUpdateMenuItem() {
+    if (!selectedMenuItem) {
+      alert("Select a menu item to update.");
+      return;
+    }
+
+    setIsEditingMenu(true);
     setShowAddMenuModal(true);
+
+    // Prefill modal fields with existing menu data
+    setNewMenuName(selectedMenuItem.name);
+    setNewMenuCategory(selectedMenuItem.category);
+    setNewCategoryInput("");  // in case they switch to "new category"
+    setNewMenuPrice(selectedMenuItem.price);
+    setNewMenuDescription(selectedMenuItem.description || "");
+    setNewMenuStart(selectedMenuItem.seasonalStart?.slice(0, 10));
+    setNewMenuEnd(selectedMenuItem.seasonalEnd?.slice(0, 10));
+
+    // TODO: ingredients — can add after kiosk/cashier work is merged
   }
-  function handleUpdateMenuItem() { console.log("Update menu item"); }
+
   function handleAddInventory() {
     setIsEditingInventory(false);
 
@@ -430,6 +453,57 @@ async function generateZReport() {
           description: newMenuDescription,
           ingredients: newMenuIngredients
         };
+        // If editing, send update instead of create
+        if (isEditingMenu) {
+          const updatePayload = {
+            id: selectedMenuId,
+            name: newMenuName,
+            category: categoryToSave,
+            price: parseFloat(newMenuPrice),
+            description: newMenuDescription,
+            seasonalStart: `${newMenuStart} 00:00:00`,
+            seasonalEnd: `${newMenuEnd} 23:59:59`
+          };
+
+          const res = await fetch("/api/menu/update", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatePayload),
+          });
+
+          if (!res.ok) {
+            alert("Error updating menu item.");
+            return;
+          }
+
+          alert("Menu item updated!");
+
+          setIsEditingMenu(false);
+          setShowAddMenuModal(false);
+
+          // Reload menu items
+          const refreshed = await fetch("/api/menu");
+          const updated = await refreshed.json();
+
+          setMenuItems(
+            updated.map(item => ({
+              id: item.menuid,
+              name: item.menuname,
+              category: item.category,
+              price: Number(item.price),
+              seasonal:
+                item.seasonalstart && item.seasonalend
+                  ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
+                  : "All Year",
+              seasonalStart: item.seasonalstart,
+              seasonalEnd: item.seasonalend,
+              description: item.menudescription || ""
+            }))
+          );
+
+          return;
+        }
+
 
 
           const res = await fetch("/api/menu/create", {
@@ -732,7 +806,11 @@ useEffect(() => {
 			{filteredMenu.map((m) => (
 				<tr
           key={m.id}
-          onClick={() => setSelectedMenuId(m.id)}
+          onClick={() => {
+            setSelectedMenuId(m.id);
+            setSelectedMenuItem(m);   // <-- needed for update
+          }}
+
           className={selectedMenuId === m.id ? styles.selectedRow : ""}
           style={{ cursor: "pointer" }}
         >
@@ -1091,7 +1169,10 @@ useEffect(() => {
 
           {/* ACTION BUTTONS */}
           <div className={styles.modalButtons}>
-            <button onClick={() => setShowAddMenuModal(false)}>Cancel</button>
+            <button onClick={() => {
+              setShowAddMenuModal(false);
+              setIsEditingMenu(false);
+            }}>Cancel</button>
             <button className={styles.primary} onClick={submitNewMenuItem}>Add Item</button>
           </div>
 
