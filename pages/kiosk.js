@@ -865,7 +865,7 @@ export default function KioskPage() {
                 }}
               >
                 <button
-                  onClick={() => removeItem(index)}
+                  onPointerUp={() => removeItem(index)}
                   style={{
                     position: "absolute",
                     top: accessibilityMode ? "15px" : "10px",
@@ -907,7 +907,7 @@ export default function KioskPage() {
                   <strong>Quantity:</strong>{" "}
                   <button
                     type="button"
-                    onClick={() =>
+                    onPointerUp={() =>
                       updateQuantity(
                         index,
                         Number(item.quantity || 1) - 1
@@ -929,7 +929,7 @@ export default function KioskPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() =>
+                    onPointerUp={() =>
                       updateQuantity(
                         index,
                         Number(item.quantity || 1) + 1
@@ -1070,7 +1070,7 @@ export default function KioskPage() {
                   >
                     <button
                       type="button"
-                      onClick={() => changePointsBy(-1)}
+                      onPointerUp={() => changePointsBy(-1)}
                       style={{
                         width: accessibilityMode ? "70px" : "56px",
                         height: accessibilityMode ? "70px" : "56px",
@@ -1116,7 +1116,7 @@ export default function KioskPage() {
 
                     <button
                       type="button"
-                      onClick={() => changePointsBy(1)}
+                      onPointerUp={() => changePointsBy(1)}
                       style={{
                         width: accessibilityMode ? "70px" : "56px",
                         height: accessibilityMode ? "70px" : "56px",
@@ -1148,7 +1148,7 @@ export default function KioskPage() {
                   >
                     <button
                       type="button"
-                      onClick={() =>
+                      onPointerUp={() =>
                         setPointsToRedeem(maxRedeemable)
                       }
                       style={{
@@ -1164,7 +1164,7 @@ export default function KioskPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPointsToRedeem(0)}
+                      onPointerUp={() => setPointsToRedeem(0)}
                       style={{
                         padding: "8px 14px",
                         borderRadius: "8px",
@@ -1223,7 +1223,7 @@ export default function KioskPage() {
 
         <button
           type="button"
-          onClick={() => setScreen("payment")}
+          onPointerUp={() => setScreen("payment")}
           disabled={cart.length === 0}
           style={{
             padding: accessibilityMode ? "28px 50px" : "20px 40px",
@@ -1244,7 +1244,7 @@ export default function KioskPage() {
 
         <button
           type="button"
-          onClick={() => setScreen("menu")}
+          onPointerUp={() => setScreen("menu")}
           style={{
             padding: accessibilityMode ? "22px 40px" : "15px 30px",
             backgroundColor: accessibilityMode ? "#555" : "#ccc",
