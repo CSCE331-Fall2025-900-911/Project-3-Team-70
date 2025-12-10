@@ -110,6 +110,7 @@ export default function CashierPage() {
 
     return matchCat && matchQuery;
   });
+  const categories = ["all", ...Array.from(new Set(menuItems.map(i => i.category)))].sort();
 
   // Add to order
   const addToOrder = (item) => {
@@ -258,14 +259,7 @@ export default function CashierPage() {
             />
 
             <div className="category-tabs">
-              {[
-                "all",
-                "Ice-Blended",
-                "Fruity Beverage",
-                "Fresh Brew",
-                "Milky Series",
-                "Non-Caffeinated",
-              ].map((cat) => (
+              {categories.map((cat) => (
                 <button
                   key={cat}
                   className={`tab ${filter === cat ? "active" : ""}`}
