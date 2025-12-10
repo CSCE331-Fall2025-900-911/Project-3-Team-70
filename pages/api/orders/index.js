@@ -87,7 +87,7 @@ async function handleCreateOrder(req, res) {
         Number(item.priceAtPurchase || 0),
         Number(item.quantity || 0),
         orderID,
-        item.size ?? null
+        mapSizeToInt(item.size)
       );
     }
 
@@ -130,7 +130,7 @@ async function handleCreateOrder(req, res) {
     return res.status(201).json({
       success: true,
       orderID,
-      orderTotal,
+      orderTotal: Number(orderTotal),
     });
 
   } catch (err) {
