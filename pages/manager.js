@@ -14,6 +14,22 @@ function toLocal(ts) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000);
 }
 
+function getLocalYMD(ts) {
+  const d = new Date(ts);
+  return {
+    y: d.getFullYear(),
+    m: d.getMonth() + 1,
+    d: d.getDate()
+  };
+}
+
+function isSameLocalDay(tsA, tsB) {
+  const a = getLocalYMD(tsA);
+  const b = getLocalYMD(tsB);
+  return a.y === b.y && a.m === b.m && a.d === b.d;
+}
+
+
 export default function ManagerPage() {
   const [salesSummary, setSalesSummary] = useState(null);
   const [salesHourly, setSalesHourly] = useState([]);
@@ -154,9 +170,7 @@ const [inventory, setInventory] = useState([]);
         if (!o.orderdate) return false;
 
         const tsLocal = toLocal(o.orderdate);
-        const dateOnly = tsLocal.toLocaleDateString("en-CA");
-
-        return dateOnly === today;
+        return isSameLocalDay(o.orderdate, new Date());
       });
 
       // ===== GROUP INTO HOUR BLOCKS =====
@@ -220,8 +234,9 @@ const [inventory, setInventory] = useState([]);
           quantity: Number(i.quantityavailable || 0),
           restockMin: Number(i.restockmin || 0),
           unit: i.unit,
-          restockOrdered: Number(i.restockordered || 0)
-
+          allergy: i.allergy,
+          restockOrdered: Number(i.restockordered || 0),
+          isTopping: Boolean(i.istopping)   // ← add this
         }));
 
         setInventory(normalized);
@@ -251,9 +266,7 @@ async function generateZReport() {
       if (!o.orderdate) return false;
 
       const tsLocal = toLocal(o.orderdate);  // convert UTC → local
-      const dateOnly = tsLocal.toLocaleDateString("en-CA");
-
-      return dateOnly === today;
+      return isSameLocalDay(o.orderdate, new Date());
     });
 
     // Compute total revenue
@@ -493,7 +506,8 @@ async function handleUpdateMenuItem() {
       restockMin: Number(i.restockmin || 0),
       unit: i.unit,
       allergy: i.allergy,
-      restockOrdered: Number(i.restockordered || 0)
+      restockOrdered: Number(i.restockordered || 0),
+      isTopping: Boolean(i.istopping)
     }));
 
     setInventory(normalized);
@@ -533,7 +547,8 @@ async function handleUpdateMenuItem() {
             price: parseFloat(newMenuPrice),
             description: newMenuDescription,
             seasonalStart: `${newMenuStart} 00:00:00`,
-            seasonalEnd: `${newMenuEnd} 23:59:59`
+            seasonalEnd: `${newMenuEnd} 23:59:59`,
+            ingredients: newMenuIngredients   // ← REQUIRED FIX
           };
 
           const res = await fetch("/api/menu/update", {
@@ -665,7 +680,8 @@ async function handleUpdateMenuItem() {
       restockMin: Number(invMin),
       unit: invUnit,
       allergy: invAllergy || null,
-      restockOrdered: isEditingInventory ? inventory.find(x => x.id === invID)?.restockOrdered || 0 : 0
+      restockOrdered: isEditingInventory ? inventory.find(x => x.id === invID)?.restockOrdered || 0 : 0,
+      isTopping: inventory.find(x => x.id === invID)?.isTopping ?? false
     };
 
     const method = isEditingInventory ? "PUT" : "POST";
@@ -694,6 +710,8 @@ async function handleUpdateMenuItem() {
         restockMin: Number(i.restockmin || 0),
         unit: i.unit,
         allergy: i.allergy,
+        restockOrdered: Number(i.restockordered || 0),
+        isTopping: i.istopping
       }))
     );
   } 
