@@ -1,8 +1,8 @@
-DROP TABLE modification;
-DROP TABLE menuInfo;
-DROP TABLE orderItem;
-DROP TABLE locationTable;
-DROP TABLE menu;
-DROP TABLE orderTest;
-DROP TABLE employee;
-DROP TABLE inventory;
+DROP TABLE IF EXISTS modification;
+DROP TABLE IF EXISTS menuInfo;
+DROP TABLE IF EXISTS orderItem;
+DROP TABLE IF EXISTS orderTest;
+DROP TABLE IF EXISTS menu;
+DROP TABLE IF EXISTS inventory;
+DROP TABLE IF EXISTS employee;
+DROP TABLE IF EXISTS locationTable;

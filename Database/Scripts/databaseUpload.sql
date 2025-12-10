@@ -1,19 +1,20 @@
+------------------------------------------------------------
+-- MENU
+------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS menu (
     menuID INT PRIMARY KEY,
     menuName VARCHAR,
     category VARCHAR,
-    price DECIMAL,
+    price NUMERIC,
     menuImage INT,
     menuDescription VARCHAR,
     seasonalStart TIMESTAMP,
-    seasonalEnd TIMESTAMP
+    seasonalEnd TIMESTAMP,
+    isActive BOOLEAN NOT NULL DEFAULT true
 );
 
 DROP TABLE IF EXISTS staging_menu;
---two new columns in menu for availability with their start and end date (done)
---have cashier controller check if item is available (within those days)
---cashier controller has a private variable (check currdatetime) should have date set 
---use this to make sure that the private variable is within the start and end date for the item to appear
+
 CREATE TEMP TABLE staging_menu (
     menuID INT,
     menuName VARCHAR,
@@ -24,10 +25,13 @@ CREATE TEMP TABLE staging_menu (
     seasonalStart TIMESTAMP,
     seasonalEnd TIMESTAMP
 );
-\copy staging_menu FROM 'Database/DatabaseSeed/menu.csv' CSV HEADER
 
-INSERT INTO menu (menuID, menuName, category, price, menuImage, menuDescription, seasonalStart, seasonalEnd)
-SELECT menuID, menuName, category, price, menuImage, menuDescription, seasonalStart, seasonalEnd FROM staging_menu
+\copy staging_menu FROM 'Database/DatabaseSeed/menu.csv' CSV HEADER;
+
+INSERT INTO menu (menuID, menuName, category, price, menuImage, menuDescription, seasonalStart, seasonalEnd, isActive)
+SELECT menuID, menuName, category, price, menuImage, menuDescription, seasonalStart, seasonalEnd,
+       COALESCE(isActive, true)
+FROM staging_menu
 ON CONFLICT (menuID) DO UPDATE
 SET menuName = EXCLUDED.menuName,
     category = EXCLUDED.category,
@@ -35,8 +39,13 @@ SET menuName = EXCLUDED.menuName,
     menuImage = EXCLUDED.menuImage,
     menuDescription = EXCLUDED.menuDescription,
     seasonalStart = EXCLUDED.seasonalStart,
-    seasonalEnd = EXCLUDED.seasonalEnd;
+    seasonalEnd = EXCLUDED.seasonalEnd,
+    isActive = EXCLUDED.isActive;
 
+
+------------------------------------------------------------
+-- EMPLOYEE
+------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS employee (
     employeeID INT PRIMARY KEY,
     employeeName VARCHAR,
@@ -53,27 +62,30 @@ CREATE TEMP TABLE staging_employee (
     employeePasscode VARCHAR
 );
 
-\copy staging_employee FROM 'Database/DatabaseSeed/employee.csv' CSV HEADER
+\copy staging_employee FROM 'Database/DatabaseSeed/employee.csv' CSV HEADER;
 
 INSERT INTO employee (employeeID, employeeName, employeePosition, employeePasscode)
-SELECT employeeID, employeeName, employeePosition, employeePasscode FROM staging_employee
+SELECT employeeID, employeeName, employeePosition, employeePasscode
+FROM staging_employee
 ON CONFLICT (employeeID) DO UPDATE
 SET employeeName = EXCLUDED.employeeName,
     employeePosition = EXCLUDED.employeePosition,
     employeePasscode = EXCLUDED.employeePasscode;
 
-CREATE TABLE IF NOT EXISTS ordertest (
+
+------------------------------------------------------------
+-- ORDERTEST
+------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS orderTest (
     orderID INT PRIMARY KEY,
-    employeeID INT,
-    FOREIGN KEY (employeeID) REFERENCES employee(employeeID),
+    employeeID INT REFERENCES employee(employeeID),
     orderLocation VARCHAR,
     orderDate TIMESTAMP,
-    orderTotal DECIMAL,
+    orderTotal NUMERIC,
     orderComplete BOOLEAN DEFAULT false,
     customerEmail VARCHAR,
     orderSource VARCHAR DEFAULT 'kiosk'
 );
-
 
 DROP TABLE IF EXISTS staging_order;
 
@@ -82,16 +94,17 @@ CREATE TEMP TABLE staging_order (
     employeeID INT,
     orderLocation VARCHAR,
     orderDate TIMESTAMP,
-    orderTotal DECIMAL,
-    orderComplete BOOLEAN DEFAULT false,
+    orderTotal NUMERIC,
+    orderComplete BOOLEAN,
     customerEmail VARCHAR,
-    orderSource VARCHAR DEFAULT 'kiosk'
+    orderSource VARCHAR
 );
 
-\copy staging_order FROM 'Database/DatabaseSeed/order.csv' CSV HEADER
+\copy staging_order FROM 'Database/DatabaseSeed/order.csv' CSV HEADER;
 
-INSERT INTO ordertest (orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, customerEmail, orderSource)
-SELECT orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, customerEmail, orderSource FROM staging_order
+INSERT INTO orderTest (orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, customerEmail, orderSource)
+SELECT orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, customerEmail, orderSource
+FROM staging_order
 ON CONFLICT (orderID) DO UPDATE
 SET employeeID = EXCLUDED.employeeID,
     orderLocation = EXCLUDED.orderLocation,
@@ -101,33 +114,35 @@ SET employeeID = EXCLUDED.employeeID,
     customerEmail = EXCLUDED.customerEmail,
     orderSource = EXCLUDED.orderSource;
 
---OrderItemID,MenuID,Price,QuantityPurchased,OrderID,Size
+
+------------------------------------------------------------
+-- ORDER ITEM
+------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS orderItem (
-    orderItemID INT PRIMARY KEY, 
-    menuID INT,
-    FOREIGN KEY (menuID) REFERENCES menu(menuID),
-    priceAtPurchase DECIMAL,
-    quantityPurchased DECIMAL,
-    orderID INT,
-    FOREIGN KEY (orderID) REFERENCES ordertest(orderID),
+    orderItemID INT PRIMARY KEY,
+    menuID INT REFERENCES menu(menuID),
+    priceAtPurchase NUMERIC,
+    quantityPurchased NUMERIC,
+    orderID INT REFERENCES orderTest(orderID),
     orderSize INT
 );
 
 DROP TABLE IF EXISTS staging_item;
 
-CREATE TEMP TABLE staging_item(
+CREATE TEMP TABLE staging_item (
     orderItemID INT,
     menuID INT,
-    priceAtPurchase DECIMAL,
-    quantityPurchased DECIMAL,
+    priceAtPurchase NUMERIC,
+    quantityPurchased NUMERIC,
     orderID INT,
     orderSize INT
 );
 
-\copy staging_item FROM 'Database/DatabaseSeed/orderItem.csv' CSV HEADER
+\copy staging_item FROM 'Database/DatabaseSeed/orderItem.csv' CSV HEADER;
 
 INSERT INTO orderItem (orderItemID, menuID, priceAtPurchase, quantityPurchased, orderID, orderSize)
-SELECT orderItemID, menuID, priceAtPurchase, quantityPurchased, orderID, orderSize FROM staging_item
+SELECT orderItemID, menuID, priceAtPurchase, quantityPurchased, orderID, orderSize
+FROM staging_item
 ON CONFLICT (orderItemID) DO UPDATE
 SET menuID = EXCLUDED.menuID,
     priceAtPurchase = EXCLUDED.priceAtPurchase,
@@ -135,16 +150,21 @@ SET menuID = EXCLUDED.menuID,
     orderID = EXCLUDED.orderID,
     orderSize = EXCLUDED.orderSize;
 
+
+------------------------------------------------------------
+-- INVENTORY (includes new isTopping boolean)
+------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS inventory (
     inventoryID INT PRIMARY KEY,
     inventoryName VARCHAR,
-    quantityAvailable DECIMAL,
-    restockPrice DECIMAL,
-    addOnPrice DECIMAL,
+    quantityAvailable NUMERIC,
+    restockPrice NUMERIC,
+    addOnPrice NUMERIC,
     restockOrdered INT,
     unit VARCHAR,
     allergy VARCHAR,
-    restockMin INT
+    restockMin INT,
+    isTopping BOOLEAN DEFAULT false
 );
 
 DROP TABLE IF EXISTS staging_inventory;
@@ -152,19 +172,22 @@ DROP TABLE IF EXISTS staging_inventory;
 CREATE TEMP TABLE staging_inventory (
     inventoryID INT,
     inventoryName VARCHAR,
-    quantityAvailable DECIMAL,
-    restockPrice DECIMAL,
-    addOnPrice DECIMAL,
+    quantityAvailable NUMERIC,
+    restockPrice NUMERIC,
+    addOnPrice NUMERIC,
     restockOrdered INT,
     unit VARCHAR,
     allergy VARCHAR,
-    restockMin INT
+    restockMin INT,
+    isTopping BOOLEAN
 );
 
-\copy staging_inventory FROM 'Database/DatabaseSeed/inventory.csv' CSV HEADER
+\copy staging_inventory FROM 'Database/DatabaseSeed/inventory.csv' CSV HEADER;
 
-INSERT INTO inventory (inventoryID, inventoryName, quantityAvailable, restockPrice, addOnPrice, restockOrdered, unit, allergy, restockMin)
-SELECT inventoryID, inventoryName, quantityAvailable, restockPrice, addOnPrice, restockOrdered, unit, allergy, restockMin FROM staging_inventory
+INSERT INTO inventory (inventoryID, inventoryName, quantityAvailable, restockPrice, addOnPrice, restockOrdered, unit, allergy, restockMin, isTopping)
+SELECT inventoryID, inventoryName, quantityAvailable, restockPrice, addOnPrice, restockOrdered, unit, allergy, restockMin,
+       COALESCE(isTopping, false)
+FROM staging_inventory
 ON CONFLICT (inventoryID) DO UPDATE
 SET inventoryName = EXCLUDED.inventoryName,
     quantityAvailable = EXCLUDED.quantityAvailable,
@@ -173,8 +196,13 @@ SET inventoryName = EXCLUDED.inventoryName,
     restockOrdered = EXCLUDED.restockOrdered,
     unit = EXCLUDED.unit,
     allergy = EXCLUDED.allergy,
-    restockMin = EXCLUDED.restockMin;
+    restockMin = EXCLUDED.restockMin,
+    isTopping = EXCLUDED.isTopping;
 
+
+------------------------------------------------------------
+-- LOCATION TABLE
+------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS locationTable (
     locationID INT PRIMARY KEY,
     locationName VARCHAR,
@@ -191,23 +219,26 @@ CREATE TEMP TABLE staging_location (
     locationPhoneNum VARCHAR
 );
 
-\copy staging_location FROM 'Database/DatabaseSeed/location.csv' CSV HEADER
+\copy staging_location FROM 'Database/DatabaseSeed/location.csv' CSV HEADER;
 
 INSERT INTO locationTable (locationID, locationName, locationAddress, locationPhoneNum)
-SELECT locationID, locationName, locationAddress, locationPhoneNum FROM staging_location
+SELECT locationID, locationName, locationAddress, locationPhoneNum
+FROM staging_location
 ON CONFLICT (locationID) DO UPDATE
 SET locationName = EXCLUDED.locationName,
     locationAddress = EXCLUDED.locationAddress,
     locationPhoneNum = EXCLUDED.locationPhoneNum;
 
+
+------------------------------------------------------------
+-- MODIFICATION
+------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS modification (
     modificationID INT PRIMARY KEY,
-    inventoryID INT,
-    FOREIGN KEY (inventoryID) REFERENCES inventory(inventoryID),
-    orderItemID INT,
-    FOREIGN KEY (orderItemID) REFERENCES orderItem(orderItemID),
-    modificationQuantity DECIMAL,
-    cost DECIMAL
+    inventoryID INT REFERENCES inventory(inventoryID),
+    orderItemID INT REFERENCES orderItem(orderItemID),
+    modificationQuantity NUMERIC,
+    cost NUMERIC
 );
 
 DROP TABLE IF EXISTS staging_modification;
@@ -216,27 +247,30 @@ CREATE TEMP TABLE staging_modification (
     modificationID INT,
     inventoryID INT,
     orderItemID INT,
-    modificationQuantity DECIMAL,
-    cost DECIMAL
+    modificationQuantity NUMERIC,
+    cost NUMERIC
 );
 
-\copy staging_modification FROM 'Database/DatabaseSeed/modifications.csv' CSV HEADER
+\copy staging_modification FROM 'Database/DatabaseSeed/modifications.csv' CSV HEADER;
 
 INSERT INTO modification (modificationID, inventoryID, orderItemID, modificationQuantity, cost)
-SELECT modificationID, inventoryID, orderItemID, modificationQuantity, cost FROM staging_modification
+SELECT modificationID, inventoryID, orderItemID, modificationQuantity, cost
+FROM staging_modification
 ON CONFLICT (modificationID) DO UPDATE
 SET inventoryID = EXCLUDED.inventoryID,
     orderItemID = EXCLUDED.orderItemID,
     modificationQuantity = EXCLUDED.modificationQuantity,
     cost = EXCLUDED.cost;
 
+
+------------------------------------------------------------
+-- MENU INFO
+------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS menuInfo (
     menuInfoID INT PRIMARY KEY,
-    inventoryID INT,
-    FOREIGN KEY (inventoryID) REFERENCES inventory(inventoryID),
-    menuID INT,
-    FOREIGN KEY (menuID) REFERENCES menu(menuID),
-    menuInfoQuantity DECIMAL
+    inventoryID INT REFERENCES inventory(inventoryID),
+    menuID INT REFERENCES menu(menuID),
+    menuInfoQuantity NUMERIC
 );
 
 DROP TABLE IF EXISTS staging_menuInfo;
@@ -245,29 +279,23 @@ CREATE TEMP TABLE staging_menuInfo (
     menuInfoID INT,
     inventoryID INT,
     menuID INT,
-    menuInfoQuantity DECIMAL
+    menuInfoQuantity NUMERIC
 );
 
-\copy staging_menuInfo FROM 'Database/DatabaseSeed/menuInfo.csv' CSV HEADER
+\copy staging_menuInfo FROM 'Database/DatabaseSeed/menuInfo.csv' CSV HEADER;
 
 INSERT INTO menuInfo (menuInfoID, inventoryID, menuID, menuInfoQuantity)
-SELECT menuInfoID, inventoryID, menuID, menuInfoQuantity FROM staging_menuInfo
+SELECT menuInfoID, inventoryID, menuID, menuInfoQuantity
+FROM staging_menuInfo
 ON CONFLICT (menuInfoID) DO UPDATE
 SET inventoryID = EXCLUDED.inventoryID,
     menuID = EXCLUDED.menuID,
     menuInfoQuantity = EXCLUDED.menuInfoQuantity;
 
-CREATE TABLE IF NOT EXISTS app_users (
-    userID SERIAL PRIMARY KEY,
-    userEmail VARCHAR UNIQUE NOT NULL,
-    userName VARCHAR,
-    userRole VARCHAR DEFAULT 'customer',
-    userCreationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    loyaltyPoints INT DEFAULT 0,
-    loyaltyUpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
-
+------------------------------------------------------------
+-- TEMP TABLE CLEANUP
+------------------------------------------------------------
 DROP TABLE IF EXISTS staging_menu;
 DROP TABLE IF EXISTS staging_menuInfo;
 DROP TABLE IF EXISTS staging_order;
@@ -276,3 +304,10 @@ DROP TABLE IF EXISTS staging_inventory;
 DROP TABLE IF EXISTS staging_location;
 DROP TABLE IF EXISTS staging_modification;
 DROP TABLE IF EXISTS staging_employee;
+
+------------------------------------------------------------
+-- APP USERS (optional seed section, uncomment if needed)
+------------------------------------------------------------
+-- INSERT INTO app_users (userEmail, userName, userRole)
+-- VALUES ('test@example.com','Test User','customer')
+-- ON CONFLICT (userEmail) DO NOTHING;
