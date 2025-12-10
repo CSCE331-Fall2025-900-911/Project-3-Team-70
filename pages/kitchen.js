@@ -163,14 +163,7 @@ export default function KitchenPage() {
                     {/* Line total (base + add-ons) */}
                     <div className="line-price">
                       ${(
-                        Number(item.priceatpurchase || 0) * Number(item.quantitypurchased || 0) +
-                        (Array.isArray(item.modifications)
-                          ? item.modifications.reduce(
-                              (sum, mod) =>
-                                sum + Number(mod.cost || 0) * Number(mod.modificationquantity || 1),
-                             0
-                            )
-                          : 0)
+                        Number(item.priceatpurchase || 0) * Number(item.quantitypurchased || 0)
                       ).toFixed(2)}
                     </div>
                     
