@@ -150,30 +150,76 @@ export default function CashierPage() {
     }
 
     try {
-      const items = order.map((i) => {
-        // Convert toppings → kiosk format
-        const toppingMods = (i.modifications?.toppings || []).map((t) => ({
-          inventoryID: t.id,
-          name: t.name,
-          cost: 1.0,
-          quantity: 1
-        }));
+    const items = order.map((i) => {
+      const toppingMods = (i.modifications?.toppings || []).map((t) => ({
+        inventoryID: t.id,
+        name: t.name,
+        cost: 1.0,
+        quantity: 1,
+      }));
 
-        return {
-          menuID: i.id,
-          quantity: i.qty,
-          priceAtPurchase: Number(i.price || 0),
+      // Convert sweetness/ice/temp → inventory IDs
+      const MODIFIER_IDS = {
+        // Sweetness
+        "0%": 41,
+        "25%": 42,
+        "50%": 43,
+        "75%": 44,
+        "100%": 45,
+        "125%": 52,
+        "150%": 53,
 
-          // KIOSK-COMPATIBLE FORMAT
-          size: i.modifications?.size ?? null,
-          sweetness: i.modifications?.sweetness ?? null,
-          ice: i.modifications?.ice ?? null,
-          temperature: i.modifications?.temperature ?? null,
+        // Ice
+        "No Ice": 48,
+        "Less Ice": 47,
+        "Regular Ice": 46,
+        "Extra Ice": 49,
 
-          // Kitchen reads these:
-          modifications: toppingMods
-        };
-      });
+        // Temp
+        "Cold": 50,
+        "Hot": 51,
+      };
+
+      const virtualMods = [];
+
+      if (i.modifications?.sweetness) {
+        virtualMods.push({
+          inventoryID: MODIFIER_IDS[i.modifications.sweetness] ?? null,
+          name: `Sweetness ${i.modifications.sweetness}`,
+          cost: 0,
+          quantity: 1,
+        });
+      }
+
+      if (i.modifications?.temperature) {
+        virtualMods.push({
+          inventoryID: MODIFIER_IDS[i.modifications.temperature] ?? null,
+          name: `Temperature: ${i.modifications.temperature}`,
+          cost: 0,
+          quantity: 1,
+        });
+      }
+
+      if (i.modifications?.ice) {
+        virtualMods.push({
+          inventoryID: MODIFIER_IDS[i.modifications.ice] ?? null,
+          name: `Ice: ${i.modifications.ice}`,
+          cost: 0,
+          quantity: 1,
+        });
+      }
+
+      return {
+        menuID: i.id,
+        quantity: i.qty,
+        priceAtPurchase: Number(i.price || 0),
+
+        size: i.modifications?.size ?? null,
+
+        // The kitchen reads ONLY this array
+        modifications: [...toppingMods, ...virtualMods],
+      };
+    });
 
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -244,7 +290,7 @@ export default function CashierPage() {
       toppings: modToppings,
       size: modSize,
       sweetness: modSweetness,
-      ice: modIce,
+      ice: modTemp === "Hot" ? null : modIce,
       temperature: modTemp,
       finalPrice,
     };
@@ -487,28 +533,33 @@ export default function CashierPage() {
                 className="search"
                 style={{ padding: "8px", borderRadius: "8px" }}
               >
-                <option>None</option>
-                <option>Easy</option>
-                <option>Regular</option>
-                <option>Extra</option>
+                <option>0%</option>
+                <option>25%</option>
+                <option>50%</option>
+                <option>75%</option>
+                <option>100%</option>
+                <option>125%</option>
+                <option>150%</option>
               </select>
             </div>
 
             {/* ICE */}
-            <div className="mod-section">
-              <p>Ice Level:</p>
-              <select
-                value={modIce}
-                onChange={(e) => setModIce(e.target.value)}
-                className="search"
-                style={{ padding: "8px", borderRadius: "8px" }}
-              >
-                <option>No Ice</option>
-                <option>Easy Ice</option>
-                <option>Regular Ice</option>
-                <option>Extra Ice</option>
-              </select>
-            </div>
+            {modTemp === "Cold" && (
+              <div className="mod-section">
+                <p>Ice Level:</p>
+                <select
+                  value={modIce}
+                  onChange={(e) => setModIce(e.target.value)}
+                  className="search"
+                  style={{ padding: "8px", borderRadius: "8px" }}
+                >
+                  <option>No Ice</option>
+                  <option>Easy Ice</option>
+                  <option>Regular Ice</option>
+                  <option>Extra Ice</option>
+                </select>
+              </div>
+            )}
 
             {/* TEMP */}
             <div className="mod-section">
