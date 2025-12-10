@@ -316,13 +316,9 @@ export default function KioskPage() {
   });
   const [lastPointsSummary, setLastPointsSummary] = useState(null);
 
-  const categories = [
-    "Ice-Blended",
-    "Fruity Beverage",
-    "Fresh Brew",
-    "Milky Series",
-    "Non-Caffeinated",
-  ];
+  const categories = Array.from(
+  new Set(menuItems.map(item => item.category).filter(Boolean))
+);
 
   const [accessibilityLabel, setAccessibilityLabel] = useState({
     on: "Accessibility Mode: ON",
