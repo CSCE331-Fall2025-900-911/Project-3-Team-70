@@ -3,27 +3,30 @@ import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { QRCodeCanvas } from "qrcode.react";
 
-// === SEND ORDERS TO BACKEND ===
-async function sendOrderToSystem(order, session) {
-  const rawItems = Array.isArray(order)
-    ? order
-    : (order && order.items) || [];
-
+// === SEND ORDERS TO BACKEND (DB-backed orderID) ===
+async function sendOrderToSystem(
+  cart,
+  source = "kiosk",
+  orderLocation = "Kiosk",
+  customerEmail = null
+) {
   try {
-    const items = rawItems.map((i) => ({
-      menuID: i.menuid,                      // FIXED
-      quantity: Number(i.quantity || 1),     // matches kiosk
-      priceAtPurchase: Number(i.price || 0),
-      size: null,
+    if (!cart || cart.length === 0) return null;
+
+    const items = cart.map((item) => ({
+      menuID: item.id,
+      quantity: 1,
+      priceAtPurchase: Number(item.finalPrice || item.price || 0),
+      size: item.size ?? null,
     }));
 
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        source: "kiosk",
-        orderLocation: "Kiosk",
-        customerEmail: session?.user?.email || null,   // ★ REQUIRED
+        source,
+        orderLocation,
+        customerEmail,
         items,
       }),
     });
@@ -36,7 +39,6 @@ async function sendOrderToSystem(order, session) {
     }
 
     const data = await res.json();
-    // API returns { success, orderID, orderTotal }
     return {
       orderID: data.orderID,
       orderTotal: data.orderTotal,
@@ -1054,9 +1056,18 @@ const DrinkDetailsPage = () => {
     const paymentMethods = ["Card", "Tap to Pay", "Mobile Wallet", "Cash"];
 
     const handlePayment = async () => {
-      const result = await sendOrderToSystem(cart, "kiosk", "Kiosk");
-      if (!result) return;
-
+      const result = await sendOrderToSystem(
+        cart,
+        "kiosk",
+        "Kiosk",
+        session?.user?.email ?? null
+      );
+    
+      if (!result || !result.orderID) {
+        alert("Order failed: no order ID returned.");
+        return;
+      }
+    
       setLastOrderId(result.orderID);
       setScreen("success");
     };
@@ -1197,17 +1208,122 @@ const DrinkDetailsPage = () => {
     );
   };
 
-  const SuccessScreen = () => (
-      <div style={{ padding: "40px", textAlign: "center" }}>
-        <h1 style={{ fontSize: "48px" }}>Payment Successful!</h1>
-        <p style={{ fontSize: "24px", marginTop: "20px" }}>
+  // === SUCCESS / RECEIPT SCREEN WITH QR CODE ===
+  const SuccessScreen = ({ accessibilityMode, orderId }) => {
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.finalPrice || item.price || 0),
+      0
+    );
+    const now = new Date();
+
+    return (
+      <div
+        style={{
+          padding: "40px",
+          textAlign: "center",
+          backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
+          color: accessibilityMode ? "#fff" : "#000",
+          minHeight: "100vh",
+        }}
+      >
+        <h1 style={{ fontSize: "48px", marginBottom: "10px" }}>
+          Payment Successful!
+        </h1>
+        <p style={{ fontSize: "24px", marginBottom: "30px" }}>
           Thank you for your order.
         </p>
 
+        <div
+          style={{
+            maxWidth: "480px",
+            margin: "0 auto",
+            textAlign: "left",
+            backgroundColor: "#fff",
+            color: "#000",
+            borderRadius: "16px",
+            padding: "24px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "28px",
+              marginBottom: "8px",
+              borderBottom: "1px solid #ddd",
+              paddingBottom: "8px",
+            }}
+          >
+            Receipt
+          </h2>
+
+          <div style={{ fontSize: "14px", marginBottom: "12px", color: "#555" }}>
+            <div>Order ID: <strong>{orderId}</strong></div>
+            <div>
+              Date: {now.toLocaleDateString()}{" "}
+              {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </div>
+          </div>
+
+          {/* QR CODE */}
+          {orderId && (
+            <div style={{ textAlign: "center", margin: "20px 0" }}>
+              <p style={{ fontSize: "14px", marginBottom: "8px" }}>Scan to view your order:</p>
+              <QRCodeCanvas
+                value={`/receipt?orderid=${orderId}`}
+                size={160}
+                includeMargin={true}
+                fgColor="#000"
+                bgColor="#fff"
+                style={{ borderRadius: "8px" }}
+              />
+            </div>
+          )}
+
+          <div
+            style={{
+              borderTop: "1px dashed #ccc",
+              paddingTop: "10px",
+              marginTop: "10px",
+              maxHeight: "260px",
+              overflowY: "auto",
+            }}
+          >
+            {cart.map((item, idx) => (
+              <div
+                key={`${item.id}-${idx}`}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "6px",
+                  fontSize: "16px",
+                }}
+              >
+                <span>{item.name}</span>
+                <span>${Number(item.finalPrice || item.price).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              borderTop: "1px solid #000",
+              marginTop: "12px",
+              paddingTop: "12px",
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "18px",
+              fontWeight: "bold",
+            }}
+          >
+            <span>Total</span>
+            <span>${total.toFixed(2)}</span>
+          </div>
+        </div>
+
         <button
-          onClick={async () => {
-            await sendOrderToSystem(cart, session);
+          onClick={() => {
             setCart([]);
+            setLastOrderId(null);
             setScreen("menu");
           }}
           style={{
@@ -1216,7 +1332,7 @@ const DrinkDetailsPage = () => {
             border: "none",
             borderRadius: "10px",
             fontSize: "24px",
-            marginTop: "30px",
+            marginTop: "40px",
             cursor: "pointer",
           }}
         >
@@ -1224,6 +1340,7 @@ const DrinkDetailsPage = () => {
         </button>
       </div>
     );
+  };
 
     const AllergyFilterPanel = () => {
       const allergens = ["Dairy", "Nuts"]; // from DB
