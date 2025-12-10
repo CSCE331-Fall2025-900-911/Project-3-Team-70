@@ -1,111 +1,158 @@
 // pages/auth/employee-access.js
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useRouter } from "next/router";
+import { useSession, signIn } from "next-auth/react";
+import Link from "next/link";
 
-export default function EmployeeAccess() {
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState("");
+export default function EmployeeAccessPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-  const submit = async (e) => {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setErr("");
+    setError("");
 
+    if (!session?.user?.email) {
+      setError("Please sign in with Google first.");
+      return;
+    }
+
+    setLoading(true);
     try {
-      const res = await fetch("/api/staff/verify-password", {
+      // 1) Verify employee password
+      const res = await fetch("/api/verify-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password: pw,
-          requestedRole: "employee",
-        }),
+        body: JSON.stringify({ role: "employee", password }),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setErr(data.error || "Invalid password");
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        console.error("Failed to parse JSON from /api/verify-password:", jsonErr);
+        setError("Server returned an invalid response.");
+        setLoading(false);
         return;
       }
 
-      await signIn("google", {
-        callbackUrl: "/cashier",
+      if (!res.ok || !data.ok) {
+        setError(data?.error || "Incorrect employee password.");
+        setLoading(false);
+        return;
+      }
+
+      // 2) Update role in DB
+      const roleRes = await fetch("/api/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "employee" }),
       });
-    } catch (error) {
-      console.error("Employee access error:", error);
-      setErr("Something went wrong. Please try again.");
+
+      let roleData;
+      try {
+        roleData = await roleRes.json();
+      } catch (jsonErr) {
+        console.error("Failed to parse JSON from /api/role:", jsonErr);
+        setError("Server returned an invalid response.");
+        setLoading(false);
+        return;
+      }
+
+      if (!roleRes.ok || !roleData?.success) {
+        setError(roleData?.error || "Could not set employee role.");
+        setLoading(false);
+        return;
+      }
+
+      // 3) Go to cashier
+      router.push("/cashier");
+    } catch (err) {
+      console.error("Unexpected error in employee-access:", err);
+      setError("Unexpected error. Please try again.");
+      setLoading(false);
     }
   };
 
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#020617",
-        color: "#f9fafb",
-      }}
-    >
-      <div
-        style={{
-          padding: 24,
-          borderRadius: 12,
-          border: "1px solid #374151",
-          background: "#111827",
-          maxWidth: 360,
-          width: "100%",
-        }}
-      >
-        <h1 style={{ fontSize: 24, marginBottom: 16 }}>
-          Employee Access
-        </h1>
-        <p style={{ fontSize: 14, marginBottom: 16 }}>
-          Enter the employee password, then sign in with Google.
-        </p>
+  if (status === "loading") {
+    return <p style={{ padding: "20px" }}>Loading session…</p>;
+  }
 
-        <form
-          onSubmit={submit}
+  if (!session) {
+    return (
+      <div style={{ padding: "20px" }}>
+        <h1>Employee Access</h1>
+        <p>You must sign in with Google before entering the employee area.</p>
+        <button
+          onClick={() => signIn("google", { callbackUrl: "/auth/employee-access" })}
           style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
+            padding: "12px 24px",
+            backgroundColor: "#500000",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
           }}
         >
-          <input
-            type="password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            placeholder="Employee Password"
-            style={{
-              padding: "8px 10px",
-              borderRadius: 999,
-              border: "1px solid #4b5563",
-              background: "#020617",
-              color: "#f9fafb",
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              padding: "10px 14px",
-              borderRadius: 999,
-              border: "1px solid #22c55e",
-              background: "#22c55e",
-              color: "#022c22",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            Continue with Google
-          </button>
-        </form>
-
-        {err && (
-          <p style={{ color: "#fca5a5", marginTop: 10, fontSize: 14 }}>
-            {err}
-          </p>
-        )}
+          Sign in with Google
+        </button>
+        <p style={{ marginTop: "10px" }}>
+          <Link href="/">Back to home</Link>
+        </p>
       </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h1>Employee Access</h1>
+      <p>Signed in as {session.user.email}</p>
+      <p>Enter the employee password to access Cashier & Kitchen.</p>
+
+      <form onSubmit={handleSubmit} style={{ maxWidth: "320px" }}>
+        <input
+          type="password"
+          placeholder="Employee password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            margin: "10px 0",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+          }}
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "10px",
+            backgroundColor: "#500000",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
+          {loading ? "Checking..." : "Enter Employee Area"}
+        </button>
+      </form>
+
+      {error && (
+        <p style={{ color: "red", marginTop: "10px" }}>
+          {error}
+        </p>
+      )}
+
+      <p style={{ marginTop: "10px" }}>
+        <Link href="/">Back to home</Link>
+      </p>
     </div>
   );
 }
