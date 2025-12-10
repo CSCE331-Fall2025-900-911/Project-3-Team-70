@@ -40,82 +40,80 @@ async function handleGet(req, res) {
   let where;
 
   if (type === "current") {
-    where = "orderComplete = FALSE AND DATE(orderDate) = CURRENT_DATE";
+    where =
+      "orderComplete = FALSE AND DATE(orderDate) = CURRENT_DATE";
   } else if (type === "completed") {
-    where = "orderComplete = TRUE AND DATE(orderDate) = CURRENT_DATE";
+    where =
+      "orderComplete = TRUE AND DATE(orderDate) = CURRENT_DATE";
   } else {
     return res
       .status(400)
       .json({ error: "Specify ?type=current or ?type=completed" });
   }
 
-  // Fetch the base order information
+  // Get orders
   const { rows: orders } = await query(
     `
     SELECT
-      orderID,
-      employeeID,
-      orderLocation,
-      orderDate,
-      orderTotal,
-      orderComplete,
-      customerEmail,
-      orderSource
+      orderid,
+      employeeid,
+      orderlocation,
+      orderdate,
+      ordertotal,
+      ordercomplete,
+      customeremail,
+      ordersource
     FROM ordertest
     WHERE ${where}
-    ORDER BY orderDate DESC
+    ORDER BY orderdate DESC
     `
   );
 
-  if (orders.length === 0) {
-    return res.status(200).json([]);
+  // For each order fetch items and their modifications
+  for (const order of orders) {
+    const { rows: items } = await query(
+      `
+      SELECT
+        oi.orderitemid,
+        oi.menuid,
+        m.menuname,
+        oi.priceatpurchase,
+        oi.quantitypurchased,
+        oi.ordersize
+      FROM orderitem oi
+      LEFT JOIN menu m ON m.menuid = oi.menuid
+      WHERE oi.orderid = $1
+      ORDER BY oi.orderitemid
+      `,
+      [order.orderid]
+    );
+
+    for (const item of items) {
+      const { rows: mods } = await query(
+        `
+        SELECT
+          mod.modificationid,
+          inv.inventoryname,
+          inv.allergy,
+          mod.modificationquantity,
+          mod.cost
+        FROM modification mod
+        LEFT JOIN inventory inv ON inv.inventoryid = mod.inventoryid
+        WHERE mod.orderitemid = $1
+        ORDER BY mod.modificationid
+        `,
+        [item.orderitemid]
+      );
+
+      item.modifications = mods;
+    }
+
+    order.items = items;
   }
 
-  const ids = orders.map((o) => o.orderid);
-
-  // Fetch all items for these orders
-  const { rows: items } = await query(
-    `
-      SELECT
-        orderID,
-        itemName,
-        itemQuantity,
-        itemPrice,
-        itemSize,
-        itemToppings,
-        itemModifications
-      FROM orderItem oi
-      WHERE orderID = ANY($1)
-      ORDER BY orderID
-    `,
-    [ids]
-  );
-
-  // Group items by orderID
-  const itemMap = {};
-  items.forEach((it) => {
-    if (!itemMap[it.orderid]) itemMap[it.orderid] = [];
-
-    itemMap[it.orderid].push({
-      name: it.itemname,
-      qty: it.itemquantity,
-      price: Number(it.itemprice),
-      modifications: {
-        size: it.itemsize,
-        toppings: it.itemtoppings || [],
-        extras: it.itemmodifications || []
-      }
-    });
-  });
-
-  // Attach items into orders
-  const finalOrders = orders.map((order) => ({
-    ...order,
-    items: itemMap[order.orderid] || []
-  }));
-
-  return res.status(200).json(finalOrders);
+  return res.status(200).json(orders);
 }
+
 
 async function handlePatch(req, res) {
   const { id } = req.query;
