@@ -3,22 +3,47 @@ import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { QRCodeCanvas } from "qrcode.react";
 
+// Texas state sales tax: 6.25%
+const TAX_RATE = 0.0625;
+
 // === SEND ORDERS TO BACKEND (DB-backed orderID) ===
 async function sendOrderToSystem(
   cart,
   source = "kiosk",
   orderLocation = "Kiosk",
-  customerEmail = null
+  customerEmail = null,
+  summary = null
 ) {
   try {
     if (!cart || cart.length === 0) return null;
 
     const items = cart.map((item) => ({
       menuID: item.id,
-      quantity: 1,
+      quantity: item.quantity || 1,
       priceAtPurchase: Number(item.finalPrice || item.price || 0),
       size: item.size ?? null,
     }));
+
+    // Fallback if no summary provided
+    const fallbackSubtotal = items.reduce(
+      (sum, item) =>
+        sum +
+        Number(item.priceAtPurchase || 0) * Number(item.quantity || 0),
+      0
+    );
+
+    const orderSubtotal = summary?.subtotal ?? fallbackSubtotal;
+    const discountAmount = summary?.discount ?? 0;
+    const taxAmount =
+      summary?.tax ??
+      Number(
+        ((orderSubtotal - discountAmount) * TAX_RATE).toFixed(2)
+      );
+    const finalTotal =
+      summary?.total ??
+      Number(
+        (orderSubtotal - discountAmount + taxAmount).toFixed(2)
+      );
 
     const res = await fetch("/api/orders", {
       method: "POST",
@@ -28,6 +53,10 @@ async function sendOrderToSystem(
         orderLocation,
         customerEmail,
         items,
+        orderSubtotal,
+        taxAmount,
+        discountAmount,
+        finalTotal,
       }),
     });
 
@@ -42,6 +71,9 @@ async function sendOrderToSystem(
     return {
       orderID: data.orderID,
       orderTotal: data.orderTotal,
+      subtotal: data.subtotal,
+      discount: data.discount,
+      tax: data.tax,
     };
   } catch (err) {
     console.error("Error sending order:", err);
@@ -202,38 +234,47 @@ export default function KioskPage() {
   const [excludedAllergies, setExcludedAllergies] = useState([]);
   const [filteredMenuItems, setFilteredMenuItems] = useState([]);
 
-  useEffect(() => {
-    const newFiltered = filterByAllergies(menuItems, excludedAllergies);
-    setFilteredMenuItems(newFiltered);
-  }, [menuItems, excludedAllergies]);
-
-// Generate categories dynamically from menu data
-const categories = Array.from(
-  new Set(menuItems.map((item) => item.category))
-).sort();
-
-  const [accessibilityLabel, setAccessibilityLabel] = useState({
-    on: "Accessibility Mode: ON",
-    off: "Accessibility Mode: OFF",
-  });
-
-  // Single source of truth for session (for rewards + sign-in)
   const { data: session } = useSession();
 
   const [loyaltyPoints, setLoyaltyPoints] = useState(null);
   const [pointsError, setPointsError] = useState(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
+  const [orderSummary, setOrderSummary] = useState({
+    subtotal: 0,
+    discount: 0,
+    tax: 0,
+    total: 0,
+    pointsSpent: 0,
+  });
+  const [lastPointsSummary, setLastPointsSummary] = useState(null);
+
+  const categories = [
+    "Ice-Blended",
+    "Fruity Beverage",
+    "Fresh Brew",
+    "Milky Series",
+    "Non-Caffeinated",
+  ];
+
+  const [accessibilityLabel, setAccessibilityLabel] = useState({
+    on: "Accessibility Mode: ON",
+    off: "Accessibility Mode: OFF",
+  });
+
   function filterByAllergies(items, excludedAllergies) {
     if (excludedAllergies.length === 0) return items;
 
     return items.filter((item) => {
       if (!item.allergies || item.allergies.length === 0) return true;
-
-      // If ANY allergen in the item matches one the user wants to avoid → hide it
       return !item.allergies.some((a) => excludedAllergies.includes(a));
     });
   }
+
+  useEffect(() => {
+    const newFiltered = filterByAllergies(menuItems, excludedAllergies);
+    setFilteredMenuItems(newFiltered);
+  }, [menuItems, excludedAllergies]);
 
   // Load rewards points for logged-in customers
   useEffect(() => {
@@ -391,7 +432,7 @@ const categories = Array.from(
   };
 
   const addToCart = (item) => {
-    setCart((prev) => [...prev, item]);
+    setCart((prev) => [...prev, { ...item, quantity: 1 }]);
     if (narrationOn) {
       speak(`${item.name} added to cart.`, language);
     }
@@ -407,7 +448,6 @@ const categories = Array.from(
 
     if (!detailsItem) return null;
 
-    // Match by ID, not object reference
     const toggleTopping = (topping) => {
       setSelectedToppings((prev) =>
         prev.some((t) => t.id === topping.id)
@@ -420,7 +460,6 @@ const categories = Array.from(
       Number(detailsItem.price) +
       selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
 
-    // === SIZE PRICE ADJUSTMENT ===
     let finalPrice = totalPrice;
     if (size === "Small") finalPrice -= 0.5;
     if (size === "Large") finalPrice += 0.5;
@@ -464,8 +503,7 @@ const categories = Array.from(
             borderRadius: "10px",
             fontSize: "18px",
             cursor: "pointer",
-            fontFamily:
-              "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           ← Back
@@ -502,8 +540,7 @@ const categories = Array.from(
             width: "80%",
             margin: "0 auto",
             marginBottom: "40px",
-            fontFamily:
-              "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           {detailsItem.description}
@@ -516,8 +553,7 @@ const categories = Array.from(
               margin: "20px auto",
               width: "80%",
               textAlign: "left",
-              fontFamily:
-                "'Helvetica Neue', Helvetica, Arial, sans-serif",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             }}
           >
             <h3
@@ -690,7 +726,7 @@ const categories = Array.from(
         <h2
           style={{ marginTop: "30px", fontSize: "30px" }}
         >
-          Total: ${finalPrice.toFixed(2)}
+          Price per drink: ${finalPrice.toFixed(2)}
         </h2>
 
         <button
@@ -703,8 +739,7 @@ const categories = Array.from(
             borderRadius: "15px",
             fontSize: "26px",
             cursor: "pointer",
-            fontFamily:
-              "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           Add to Cart
@@ -713,13 +748,8 @@ const categories = Array.from(
     );
   };
 
-  // === CART / CHECKOUT SCREEN WITH POINT REDEMPTION ===
-  const CartScreen = ({
-    accessibilityMode,
-    speak,
-    narrationOn,
-    language,
-  }) => {
+  // === CART / CHECKOUT SCREEN WITH QUANTITY + POINT REDEMPTION ===
+  const CartScreen = () => {
     // Narrate upon entering the cart page
     useEffect(() => {
       if (narrationOn) {
@@ -731,22 +761,28 @@ const categories = Array.from(
     }, [narrationOn, language]);
 
     const removeItem = (indexToRemove) => {
+      setCart((prev) => prev.filter((_, i) => i !== indexToRemove));
+    };
+
+    const updateQuantity = (index, newQty) => {
+      if (newQty < 1) newQty = 1;
       setCart((prev) =>
-        prev.filter((_, i) => i !== indexToRemove)
+        prev.map((item, i) =>
+          i === index ? { ...item, quantity: newQty } : item
+        )
       );
     };
 
-    // Subtotal (no discounts yet)
+    // Subtotal (no discounts yet), respecting quantity
     const cartSubtotal = cart.reduce(
       (sum, item) =>
         sum +
-        Number(
-          item.finalPrice || item.finalPrice || item.price || 0
-        ),
+        Number(item.finalPrice || item.price || 0) *
+          Number(item.quantity || 1),
       0
     );
 
-    // 1 point = $1 discount, consistent with your old CheckoutScreen
+    // 1 point = $1 discount
     const maxRedeemable =
       session?.user?.email && typeof loyaltyPoints === "number"
         ? Math.min(loyaltyPoints, Math.floor(cartSubtotal))
@@ -757,7 +793,31 @@ const categories = Array.from(
       maxRedeemable
     );
 
-    const finalTotal = Math.max(cartSubtotal - applied, 0);
+    // Tax after discount
+    const taxable = Math.max(cartSubtotal - applied, 0);
+    const taxAmount = Number((taxable * TAX_RATE).toFixed(2));
+    const finalTotal = Number(
+      (taxable + taxAmount).toFixed(2)
+    );
+
+    // Keep a summary ready for payment & receipt
+    useEffect(() => {
+      setOrderSummary({
+        subtotal: Number(cartSubtotal.toFixed(2)),
+        discount: applied,
+        tax: taxAmount,
+        total: finalTotal,
+        pointsSpent: applied,
+      });
+    }, [cartSubtotal, applied, taxAmount, finalTotal]);
+
+    // helper for changing points nicely
+    const changePointsBy = (delta) => {
+      let val = Number(pointsToRedeem || 0) + delta;
+      if (val < 0) val = 0;
+      if (val > maxRedeemable) val = maxRedeemable;
+      setPointsToRedeem(val);
+    };
 
     return (
       <div
@@ -767,6 +827,7 @@ const categories = Array.from(
           color: accessibilityMode ? "#fff" : "#000",
           minHeight: "100vh",
           transition: "all 0.3s ease",
+          pointerEvents: "auto",
         }}
       >
         <h2
@@ -786,105 +847,166 @@ const categories = Array.from(
             Your cart is empty.
           </p>
         ) : (
-          cart.map((item, index) => (
-            <div
-              key={index}
-              style={{
-                padding: accessibilityMode ? "25px" : "15px",
-                margin: "15px 0",
-                border: accessibilityMode
-                  ? "2px solid #FFD700"
-                  : "1px solid #ccc",
-                borderRadius: "12px",
-                fontSize: accessibilityMode ? "26px" : "20px",
-                backgroundColor: accessibilityMode
-                  ? "#111"
-                  : "#fafafa",
-                color: accessibilityMode ? "#fff" : "#000",
-                position: "relative",
-              }}
-            >
-              <button
-                onClick={() => removeItem(index)}
+          cart.map((item, index) => {
+            const lineTotal =
+              Number(item.finalPrice || item.price || 0) *
+              Number(item.quantity || 1);
+
+            return (
+              <div
+                key={index}
                 style={{
-                  position: "absolute",
-                  top: accessibilityMode ? "15px" : "10px",
-                  right: accessibilityMode ? "15px" : "10px",
-                  backgroundColor: "#b00000",
-                  color: "white",
-                  border: "none",
-                  padding: accessibilityMode
-                    ? "12px 18px"
-                    : "8px 14px",
-                  borderRadius: "8px",
-                  fontSize: accessibilityMode
-                    ? "20px"
-                    : "16px",
-                  cursor: "pointer",
-                  marginTop: "10px",
+                  padding: accessibilityMode ? "25px" : "15px",
+                  margin: "15px 0",
+                  border: accessibilityMode
+                    ? "2px solid #FFD700"
+                    : "1px solid #ccc",
+                  borderRadius: "12px",
+                  fontSize: accessibilityMode ? "26px" : "20px",
+                  backgroundColor: accessibilityMode
+                    ? "#111"
+                    : "#fafafa",
+                  color: accessibilityMode ? "#fff" : "#000",
+                  position: "relative",
                 }}
               >
-                Remove
-              </button>
+                <button
+                  onPointerUp={() => removeItem(index)}
+                  style={{
+                    position: "absolute",
+                    top: accessibilityMode ? "15px" : "10px",
+                    right: accessibilityMode ? "15px" : "10px",
+                    backgroundColor: "#b00000",
+                    color: "white",
+                    border: "none",
+                    padding: accessibilityMode
+                      ? "12px 18px"
+                      : "8px 14px",
+                    borderRadius: "8px",
+                    fontSize: accessibilityMode ? "20px" : "16px",
+                    cursor: "pointer",
+                    marginTop: "10px",
+                  }}
+                >
+                  Remove
+                </button>
 
-              <p
-                style={{
-                  fontSize: accessibilityMode ? "32px" : "24px",
-                  fontWeight: "bold",
-                  marginBottom: "10px",
-                }}
-              >
-                {item.name} — $
-                {Number(
-                  item.finalPrice || item.finalPrice || item.price
-                ).toFixed(2)}
-              </p>
-
-              {item.sweetness && (
-                <p style={{ margin: "5px 0" }}>
-                  <strong>Sweetness:</strong> {item.sweetness}
+                <p
+                  style={{
+                    fontSize: accessibilityMode ? "32px" : "24px",
+                    fontWeight: "bold",
+                    marginBottom: "10px",
+                  }}
+                >
+                  {item.name}
                 </p>
-              )}
 
-              {item.temperature && (
                 <p style={{ margin: "5px 0" }}>
-                  <strong>Temperature:</strong>{" "}
-                  {item.temperature}
+                  <strong>Price per drink:</strong> $
+                  {Number(
+                    item.finalPrice || item.price || 0
+                  ).toFixed(2)}
                 </p>
-              )}
 
-              {item.iceLevel && (
+                {/* Quantity controls */}
                 <p style={{ margin: "5px 0" }}>
-                  <strong>Ice:</strong> {item.iceLevel}
-                </p>
-              )}
-
-              {item.size && (
-                <p style={{ margin: "5px 0" }}>
-                  <strong>Size:</strong> {item.size}
-                </p>
-              )}
-
-              {item.toppings && item.toppings.length > 0 && (
-                <div style={{ marginTop: "10px" }}>
-                  <strong>Toppings:</strong>
-                  <ul
+                  <strong>Quantity:</strong>{" "}
+                  <button
+                    type="button"
+                    onPointerUp={() =>
+                      updateQuantity(
+                        index,
+                        Number(item.quantity || 1) - 1
+                      )
+                    }
                     style={{
-                      marginLeft: "20px",
-                      marginTop: "5px",
+                      marginRight: "8px",
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid #ccc",
+                      backgroundColor: "#fff",
+                      cursor: "pointer",
                     }}
                   >
-                    {item.toppings.map((t, idx) => (
-                      <li key={idx}>
-                        {t.name} (+$
-                        {Number(t.price).toFixed(2)})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ))
+                    -
+                  </button>
+                  <span style={{ margin: "0 8px" }}>
+                    {item.quantity || 1}
+                  </span>
+                  <button
+                    type="button"
+                    onPointerUp={() =>
+                      updateQuantity(
+                        index,
+                        Number(item.quantity || 1) + 1
+                      )
+                    }
+                    style={{
+                      marginLeft: "8px",
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid #ccc",
+                      backgroundColor: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    +
+                  </button>
+                </p>
+
+                {item.sweetness && (
+                  <p style={{ margin: "5px 0" }}>
+                    <strong>Sweetness:</strong>{" "}
+                    {item.sweetness}
+                  </p>
+                )}
+                {item.temperature && (
+                  <p style={{ margin: "5px 0" }}>
+                    <strong>Temperature:</strong>{" "}
+                    {item.temperature}
+                  </p>
+                )}
+                {item.iceLevel && (
+                  <p style={{ margin: "5px 0" }}>
+                    <strong>Ice:</strong> {item.iceLevel}
+                  </p>
+                )}
+                {item.size && (
+                  <p style={{ margin: "5px 0" }}>
+                    <strong>Size:</strong> {item.size}
+                  </p>
+                )}
+
+                {item.toppings && item.toppings.length > 0 && (
+                  <div style={{ marginTop: "10px" }}>
+                    <strong>Toppings:</strong>
+                    <ul
+                      style={{
+                        marginLeft: "20px",
+                        marginTop: "5px",
+                      }}
+                    >
+                      {item.toppings.map((t, idx) => (
+                        <li key={idx}>
+                          {t.name} (+$
+                          {Number(t.price).toFixed(2)})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <p
+                  style={{
+                    marginTop: "8px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Line total: ${lineTotal.toFixed(2)}
+                </p>
+              </div>
+            );
+          })
         )}
 
         {cart.length > 0 && (
@@ -908,17 +1030,15 @@ const categories = Array.from(
                 <div
                   style={{
                     marginTop: "15px",
-                    padding: "12px",
-                    borderRadius: "8px",
+                    padding: "16px",
+                    borderRadius: "10px",
                     backgroundColor: accessibilityMode
                       ? "#111"
                       : "#f0f0f0",
-                    fontSize: accessibilityMode
-                      ? "22px"
-                      : "16px",
+                    fontSize: accessibilityMode ? "22px" : "16px",
                   }}
                 >
-                  <div style={{ marginBottom: "8px" }}>
+                  <div style={{ marginBottom: "10px" }}>
                     You have{" "}
                     <strong>{loyaltyPoints}</strong> points.
                     <br />
@@ -943,27 +1063,84 @@ const categories = Array.from(
                   >
                     Points to redeem:
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={maxRedeemable}
-                    value={pointsToRedeem}
-                    onChange={(e) => {
-                      let val =
-                        Number(e.target.value) || 0;
-                      if (val < 0) val = 0;
-                      if (val > maxRedeemable)
-                        val = maxRedeemable;
-                      setPointsToRedeem(val);
-                    }}
+
+                  {/* BIGGER POINTS CONTROL */}
+                  <div
                     style={{
-                      width: "100%",
-                      padding: "8px",
-                      borderRadius: "6px",
-                      border: "1px solid #ccc",
-                      marginBottom: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: accessibilityMode ? "16px" : "10px",
+                      marginBottom: "12px",
                     }}
-                  />
+                  >
+                    <button
+                      type="button"
+                      onPointerUp={() => changePointsBy(-1)}
+                      style={{
+                        width: accessibilityMode ? "70px" : "56px",
+                        height: accessibilityMode ? "70px" : "56px",
+                        borderRadius: "50%",
+                        border: "none",
+                        fontSize: accessibilityMode ? "32px" : "26px",
+                        fontWeight: "bold",
+                        backgroundColor: "#500000",
+                        color: "#fff",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      −
+                    </button>
+
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      max={maxRedeemable}
+                      value={pointsToRedeem}
+                      onChange={(e) => {
+                        let val = Number(e.target.value) || 0;
+                        if (val < 0) val = 0;
+                        if (val > maxRedeemable)
+                          val = maxRedeemable;
+                        setPointsToRedeem(val);
+                      }}
+                      style={{
+                        flex: "0 0 140px",
+                        textAlign: "center",
+                        padding: accessibilityMode ? "12px" : "8px",
+                        borderRadius: "10px",
+                        border: "1px solid #ccc",
+                        fontSize: accessibilityMode ? "26px" : "20px",
+                        height: accessibilityMode ? "60px" : "48px",
+                        backgroundColor: "#fff",
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onPointerUp={() => changePointsBy(1)}
+                      style={{
+                        width: accessibilityMode ? "70px" : "56px",
+                        height: accessibilityMode ? "70px" : "56px",
+                        borderRadius: "50%",
+                        border: "none",
+                        fontSize: accessibilityMode ? "32px" : "26px",
+                        fontWeight: "bold",
+                        backgroundColor: "#500000",
+                        color: "#fff",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
 
                   <div
                     style={{
@@ -977,12 +1154,12 @@ const categories = Array.from(
                   >
                     <button
                       type="button"
-                      onClick={() =>
+                      onPointerUp={() =>
                         setPointsToRedeem(maxRedeemable)
                       }
                       style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
+                        padding: "8px 14px",
+                        borderRadius: "8px",
                         border: "none",
                         backgroundColor: "#500000",
                         color: "#fff",
@@ -993,10 +1170,10 @@ const categories = Array.from(
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPointsToRedeem(0)}
+                      onPointerUp={() => setPointsToRedeem(0)}
                       style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
+                        padding: "8px 14px",
+                        borderRadius: "8px",
                         border: "none",
                         backgroundColor: "#ccc",
                         color: "#000",
@@ -1018,19 +1195,29 @@ const categories = Array.from(
                     >
                       Discount:{" "}
                       <strong>
-                        -${applied.toFixed(2)} (
-                        {applied} points)
+                        -${applied.toFixed(2)} ({applied} points)
                       </strong>
                     </div>
                   )}
                 </div>
               )}
 
-            {/* Final total */}
+            {/* Tax + Total */}
+            <h3
+              style={{
+                fontSize: accessibilityMode ? "30px" : "22px",
+                marginTop: "10px",
+                textAlign: "right",
+                paddingRight: "10px",
+              }}
+            >
+              Tax (6.25%): ${taxAmount.toFixed(2)}
+            </h3>
+
             <h2
               style={{
                 fontSize: accessibilityMode ? "40px" : "32px",
-                marginTop: "20px",
+                marginTop: "10px",
                 textAlign: "right",
                 paddingRight: "10px",
               }}
@@ -1041,18 +1228,18 @@ const categories = Array.from(
         )}
 
         <button
-          onClick={() => setScreen("payment")}
+          type="button"
+          onPointerUp={() => setScreen("payment")}
           disabled={cart.length === 0}
           style={{
-            padding: accessibilityMode
-              ? "28px 50px"
-              : "20px 40px",
+            padding: accessibilityMode ? "28px 50px" : "20px 40px",
             backgroundColor: "#FFD700",
             border: "none",
             borderRadius: "10px",
             fontSize: accessibilityMode ? "32px" : "24px",
             marginTop: "20px",
-            cursor: cart.length === 0 ? "not-allowed" : "pointer",
+            cursor:
+              cart.length === 0 ? "not-allowed" : "pointer",
             opacity: cart.length === 0 ? 0.6 : 1,
             fontFamily:
               "'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -1062,11 +1249,10 @@ const categories = Array.from(
         </button>
 
         <button
-          onClick={() => setScreen("menu")}
+          type="button"
+          onPointerUp={() => setScreen("menu")}
           style={{
-            padding: accessibilityMode
-              ? "22px 40px"
-              : "15px 30px",
+            padding: accessibilityMode ? "22px 40px" : "15px 30px",
             backgroundColor: accessibilityMode ? "#555" : "#ccc",
             border: "none",
             borderRadius: "10px",
@@ -1084,7 +1270,7 @@ const categories = Array.from(
     );
   };
 
-  // === PAYMENT SCREEN WITH ACCESSIBILITY ONLY WHEN ENABLED + LOYALTY POINTS ===
+  // === PAYMENT SCREEN WITH POINTS + TAX AWARENESS ===
   const PaymentScreen = ({ accessibilityMode }) => {
     const [confirmMethod, setConfirmMethod] = useState(null);
     const paymentMethods = [
@@ -1095,12 +1281,15 @@ const categories = Array.from(
     ];
 
     const handlePayment = async () => {
-      // 1) Create the order in DB
+      setLastPointsSummary(null);
+
+      // 1) Create the order in DB with breakdown
       const result = await sendOrderToSystem(
         cart,
         "kiosk",
         "Kiosk",
-        session?.user?.email ?? null
+        session?.user?.email ?? null,
+        orderSummary
       );
 
       if (!result || !result.orderID) {
@@ -1111,40 +1300,8 @@ const categories = Array.from(
       // 2) If the user is signed in, update loyalty points
       if (session?.user?.email) {
         try {
-          // Recompute subtotal and applied discount just like CartScreen
-          const cartSubtotal = cart.reduce(
-            (sum, item) =>
-              sum +
-              Number(
-                item.finalPrice ||
-                  item.finalPrice ||
-                  item.price ||
-                  0
-              ),
-            0
-          );
-
-          const maxRedeemable =
-            typeof loyaltyPoints === "number"
-              ? Math.min(
-                  loyaltyPoints,
-                  Math.floor(cartSubtotal)
-                )
-              : 0;
-
-          const applied = Math.min(
-            Number(pointsToRedeem || 0),
-            maxRedeemable
-          );
-
-          const netTotal = Math.max(
-            cartSubtotal - applied,
-            0
-          );
-
-          // Example rule: earn 1 point per $1 spent after discount
-          const pointsEarned = Math.floor(netTotal);
-          const pointsSpent = applied;
+          const pointsSpent = orderSummary.pointsSpent || 0;
+          const pointsEarned = Math.floor(orderSummary.total || 0);
 
           const res = await fetch("/api/rewards", {
             method: "POST",
@@ -1157,11 +1314,18 @@ const categories = Array.from(
 
           if (res.ok) {
             const data = await res.json();
-            if (typeof data.loyaltyPoints === "number") {
-              setLoyaltyPoints(data.loyaltyPoints);
-            }
-            // Reset spent points for next order
+            const newPoints =
+              typeof data.loyaltyPoints === "number"
+                ? data.loyaltyPoints
+                : loyaltyPoints;
+
+            setLoyaltyPoints(newPoints);
             setPointsToRedeem(0);
+            setLastPointsSummary({
+              pointsEarned,
+              pointsSpent,
+              pointsAfter: newPoints,
+            });
           } else {
             const data = await res.json().catch(() => ({}));
             console.error(
@@ -1171,7 +1335,6 @@ const categories = Array.from(
           }
         } catch (err) {
           console.error("Error updating rewards:", err);
-          // Don't block the receipt if points update fails.
         }
       }
 
@@ -1182,7 +1345,12 @@ const categories = Array.from(
 
     if (!accessibilityMode) {
       return (
-        <div style={{ padding: "20px" }}>
+        <div
+          style={{
+            padding: "20px",
+            pointerEvents: "auto",
+          }}
+        >
           <h2 style={{ fontSize: "36px" }}>Payment</h2>
 
           <p style={{ fontSize: "22px" }}>
@@ -1241,6 +1409,7 @@ const categories = Array.from(
           minHeight: "100vh",
           fontFamily:
             "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          pointerEvents: "auto",
         }}
       >
         <h2 style={{ fontSize: "44px" }}>Payment</h2>
@@ -1323,14 +1492,26 @@ const categories = Array.from(
     );
   };
 
-  // === SUCCESS / RECEIPT SCREEN WITH QR CODE ===
-  const SuccessScreen = ({ accessibilityMode, orderId }) => {
-    const total = cart.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.finalPrice || item.price || 0),
-      0
-    );
+  // === SUCCESS / RECEIPT SCREEN WITH TAX + POINTS + QR CODE ===
+  const SuccessScreen = ({
+    accessibilityMode,
+    orderId,
+    orderSummary,
+    lastPointsSummary,
+  }) => {
+    const subtotal =
+      orderSummary?.subtotal ??
+      cart.reduce(
+        (sum, item) =>
+          sum +
+          Number(item.finalPrice || item.price || 0) *
+            Number(item.quantity || 1),
+        0
+      );
+    const discount = orderSummary?.discount ?? 0;
+    const tax = orderSummary?.tax ?? 0;
+    const total = orderSummary?.total ?? subtotal - discount + tax;
+
     const now = new Date();
 
     return (
@@ -1343,6 +1524,7 @@ const categories = Array.from(
             : "#f8f0d7ff",
           color: accessibilityMode ? "#fff" : "#000",
           minHeight: "100vh",
+          pointerEvents: "auto",
         }}
       >
         <h1
@@ -1434,41 +1616,141 @@ const categories = Array.from(
               overflowY: "auto",
             }}
           >
-            {cart.map((item, idx) => (
+            {cart.map((item, idx) => {
+              const lineTotal =
+                Number(item.finalPrice || item.price || 0) *
+                Number(item.quantity || 1);
+
+              return (
+                <div
+                  key={`${item.id}-${idx}`}
+                  style={{
+                    marginBottom: "8px",
+                    fontSize: "16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>
+                      {item.name} (x{item.quantity || 1})
+                    </span>
+                    <span>
+                      ${lineTotal.toFixed(2)}
+                    </span>
+                  </div>
+                  {item.size && (
+                    <div style={{ fontSize: "13px", opacity: 0.8 }}>
+                      Size: {item.size}
+                    </div>
+                  )}
+                  {item.toppings &&
+                    item.toppings.length > 0 && (
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          opacity: 0.8,
+                        }}
+                      >
+                        Toppings:{" "}
+                        {item.toppings
+                          .map((t) => t.name)
+                          .join(", ")}
+                      </div>
+                    )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Price breakdown */}
+          <div
+            style={{
+              borderTop: "1px solid #ddd",
+              marginTop: "12px",
+              paddingTop: "12px",
+              fontSize: "16px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "4px",
+              }}
+            >
+              <span>Subtotal</span>
+              <span>${subtotal.toFixed(2)}</span>
+            </div>
+            {discount > 0 && (
               <div
-                key={`${item.id}-${idx}`}
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  marginBottom: "6px",
-                  fontSize: "16px",
+                  marginBottom: "4px",
                 }}
               >
-                <span>{item.name}</span>
-                <span>
-                  $
-                  {Number(
-                    item.finalPrice || item.price
-                  ).toFixed(2)}
-                </span>
+                <span>Discount</span>
+                <span>- ${discount.toFixed(2)}</span>
               </div>
-            ))}
+            )}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "4px",
+              }}
+            >
+              <span>Tax (6.25%)</span>
+              <span>${tax.toFixed(2)}</span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "18px",
+                fontWeight: "bold",
+                marginTop: "6px",
+              }}
+            >
+              <span>Total</span>
+              <span>${total.toFixed(2)}</span>
+            </div>
           </div>
 
-          <div
-            style={{
-              borderTop: "1px solid #000",
-              marginTop: "12px",
-              paddingTop: "12px",
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "18px",
-              fontWeight: "bold",
-            }}
-          >
-            <span>Total</span>
-            <span>${total.toFixed(2)}</span>
-          </div>
+          {/* Points summary if applicable */}
+          {lastPointsSummary && (
+            <div
+              style={{
+                borderTop: "1px dashed #ddd",
+                marginTop: "10px",
+                paddingTop: "10px",
+                fontSize: "14px",
+              }}
+            >
+              <div>
+                Points spent:{" "}
+                <strong>
+                  {lastPointsSummary.pointsSpent}
+                </strong>
+              </div>
+              <div>
+                Points earned:{" "}
+                <strong>
+                  {lastPointsSummary.pointsEarned}
+                </strong>
+              </div>
+              <div>
+                New balance:{" "}
+                <strong>
+                  {lastPointsSummary.pointsAfter}
+                </strong>
+              </div>
+            </div>
+          )}
         </div>
 
         <button
@@ -1494,7 +1776,7 @@ const categories = Array.from(
   };
 
   const AllergyFilterPanel = () => {
-    const allergens = ["Dairy", "Nuts"]; // from DB
+    const allergens = ["Dairy", "Nuts"];
 
     const toggleAllergen = (a) => {
       setExcludedAllergies((prev) =>
@@ -1527,8 +1809,7 @@ const categories = Array.from(
             width: "90%",
             maxWidth: "400px",
             textAlign: "center",
-            fontFamily:
-              "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
           <h2 style={{ marginBottom: "20px" }}>
@@ -1588,6 +1869,7 @@ const categories = Array.from(
         speak={speak}
         narrationOn={narrationOn}
         language={language}
+        setOrderSummary={setOrderSummary}
       />
     );
 
@@ -1603,6 +1885,8 @@ const categories = Array.from(
       <SuccessScreen
         accessibilityMode={accessibilityMode}
         orderId={lastOrderId}
+        orderSummary={orderSummary}
+        lastPointsSummary={lastPointsSummary}
       />
     );
   }
@@ -1619,7 +1903,6 @@ const categories = Array.from(
         minHeight: "100vh",
         padding: accessibilityMode ? "40px" : "20px",
         position: "relative",
-        touchAction: "manipulation",
         transition: "all 0.3s ease",
       }}
     >
@@ -1638,18 +1921,13 @@ const categories = Array.from(
           color: accessibilityMode ? "#fff" : "#000",
           borderRadius: "12px",
           padding: accessibilityMode ? "12px 16px" : "8px 12px",
-          boxShadow: accessibilityMode
-            ? "none"
-            : "0 2px 8px rgba(0,0,0,0.2)",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
           fontSize: accessibilityMode ? "18px" : "14px",
-          fontWeight: accessibilityMode ? "bold" : "normal",
           display: "flex",
           alignItems: "center",
           gap: accessibilityMode ? "12px" : "8px",
           zIndex: 12,
-          transition: "all 0.3s ease",
-          fontFamily:
-            "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         {!session ? (
@@ -1697,6 +1975,7 @@ const categories = Array.from(
         )}
       </div>
 
+      {/* Narration toggle */}
       <button
         onClick={toggleNarration}
         aria-label="Toggle narration mode"
@@ -1775,8 +2054,7 @@ const categories = Array.from(
         style={{
           fontSize: accessibilityMode ? "48px" : "36px",
           marginBottom: accessibilityMode ? "30px" : "20px",
-          fontFamily:
-            "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Sharetea Self-Order Kiosk
@@ -1786,13 +2064,13 @@ const categories = Array.from(
         style={{
           fontSize: accessibilityMode ? "24px" : "18px",
           marginBottom: accessibilityMode ? "30px" : "20px",
-          fontFamily:
-            "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
         Welcome! Tap a drink to start your order.
       </p>
 
+      {/* Category buttons */}
       <div
         style={{
           display: "flex",
@@ -1824,6 +2102,7 @@ const categories = Array.from(
         ))}
       </div>
 
+      {/* Accessibility + Allergy filter */}
       <div
         style={{
           display: "flex",
@@ -1833,7 +2112,6 @@ const categories = Array.from(
           marginBottom: accessibilityMode ? "40px" : "25px",
         }}
       >
-        {/* Accessibility Toggle */}
         <button
           onClick={() =>
             setAccessibilityMode(!accessibilityMode)
@@ -1861,7 +2139,6 @@ const categories = Array.from(
             : "Accessibility Mode: OFF"}
         </button>
 
-        {/* Allergy Filter Button */}
         <button
           onClick={() => setAllergyFilterOpen(true)}
           aria-label="Open Allergy Filter"
@@ -2073,6 +2350,7 @@ const categories = Array.from(
                                 {item.description}
                               </p>
                             )}
+
                             {/* ALLERGY ICONS */}
                             {item.allergies &&
                               item.allergies.length >
