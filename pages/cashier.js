@@ -146,12 +146,30 @@ export default function CashierPage() {
     }
 
     try {
-      const items = order.map((i) => ({
-        menuID: i.id,
-        quantity: i.qty,
-        priceAtPurchase: Number(i.price || 0),
-        modifications: i.modifications || null,
-      }));
+      const items = order.map((i) => {
+        // Convert toppings → kiosk format
+        const toppingMods = (i.modifications?.toppings || []).map((t) => ({
+          inventoryID: t.id,
+          name: t.name,
+          cost: 1.0,
+          quantity: 1
+        }));
+
+        return {
+          menuID: i.id,
+          quantity: i.qty,
+          priceAtPurchase: Number(i.price || 0),
+
+          // KIOSK-COMPATIBLE FORMAT
+          size: i.modifications?.size ?? null,
+          sweetness: i.modifications?.sweetness ?? null,
+          ice: i.modifications?.ice ?? null,
+          temperature: i.modifications?.temperature ?? null,
+
+          // Kitchen reads these:
+          modifications: toppingMods
+        };
+      });
 
       const res = await fetch("/api/orders", {
         method: "POST",
