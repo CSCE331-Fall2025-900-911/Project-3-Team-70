@@ -139,37 +139,54 @@ const [inventory, setInventory] = useState([]);
       const data = await res.json();
       const orders = data.orders || [];
 
-      const today = new Date().toLocaleDateString("en-CA");  
+      const today = new Date().toLocaleDateString("en-CA");
 
+      // Select ONLY today’s orders (LOCAL)
       const todaysOrders = orders.filter(o => {
         if (!o.orderdate) return false;
 
         const tsLocal = toLocal(o.orderdate);
-        const dateOnly = tsLocal.toLocaleDateString("en-CA");  
+        const dateOnly = tsLocal.toLocaleDateString("en-CA");
 
         return dateOnly === today;
       });
 
-      const rows = [];
+      // ===== GROUP INTO HOUR BLOCKS =====
+      const hourlyMap = {};
 
       todaysOrders.forEach(order => {
         const tsLocal = toLocal(order.orderdate);
+        let hour = tsLocal.getHours();  // 0–23
 
-        const formatted = tsLocal.toLocaleString([], {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit"
-        });
+        // Build AM/PM range label
+        const startHour12 = ((hour + 11) % 12) + 1;
+        const endHour24 = hour + 1;
+        const endHour12 = ((endHour24 + 11) % 12) + 1;
 
-        rows.push({
-          time: formatted,
-          item: `Order #${order.orderid}`,
-          price: Number(order.ordertotal),
-          totalRow: false
-        });
+        const startSuffix = hour < 12 ? "AM" : "PM";
+        const endSuffix = endHour24 < 12 ? "AM" : (endHour24 < 24 ? "PM" : "AM");
+
+        const hourLabel = `${startHour12} ${startSuffix} – ${endHour12} ${endSuffix}`;
+
+        if (!hourlyMap[hourLabel]) {
+          hourlyMap[hourLabel] = {
+            hour,
+            hourLabel,
+            revenue: 0,
+          };
+        }
+
+        hourlyMap[hourLabel].revenue += Number(order.ordertotal || 0);
       });
+
+      // Convert object to sorted array (sort by actual hour number)
+      const rows = Object.values(hourlyMap)
+        .sort((a, b) => a.hour - b.hour)
+        .map(h => ({
+          time: h.hourLabel,
+          price: h.revenue,
+          totalRow: false
+        }));
 
       setZReportRows([]);
       setXReportRows(rows);
@@ -1028,25 +1045,23 @@ useEffect(() => {
           </h3>
       
           <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Item</th>
-                <th>Price ($)</th>
+          <thead>
+            <tr>
+              <th>Hour</th>
+              <th>Total ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {xReportRows.map((row, index) => (
+              <tr
+                key={index}
+                style={row.totalRow ? { fontWeight: "bold", background: "#eee" } : {}}
+              >
+                <td>{row.time}</td>
+                <td>{row.price.toFixed(2)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {xReportRows.map((row, index) => (
-                <tr
-                  key={index}
-                  style={row.totalRow ? { fontWeight: "bold", background: "#eee" } : {}}
-                >
-                  <td>{row.time}</td>
-                  <td>{row.item}</td>
-                  <td>{row.price.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
+            ))}
+          </tbody>
           </table>
         </div>
       )}
