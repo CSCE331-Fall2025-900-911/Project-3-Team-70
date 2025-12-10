@@ -1069,7 +1069,9 @@ useEffect(() => {
       </div>
 
       <ul className={styles.restockList}>
-        {inventory.map((i) => (
+        {inventory
+          .filter(i => i.unit !== "mod")
+          .map((i) => (
           <li key={i.id} className={styles.restockItem}>
             <div className={styles.restockMain}>
               <span className={styles.restockName}>{i.name}</span>
