@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getSession } from "next-auth/react";
 
-// 🔐 Protect kitchen: employee OR manager
+// Protect kitchen: employee OR manager
 export async function getServerSideProps(ctx) {
   const session = await getSession(ctx);
 
@@ -95,97 +95,121 @@ export default function KitchenPage() {
               <p>No orders in this view right now.</p>
             )}
 
-            {orders.map((o) => (
-              <div key={o.orderid} className="order-card">
-                <div className="order-header">
-                  <span className="order-id">Order #{o.orderid}</span>
-                  <span className="source-tag">
-                    {o.ordersource === "cashier" ? "Cashier" : "Kiosk"}
-                  </span>
-                </div>
-            <div className="order-body">
-              <p>
-                <strong>Total:</strong>{" "}
-                ${Number(o.ordertotal).toFixed(2)}
-              </p>
-              <p>
-                <strong>Placed:</strong>{" "}
-                {new Date(o.orderdate).toLocaleTimeString()}
-              </p>
+        {orders.map((o) => {
+          // --- Recompute total from items + modifiers ---
+          const computedTotal = Array.isArray(o.items)
+            ? o.items.reduce((orderSum, item) => {
+                const basePrice = Number(item.priceatpurchase ?? item.price ?? 0);
+                const qty = Number(item.quantitypurchased ?? item.quantity ?? 0);
 
-              {o.customeremail && (
-                <p>
-                  <strong>Customer:</strong> {o.customeremail}
-                </p>
-              )}
-              {o.employeeid && (
-                <p>
-                  <strong>Employee ID:</strong> {o.employeeid}
-                </p>
-              )}
+                const modsTotal = Array.isArray(item.modifications)
+                  ? item.modifications.reduce((modSum, mod) => {
+                      const modCost = Number(mod.cost ?? 0);
+                      const modQty = Number(mod.modificationquantity ?? 1);
+                      return modSum + modCost * modQty;
+                    }, 0)
+                  : 0;
 
-            {/* ---------- ORDER ITEMS ---------- */}
-            <div className="order-items">
-              <strong>Items:</strong>
+                // assume modifier cost is per drink; multiply whole line by qty
+                return orderSum + (basePrice + modsTotal) * qty;
+              }, 0)
+            : 0;
 
-              {o.items && o.items.length > 0 ? (
-                o.items.map((item, idx) => (
-                  <div className="order-line" key={idx}>
-                  
-                    {/* Base item */}
-                    <div className="line-main">
-                      <span className="line-name">{item.menuname}</span>
-                      <span className="line-qty">x{item.quantitypurchased}</span>
-                    </div>
-                
-                    {/* Size */}
-                    {item.ordersize && (
-                      <div className="line-mod">
-                        Size: {{ 1: "Small", 2: "Medium", 3: "Large" }[item.ordersize]}
-                      </div>
-                    )}
-
-                    {/* --- FIXED — Show modifications safely --- */}
-                    {Array.isArray(item.modifications) && item.modifications.length > 0 && (
-                      <div className="line-mod">
-                        <strong>Add-ons:</strong>{" "}
-                        {item.modifications.map((mod, i) => (
-                          <span key={i}>
-                            {mod.inventoryname}
-                            {mod.modificationquantity ? ` x${mod.modificationquantity}` : ""}
-                            {mod.cost ? ` ($${(mod.cost * (mod.modificationquantity || 1)).toFixed(2)})` : ""}
-                            {i < item.modifications.length - 1 ? ", " : ""}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Line total (base + add-ons) */}
-                    <div className="line-price">
-                      ${(
-                        Number(item.priceatpurchase || 0) * Number(item.quantitypurchased || 0)
-                      ).toFixed(2)}
-                    </div>
-                    
-                    <hr />
-                  </div>
-                ))
-              ) : (
-                <p style={{ fontSize: "13px", opacity: 0.6 }}>(No item details available)</p>
-              )}
-            </div>
-            
-            </div>
-                {tab === "current" && (
-                  <button
-                    className="btn complete"
-                    onClick={() => markComplete(o.orderid)}
-                  >
-                    Mark Complete
-                  </button>
-                )}
+          return (
+            <div key={o.orderid} className="order-card">
+              <div className="order-header">
+                <span className="order-id">Order #{o.orderid}</span>
+                <span className="source-tag">
+                  {o.ordersource === "cashier" ? "Cashier" : "Kiosk"}
+                </span>
               </div>
-            ))}
+
+              <div className="order-body">
+                <p>
+                  <strong>Total:</strong>{" "}
+                  ${computedTotal.toFixed(2)}
+                </p>
+                <p>
+                  <strong>Placed:</strong>{" "}
+                  {new Date(o.orderdate).toLocaleTimeString()}
+                </p>
+
+                {o.customeremail && (
+                  <p>
+                    <strong>Customer:</strong> {o.customeremail}
+                  </p>
+                )}
+                {o.employeeid && (
+                  <p>
+                    <strong>Employee ID:</strong> {o.employeeid}
+                  </p>
+                )}
+
+                {/* ---------- ORDER ITEMS ---------- */}
+                <div className="order-items">
+                  <strong>Items:</strong>
+
+                  {o.items && o.items.length > 0 ? (
+                    o.items.map((item, idx) => (
+                      <div className="order-line" key={idx}>
+                        {/* Base item */}
+                        <div className="line-main">
+                          <span className="line-name">{item.menuname}</span>
+                          <span className="line-qty">x{item.quantitypurchased}</span>
+                        </div>
+
+                        {/* Size */}
+                        {item.ordersize && (
+                          <div className="line-mod">
+                            Size: {{ 1: "Small", 2: "Medium", 3: "Large" }[item.ordersize]}
+                          </div>
+                        )}
+
+                        {/* Modifications */}
+                        {Array.isArray(item.modifications) && item.modifications.length > 0 && (
+                          <div className="line-mod">
+                            <strong>Add-ons:</strong>{" "}
+                            {item.modifications.map((mod, i) => (
+                              <span key={i}>
+                                {mod.inventoryname}
+                                {mod.modificationquantity ? ` x${mod.modificationquantity}` : ""}
+                                {mod.cost ? ` ($${(mod.cost * (mod.modificationquantity || 1)).toFixed(2)})` : ""}
+                                {i < item.modifications.length - 1 ? ", " : ""}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Line total (base only, like before) */}
+                        <div className="line-price">
+                          ${(
+                            Number(item.priceatpurchase || 0) *
+                            Number(item.quantitypurchased || 0)
+                          ).toFixed(2)}
+                        </div>
+
+                        <hr />
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ fontSize: "13px", opacity: 0.6 }}>
+                      (No item details available)
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {tab === "current" && (
+                <button
+                  className="btn complete"
+                  onClick={() => markComplete(o.orderid)}
+                >
+                  Mark Complete
+                </button>
+              )}
+            </div>
+          );
+        })}
           </div>
         )}
       </main>
