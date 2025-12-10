@@ -1,8 +1,6 @@
-// pages/api/reviews.js
-
 export default async function handler(req, res) {
   try {
-    const placeId = "ChIJVeu9i5SDRoYRA6VSX2zIHJM"; // ShareTea address place_id
+    const placeId = "ChIJl47z-XeDRoYRUfI28mv1vS0"; // CORRECT ShareTea business place_id
 
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
@@ -19,7 +17,7 @@ export default async function handler(req, res) {
 
     const { name, rating, user_ratings_total, reviews } = data.result;
 
-    // Filter for >=3 stars, sort by recency, keep 4
+    // Filter for positive reviews, sort by recency, take 4
     const filtered = (reviews || [])
       .filter(r => r.rating >= 3)
       .sort((a, b) => b.time - a.time)
@@ -29,7 +27,7 @@ export default async function handler(req, res) {
       name,
       rating,
       totalReviews: user_ratings_total,
-      reviews: filtered
+      reviews: filtered,
     });
 
   } catch (err) {
