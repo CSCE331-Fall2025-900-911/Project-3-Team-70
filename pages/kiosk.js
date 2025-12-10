@@ -560,7 +560,7 @@ const DrinkDetailsPage = () => {
                     fontSize: "18px",
                   }}
                 >
-                  <label
+                  <div
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -575,7 +575,7 @@ const DrinkDetailsPage = () => {
                       style={{ width: "25px", height: "25px" }}
                     />
                     {top.name}
-                  </label>
+                  </div>
                   
                   <span style={{ fontSize: accessibilityMode ? "22px" : "18px" }}>
                     + ${Number(top.price).toFixed(2)}
@@ -717,9 +717,10 @@ const DrinkDetailsPage = () => {
 };
 
 
+
       const CartScreen = ({ accessibilityMode, speak, narrationOn, language }) => {
 
-        // 🔊 Narrate upon entering the cart page
+        // Narrate upon entering the cart page
         useEffect(() => {
         if (narrationOn) speak("You are now on the cart page. Review your items.", language);
       }, []);
@@ -787,7 +788,6 @@ const DrinkDetailsPage = () => {
                     ? "12px 18px"
                     : "8px 14px",
                   borderRadius: "8px",
-                  fontSize: accessibilityMode ? "20px" : "16px",
                   cursor: "pointer",
                   marginTop: "10px",
                   fontSize: "18px",
@@ -889,6 +889,7 @@ const DrinkDetailsPage = () => {
       </div>
     );
   };
+  
 
       const CheckoutScreen = () => {
       const total = cart.reduce(
@@ -954,19 +955,6 @@ const DrinkDetailsPage = () => {
                 )}
               </div>
 
-              <button
-                onClick={() => removeFromCart(index)}
-                style={{
-                  padding: "8px 14px",
-                  backgroundColor: "#b91c1c",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                }}
-              >
-                Remove
-              </button>
             </div>
           ))}
 
@@ -1426,7 +1414,7 @@ const DrinkDetailsPage = () => {
       <DrinkDetailsPage accessibilityMode={accessibilityMode} />
     );
 
-  if (screen === "cart")
+  if (screen === "cart"){
   return (
     <CartScreen
       accessibilityMode={accessibilityMode}
@@ -1435,6 +1423,7 @@ const DrinkDetailsPage = () => {
       language={language}
     />
   );
+}
 
 
   if (screen === "payment")
