@@ -271,42 +271,77 @@ const [inventory, setInventory] = useState([]);
   }, []);
 
 
-  // NEW — Z REPORT (End of Day Reset) =========================
-async function generateZReport() {
-  try {
-    const res = await fetch("/api/sales");
-    if (!res.ok) throw new Error("Failed to load sales");
+  // NEW — Z REPORT (End of Day Reset, US Central Time aware) =========================
+  async function generateZReport() {
+    try {
+      const res = await fetch("/api/sales");
+      if (!res.ok) throw new Error("Failed to load sales");
 
-    const data = await res.json();
-    console.log("Sales data:", data);
-    const orders = data.orders || [];
+      const data = await res.json();
+      console.log("Sales data:", data);
+      const orders = data.orders || [];
 
-    // Local date for today (YYYY-MM-DD)
-    const today = new Date().toLocaleDateString("en-CA");
+      // ====== HELPER: convert ISO string to Central Time Date ======
+      function toCentral(dateStr) {
+        const dt = new Date(dateStr);
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Chicago",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          hour12: false,
+          minute: "numeric",
+          second: "numeric",
+        }).formatToParts(dt);
 
-    // Select only today's orders (LOCAL time)
-    const todaysOrders = orders.filter(o => {
-      if (!o.orderdate) return false;
+        const y = Number(parts.find(p => p.type === "year").value);
+        const m = Number(parts.find(p => p.type === "month").value) - 1;
+        const d = Number(parts.find(p => p.type === "day").value);
+        const h = Number(parts.find(p => p.type === "hour").value);
+        const min = Number(parts.find(p => p.type === "minute").value);
+        const s = Number(parts.find(p => p.type === "second").value);
 
-      const tsLocal = toLocal(o.orderdate);  // convert UTC → local
-      const dateOnly = tsLocal.toLocaleDateString("en-CA");
+        return new Date(y, m, d, h, min, s); // Central Time date
+      }
 
-      return dateOnly === today;
-    });
+      // ====== TODAY IN CENTRAL TIME ======
+      const nowCentral = toCentral(new Date().toISOString());
+      const startOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        0, 0, 0, 0
+      );
+      const endOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        23, 59, 59, 999
+      );
 
-    // Compute total revenue
-    const totalRevenue = todaysOrders.reduce(
-      (sum, o) => sum + Number(o.ordertotal),
-      0
-    );
+      // ===== FILTER ORDERS BY TODAY (Central Time) =====
+      const todaysOrders = orders.filter(o => {
+        if (!o.orderdate) return false;
+        const tsCentral = toCentral(o.orderdate);
+        return tsCentral >= startOfDay && tsCentral <= endOfDay;
+      });
 
-    setXReportRows([]);
-    setZReportRows([{ label: "Total Revenue", total: totalRevenue }]);
+      // ===== COMPUTE TOTAL REVENUE =====
+      const totalRevenue = todaysOrders.reduce(
+        (sum, o) => sum + Number(o.ordertotal || 0),
+        0
+      );
 
-  } catch (err) {
-    console.error("Error generating Z-Report:", err);
+      // ===== UPDATE STATE =====
+      setXReportRows([]);
+      setZReportRows([{ label: "Total Revenue", total: totalRevenue }]);
+
+    } catch (err) {
+      console.error("Error generating Z-Report:", err);
+    }
   }
-}
+
 
 
 
