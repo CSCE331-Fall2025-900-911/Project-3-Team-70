@@ -131,52 +131,50 @@ const [inventory, setInventory] = useState([]);
 	const [zReportRows, setZReportRows] = useState([]);
 
 	// NEW — X REPORT ============================================
-  async function generateXReport() {
-    try {
-      const res = await fetch("/api/sales");
-      if (!res.ok) throw new Error("Failed to load sales");
+async function generateXReport() {
+  try {
+    const res = await fetch("/api/sales");
+    if (!res.ok) throw new Error("Failed to load sales");
 
-      const data = await res.json();
-      const orders = data.orders || [];
+    const data = await res.json();
+    const orders = data.orders || [];
 
-      const today = new Date().toLocaleDateString("en-CA");  
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentDay = now.toLocaleDateString("en-CA");
 
-      const todaysOrders = orders.filter(o => {
-        if (!o.orderdate) return false;
+    // Filter orders from the *current hour* only
+    const hourlyOrders = orders.filter(o => {
+      if (!o.orderdate) return false;
 
-        const tsLocal = toLocal(o.orderdate);
-        const dateOnly = tsLocal.toLocaleDateString("en-CA");  
+      const tsLocal = toLocal(o.orderdate);
+      const orderDay = tsLocal.toLocaleDateString("en-CA");
+      const orderHour = tsLocal.getHours();
 
-        return dateOnly === today;
-      });
+      return orderDay === currentDay && orderHour === currentHour;
+    });
 
-      const rows = [];
+    const rows = hourlyOrders.map(order => {
+      const tsLocal = toLocal(order.orderdate);
 
-      todaysOrders.forEach(order => {
-        const tsLocal = toLocal(order.orderdate);
-
-        const formatted = tsLocal.toLocaleString([], {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
+      return {
+        time: tsLocal.toLocaleString([], {
           hour: "2-digit",
-          minute: "2-digit"
-        });
+          minute: "2-digit",
+        }),
+        item: `Order #${order.orderid}`,
+        price: Number(order.ordertotal),
+        totalRow: false
+      };
+    });
 
-        rows.push({
-          time: formatted,
-          item: `Order #${order.orderid}`,
-          price: Number(order.ordertotal),
-          totalRow: false
-        });
-      });
+    setZReportRows([]);
+    setXReportRows(rows);
 
-      setZReportRows([]);
-      setXReportRows(rows);
-    } catch (err) {
-      console.error("Error generating X-Report:", err);
-    }
+  } catch (err) {
+    console.error("Error generating X-Report:", err);
   }
+}
 
 
   	// === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
