@@ -1,5 +1,5 @@
 // pages/auth/employee-access.js
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
@@ -12,6 +12,17 @@ export default function EmployeeAccessPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!session || !session.user) return;
+
+    const role = session.user.role || "customer";
+
+    // Managers should also be allowed into cashier
+    if (role === "employee" || role === "manager") {
+      router.replace("/cashier");
+    }
+  }, [session, router]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -23,54 +34,38 @@ export default function EmployeeAccessPage() {
 
     setLoading(true);
     try {
-      // 1) Verify employee password
-      const res = await fetch("/api/verify-password", {
+      // 1) Verify employee password against env var
+      const res = await fetch("/api/staff/verify-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "employee", password }),
+        body: JSON.stringify({
+          requestedRole: "employee", // ✅ important: API expects requestedRole
+          password,
+        }),
       });
 
       let data;
       try {
         data = await res.json();
       } catch (jsonErr) {
-        console.error("Failed to parse JSON from /api/verify-password:", jsonErr);
+        console.error(
+          "Failed to parse JSON from /api/staff/verify-password:",
+          jsonErr
+        );
         setError("Server returned an invalid response.");
         setLoading(false);
         return;
       }
 
-      if (!res.ok || !data.ok) {
-        setError(data?.error || "Incorrect employee password.");
+      if (!res.ok || !data?.ok) {
+        setError(data?.error || "Invalid employee password.");
         setLoading(false);
         return;
       }
 
-      // 2) Update role in DB
-      const roleRes = await fetch("/api/role", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "employee" }),
-      });
-
-      let roleData;
-      try {
-        roleData = await roleRes.json();
-      } catch (jsonErr) {
-        console.error("Failed to parse JSON from /api/role:", jsonErr);
-        setError("Server returned an invalid response.");
-        setLoading(false);
-        return;
-      }
-
-      if (!roleRes.ok || !roleData?.success) {
-        setError(roleData?.error || "Could not set employee role.");
-        setLoading(false);
-        return;
-      }
-
-      // 3) Go to cashier
-      router.push("/cashier");
+      // 2) Tell the server to upgrade our role and redirect
+      // This page will UPDATE app_users.userRole and then redirect
+      router.push("/staff/after-login?role=employee");
     } catch (err) {
       console.error("Unexpected error in employee-access:", err);
       setError("Unexpected error. Please try again.");
@@ -82,13 +77,16 @@ export default function EmployeeAccessPage() {
     return <p style={{ padding: "20px" }}>Loading session…</p>;
   }
 
+  // Not signed in with Google yet
   if (!session) {
     return (
       <div style={{ padding: "20px" }}>
         <h1>Employee Access</h1>
         <p>You must sign in with Google before entering the employee area.</p>
         <button
-          onClick={() => signIn("google", { callbackUrl: "/auth/employee-access" })}
+          onClick={() =>
+            signIn("google", { callbackUrl: "/auth/employee-access" })
+          }
           style={{
             padding: "12px 24px",
             backgroundColor: "#500000",
@@ -107,26 +105,39 @@ export default function EmployeeAccessPage() {
     );
   }
 
-  return (
-    <div style={{ padding: "20px" }}>
-      <h1>Employee Access</h1>
-      <p>Signed in as {session.user.email}</p>
-      <p>Enter the employee password to access Cashier & Kitchen.</p>
+  // If user already has role, the useEffect above will redirect them.
+  // We can show a tiny "Redirecting..." just in case.
+  if (session.user.role === "employee" || session.user.role === "manager") {
+    return (
+      <div style={{ padding: "20px" }}>
+        <p>Redirecting you to the cashier...</p>
+      </div>
+    );
+  }
 
-      <form onSubmit={handleSubmit} style={{ maxWidth: "320px" }}>
-        <input
-          type="password"
-          placeholder="Employee password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "10px",
-            margin: "10px 0",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-          }}
-        />
+  // Otherwise, they're a "customer" and need to enter the employee password
+  return (
+    <div style={{ padding: "20px", maxWidth: "400px", margin: "0 auto" }}>
+      <h1>Employee Access</h1>
+      <p>Enter the employee access password to continue.</p>
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: "10px" }}>
+          <label htmlFor="password">Employee Password</label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "8px",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+            }}
+          />
+        </div>
+
         <button
           type="submit"
           disabled={loading}
