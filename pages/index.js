@@ -83,7 +83,7 @@ export default function HomePage() {
 
         {/* Buttons */}
         <div style={{ marginTop: "10px" }}>
-          <a href="/kiosk" style={buttonStyle}>KIOSK</a>
+          <a href="/welcome" style={buttonStyle}>KIOSK</a>
           <a href="/auth/employee-access" style={buttonStyle}>CASHIER</a>
           <a href="/auth/manager-access" style={buttonStyle}>MANAGER</a>
           <a href="/kitchen" style={buttonStyle}>KITCHEN</a>

@@ -1324,7 +1324,7 @@ const DrinkDetailsPage = () => {
           onClick={() => {
             setCart([]);
             setLastOrderId(null);
-            setScreen("menu");
+            window.location.href = "/welcome";
           }}
           style={{
             padding: "20px 40px",
