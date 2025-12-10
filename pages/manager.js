@@ -377,8 +377,13 @@ const [inventory, setInventory] = useState([]);
 
   const filteredInventory = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return inventory;
-    return inventory.filter(
+
+    // Hide all modifier-only inventory items
+    const visible = inventory.filter(i => i.unit !== "mod");
+
+    if (!q) return visible;
+
+    return visible.filter(
       (i) =>
         i.name.toLowerCase().includes(q) ||
         String(i.quantity).includes(q)
@@ -1302,7 +1307,9 @@ useEffect(() => {
 
             <div className={styles.ingredientGrid}>
               {inventory
-                .filter(inv => !ALWAYS_INCLUDED_INGREDIENTS.includes(inv.id))
+                  .filter(inv => inv.unit !== "mod")
+                  .filter(inv => inv.id !== 33) 
+                  .filter(inv => !ALWAYS_INCLUDED_INGREDIENTS.includes(inv.id))
                 .map(inv => {
                 const selected = newMenuIngredients.find(i => i.inventoryID === inv.id);
 
