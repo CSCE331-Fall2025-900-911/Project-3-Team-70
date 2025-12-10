@@ -28,6 +28,7 @@ export default function CashierPage() {
 
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [modQty, setModQty] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -122,20 +123,21 @@ export default function CashierPage() {
             JSON.stringify(item.modifications || {})
       );
 
+      // If same item exists, increase qty by item.qty
       if (existing) {
         return prev.map((x) =>
           x.id === item.id &&
           JSON.stringify(x.modifications || {}) ===
             JSON.stringify(item.modifications || {})
-            ? { ...x, qty: x.qty + 1 }
+            ? { ...x, qty: x.qty + item.qty }  // <-- FIXED
             : x
         );
       }
 
-      return [...prev, { ...item, qty: 1, price: item.price }];
+      // NEW ITEM — use the provided qty instead of forcing 1
+      return [...prev, { ...item, qty: item.qty, price: item.price }];
     });
 
-    // NEW — clear selected index (so removed doesn't mismatch)
     setSelectedIndex(null);
   };
 
@@ -201,6 +203,7 @@ export default function CashierPage() {
     setModIce("Regular Ice");
     setModTemp("Cold");
     setModSize("Medium");
+    setModQty(1);   // NEW
     setShowModifier(true);
   };
 
@@ -230,6 +233,7 @@ export default function CashierPage() {
       ...modTarget,
       modifications,
       price: finalPrice,
+      qty: modQty,    // NEW
     });
 
     setShowModifier(false);
@@ -373,7 +377,29 @@ export default function CashierPage() {
                     )}
                   </div>
 
-                  <div className="qty">x{line.qty}</div>
+                  <div className="qty">
+                  <input
+                    type="number"
+                    min="1"
+                    value={line.qty}
+                    onClick={(e) => e.stopPropagation()} // prevent selecting the row
+                    onChange={(e) => {
+                      const newQty = Math.max(1, Number(e.target.value));
+
+                      setOrder(prev =>
+                        prev.map((item, i) =>
+                          i === idx ? { ...item, qty: newQty } : item
+                        )
+                      );
+                    }}
+                    style={{
+                      width: "50px",
+                      padding: "4px",
+                      borderRadius: "6px",
+                      border: "1px solid #ccc",
+                    }}
+                  />
+                </div>
                   <div className="subtotal">
                     ${(Number(line.price || 0) * line.qty).toFixed(2)}
                   </div>
@@ -483,6 +509,18 @@ export default function CashierPage() {
                 <option value="Medium">Medium</option>
                 <option value="Large">Large (+$0.50)</option>
               </select>
+            </div>
+            {/* QUANTITY */}
+            <div className="mod-section">
+              <p>Quantity:</p>
+              <input
+                type="number"
+                min="1"
+                value={modQty}
+                onChange={(e) => setModQty(Math.max(1, Number(e.target.value)))}
+                className="search"
+                style={{ width: "90px", padding: "8px", borderRadius: "8px" }}
+              />
             </div>
 
             <div className="modal-actions">
