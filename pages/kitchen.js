@@ -130,38 +130,51 @@ export default function KitchenPage() {
 
                 {o.items && o.items.length > 0 ? (
                   o.items.map((item, idx) => (
-                    <div key={idx} className="order-line">
-
-                      {/* Name + Qty */}
+                    <div className="order-line" key={idx}>
+                      {/* Base item */}
                       <div className="line-main">
-                        <span className="line-name">{item.name}</span>
-                        <span className="line-qty">x{item.qty}</span>
+                        <span className="line-name">{item.menuname}</span>
+                        <span className="line-qty">x{item.quantitypurchased}</span>
                       </div>
 
                       {/* Size */}
-                      {item.modifications?.size && (
-                        <div className="line-mod">Size: {item.modifications.size}</div>
+                      {item.ordersize && (
+                        <div className="line-mod">
+                          Size: {{ 1: "Small", 2: "Medium", 3: "Large" }[item.ordersize]}
+                        </div>
                       )}
 
-                      {/* Toppings */}
-                      {item.modifications?.toppings &&
-                        item.modifications.toppings.length > 0 && (
-                          <div className="line-mod">
-                            Toppings:{" "}
-                            {item.modifications.toppings
-                              .map((t) => t.name || t)
-                              .join(", ")}
-                          </div>
-                        )}
 
-                      {/* Item Price */}
+                      {/* Toppings / Add-ons */}
+                      {item.modifications && item.modifications.length > 0 && (
+                        <div className="line-mod">
+                          Modifications:{" "}
+                          {item.modifications.map((mod, i) => (
+                            <span key={i}>
+                              {mod.inventoryname} x{mod.modificationquantity || 1}
+                              {mod.cost ? ` ($${(mod.cost * mod.modificationquantity).toFixed(2)})` : ""}
+                              {i < item.modifications.length - 1 ? ", " : ""}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Line total for base + add-ons */}
                       <div className="line-price">
-                        ${Number(item.price * item.qty).toFixed(2)}
+                        ${(
+                          Number(item.priceatpurchase || 0) * Number(item.quantitypurchased || 0) +
+                          item.modifications.reduce(
+                            (sum, mod) => sum + Number(mod.cost || 0) * Number(mod.modificationquantity || 1),
+                            0
+                          )
+                        ).toFixed(2)}
                       </div>
 
                       <hr />
                     </div>
+
                   ))
+
                 ) : (
                   <p style={{ fontSize: "13px", opacity: 0.6 }}>
                     (No item details available)
@@ -169,7 +182,6 @@ export default function KitchenPage() {
                 )}
               </div>
             </div>
-
                 {tab === "current" && (
                   <button
                     className="btn complete"
