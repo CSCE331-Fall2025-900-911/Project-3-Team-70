@@ -138,7 +138,7 @@ const [inventory, setInventory] = useState([]);
 	const [xReportRows, setXReportRows] = useState([]);
 	const [zReportRows, setZReportRows] = useState([]);
 
-  // NEW — X REPORT ============================================
+  // NEW — X REPORT (US Central Time) ============================================
   async function generateXReport() {
     try {
       const res = await fetch("/api/sales");
@@ -147,25 +147,38 @@ const [inventory, setInventory] = useState([]);
       const data = await res.json();
       const orders = data.orders || [];
 
-      // Get today's UTC date boundaries
+      // ======= CURRENT DATE IN US CENTRAL TIME =======
+      const centralOffset = -6; // US Central Standard Time UTC offset (-6)
       const nowUTC = new Date();
-      const startOfDayUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(), 0, 0, 0, 0));
-      const endOfDayUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(), 23, 59, 59, 999));
 
-      // Select ONLY today's orders (UTC)
+      // Calculate current time in CST (or CDT manually if needed)
+      const nowCentral = new Date(nowUTC.getTime() + centralOffset * 60 * 60 * 1000);
+
+      // Start and end of "today" in Central Time
+      const startOfDayCentral = new Date(
+        Date.UTC(nowCentral.getUTCFullYear(), nowCentral.getUTCMonth(), nowCentral.getUTCDate(), -centralOffset, 0, 0, 0)
+      );
+      const endOfDayCentral = new Date(
+        Date.UTC(nowCentral.getUTCFullYear(), nowCentral.getUTCMonth(), nowCentral.getUTCDate(), -centralOffset, 23, 59, 59, 999)
+      );
+
+      // ===== FILTER ORDERS BY TODAY IN CENTRAL TIME =====
       const todaysOrders = orders.filter(o => {
         if (!o.orderdate) return false;
 
-        const tsUTC = new Date(o.orderdate); // orderdate is UTC
-        return tsUTC >= startOfDayUTC && tsUTC <= endOfDayUTC;
+        const tsUTC = new Date(o.orderdate);
+        // Convert order timestamp to central
+        const tsCentral = new Date(tsUTC.getTime() + centralOffset * 60 * 60 * 1000);
+        return tsCentral >= startOfDayCentral && tsCentral <= endOfDayCentral;
       });
 
-      // ===== GROUP INTO HOUR BLOCKS =====
+      // ===== GROUP INTO HOUR BLOCKS IN CENTRAL TIME =====
       const hourlyMap = {};
 
       todaysOrders.forEach(order => {
         const tsUTC = new Date(order.orderdate);
-        const hour = tsUTC.getUTCHours(); // use UTC hour
+        const tsCentral = new Date(tsUTC.getTime() + centralOffset * 60 * 60 * 1000);
+        const hour = tsCentral.getHours(); // hour in central time
 
         // Build AM/PM range label
         const startHour12 = ((hour + 11) % 12) + 1;
@@ -199,10 +212,12 @@ const [inventory, setInventory] = useState([]);
 
       setZReportRows([]);
       setXReportRows(rows);
+
     } catch (err) {
       console.error("Error generating X-Report:", err);
     }
   }
+
 
 
 
