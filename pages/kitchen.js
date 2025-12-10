@@ -103,26 +103,73 @@ export default function KitchenPage() {
                     {o.ordersource === "cashier" ? "Cashier" : "Kiosk"}
                   </span>
                 </div>
-                <div className="order-body">
-                  <p>
-                    <strong>Total:</strong>{" "}
-                    ${Number(o.ordertotal).toFixed(2)}
+            <div className="order-body">
+              <p>
+                <strong>Total:</strong>{" "}
+                ${Number(o.ordertotal).toFixed(2)}
+              </p>
+              <p>
+                <strong>Placed:</strong>{" "}
+                {new Date(o.orderdate).toLocaleTimeString()}
+              </p>
+
+              {o.customeremail && (
+                <p>
+                  <strong>Customer:</strong> {o.customeremail}
+                </p>
+              )}
+              {o.employeeid && (
+                <p>
+                  <strong>Employee ID:</strong> {o.employeeid}
+                </p>
+              )}
+
+              {/* ---------- ORDER ITEMS ---------- */}
+              <div className="order-items">
+                <strong>Items:</strong>
+
+                {o.items && o.items.length > 0 ? (
+                  o.items.map((item, idx) => (
+                    <div key={idx} className="order-line">
+
+                      {/* Name + Qty */}
+                      <div className="line-main">
+                        <span className="line-name">{item.name}</span>
+                        <span className="line-qty">x{item.qty}</span>
+                      </div>
+
+                      {/* Size */}
+                      {item.modifications?.size && (
+                        <div className="line-mod">Size: {item.modifications.size}</div>
+                      )}
+
+                      {/* Toppings */}
+                      {item.modifications?.toppings &&
+                        item.modifications.toppings.length > 0 && (
+                          <div className="line-mod">
+                            Toppings:{" "}
+                            {item.modifications.toppings
+                              .map((t) => t.name || t)
+                              .join(", ")}
+                          </div>
+                        )}
+
+                      {/* Item Price */}
+                      <div className="line-price">
+                        ${Number(item.price * item.qty).toFixed(2)}
+                      </div>
+
+                      <hr />
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ fontSize: "13px", opacity: 0.6 }}>
+                    (No item details available)
                   </p>
-                  <p>
-                    <strong>Placed:</strong>{" "}
-                    {new Date(o.orderdate).toLocaleTimeString()}
-                  </p>
-                  {o.customeremail && (
-                    <p>
-                      <strong>Customer:</strong> {o.customeremail}
-                    </p>
-                  )}
-                  {o.employeeid && (
-                    <p>
-                      <strong>Employee ID:</strong> {o.employeeid}
-                    </p>
-                  )}
-                </div>
+                )}
+              </div>
+            </div>
+
                 {tab === "current" && (
                   <button
                     className="btn complete"
@@ -228,6 +275,39 @@ export default function KitchenPage() {
           background: #fee2e2;
           color: #991b1b;
         }
+          .order-items {
+            margin-top: 8px;
+            font-size: 14px;
+          }
+
+          .order-line {
+            padding: 6px 0;
+          }
+
+          .line-main {
+            display: flex;
+            justify-content: space-between;
+          }
+
+          .line-name {
+            font-weight: 600;
+          }
+
+          .line-qty {
+            font-weight: 600;
+          }
+
+          .line-mod {
+            font-size: 13px;
+            margin-left: 6px;
+            opacity: 0.8;
+          }
+
+          .line-price {
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 2px;
+          }
         .order-body p {
           margin: 2px 0;
           font-size: 14px;
