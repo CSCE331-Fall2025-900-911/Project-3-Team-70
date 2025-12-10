@@ -399,31 +399,30 @@ export default function CashierPage() {
 
             {/* TOPPINGS */}
             <div className="mod-section">
-              <p>Select ingredients / toppings:</p>
+              <p className="mod-heading">Select ingredients / toppings:</p>
 
-              {toppingOptions.length === 0 ? (
-                <p className="mods-empty">
-                  No ingredients configured in inventory.
-                </p>
-              ) : (
-                toppingOptions.map((t) => (
-                  <label key={t.id} className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={modToppings.some((x) => x.id === t.id)}
-                      onChange={(e) => {
-                        setModToppings((prev) =>
-                          e.target.checked
-                            ? [...prev, t]
-                            : prev.filter((x) => x.id !== t.id)
-                        );
-                      }}
-                    />
-                    {t.name} — <strong>+$1.00</strong>
-                  </label>
-                ))
-              )}
+              <div className="topping-scroll">
+                <div className="topping-grid">
+                  {toppingOptions.map((t) => (
+                    <label key={t.id} className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={modToppings.some((x) => x.id === t.id)}
+                        onChange={(e) => {
+                          setModToppings((prev) =>
+                            e.target.checked
+                              ? [...prev, t]
+                              : prev.filter((x) => x.id !== t.id)
+                          );
+                        }}
+                      />
+                      {t.name} — <strong>$1.00</strong>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
+
 
             {/* SWEETNESS */}
             <div className="mod-section">
@@ -516,6 +515,20 @@ export default function CashierPage() {
           --border: #e5e7eb;
           --danger: #ef4444;
           --radius: 16px;
+        }
+
+        /* Toppings arranged in 3 columns */
+        .topping-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px 20px;
+        }
+
+        /* Heading stays fixed at top */
+        .mod-heading {
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 6px;
         }
 
         * {
@@ -759,23 +772,36 @@ export default function CashierPage() {
 
         .modal {
           background: #ffffff;
-          padding: 20px;
+          padding: 28px;
           border-radius: 14px;
-          width: 360px;
+
+          /* NEW WIDTH — Much wider and better layout */
+          width: 650px;
           max-width: 95vw;
+
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 18px;
           box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+
+          /* Allow scrolling inside the modal if needed */
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+        /* Only this part scrolls */
+        .topping-scroll {
+          max-height: 260px;
+          overflow-y: auto;
+          padding-right: 6px;
         }
 
+        /* Container – full width, NOT scrollable */
         .mod-section {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          max-height: 260px;
-          overflow: auto;
+          gap: 10px;
         }
+
 
         .mods-empty {
           font-size: 13px;
@@ -784,8 +810,8 @@ export default function CashierPage() {
 
         .checkbox-row {
           display: flex;
-          gap: 8px;
           align-items: center;
+          gap: 8px;
           font-size: 14px;
         }
 
