@@ -240,6 +240,9 @@ export default function KioskPage() {
   const [pointsError, setPointsError] = useState(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
+  const [showSortModal, setShowSortModal] = useState(false);
+
+
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
     discount: 0,
@@ -2094,6 +2097,23 @@ const AllergyFilterPanel = ({ accessibilityMode }) => {
       </p>
 
       {/* Category buttons */}
+
+      <button
+      onClick={() => setShowSortModal(true)}
+      style={{
+        padding: "12px 20px",
+        borderRadius: "8px",
+        backgroundColor: "#500000",
+        color: "#fff",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "18px",
+        marginBottom: "20px",
+      }}
+    >
+      Sort by Price
+    </button>
+
       <div
         style={{
           display: "flex",
@@ -2496,6 +2516,75 @@ const AllergyFilterPanel = ({ accessibilityMode }) => {
       >
         ← Back
       </button>
+
+      {/* SORT MODAL */}
+{showSortModal && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(0,0,0,0.75)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 99999,
+    }}
+  >
+    <div
+      style={{
+        backgroundColor: accessibilityMode ? "#000" : "#fff",
+        color: accessibilityMode ? "#fff" : "#000",
+        padding: "24px",
+        borderRadius: "12px",
+        width: "90%",
+        maxWidth: "500px",
+        maxHeight: "70vh",
+        overflowY: "auto",
+        fontSize: accessibilityMode ? "28px" : "20px",
+      }}
+    >
+      <h2 style={{ textAlign: "center", marginBottom: "16px" }}>
+        Menu Sorted by Price (High → Low)
+      </h2>
+
+      {menuItems
+        .slice()
+        .sort((a, b) => Number(b.price) - Number(a.price))
+        .map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: "10px 0",
+              borderBottom: "1px solid #ddd",
+            }}
+          >
+            {item.name} — ${Number(item.price).toFixed(2)}
+          </div>
+        ))}
+
+      <button
+        onClick={() => setShowSortModal(false)}
+        style={{
+          marginTop: "20px",
+          padding: "12px 20px",
+          backgroundColor: "#b00000",
+          color: "#fff",
+          border: "none",
+          borderRadius: "10px",
+          cursor: "pointer",
+          width: "100%",
+          fontSize: accessibilityMode ? "26px" : "20px",
+        }}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

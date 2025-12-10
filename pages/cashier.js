@@ -40,6 +40,8 @@ export default function CashierPage() {
   const [modSweetness, setModSweetness] = useState("100%");
   const [modIce, setModIce] = useState("Regular Ice");
   const [modTemp, setModTemp] = useState("Cold");
+  const [showSortModal, setShowSortModal] = useState(false);
+
 
   // Fetch and normalize menu data
   useEffect(() => {
@@ -250,6 +252,14 @@ export default function CashierPage() {
         {/* LEFT SIDE — MENU */}
         <section className="panel">
           <div className="menu-header">
+            <button
+              className="btn"
+              onClick={() => setShowSortModal(true)}
+              style={{ marginLeft: "auto" }}
+            >
+              Sort by Price
+            </button>
+
             <input
               type="search"
               placeholder="Search menu…"
@@ -502,6 +512,40 @@ export default function CashierPage() {
           </div>
         </div>
       )}
+
+      {/* SORT MODAL */}
+{showSortModal && (
+  <div className="modal-backdrop">
+    <div className="modal" style={{ maxWidth: "500px" }}>
+      <h2>Menu Sorted by Price (High → Low)</h2>
+
+      <div style={{
+        maxHeight: "60vh",
+        overflowY: "auto",
+        padding: "10px",
+        lineHeight: "1.6"
+      }}>
+        {menuItems
+          .slice()
+          .sort((a, b) => Number(b.price) - Number(a.price))
+          .map((item) => (
+            <div key={item.id} style={{ padding: "6px 0", borderBottom: "1px solid #ddd" }}>
+              {item.name} — ${Number(item.price).toFixed(2)}
+            </div>
+          ))}
+      </div>
+
+      <button
+        className="btn danger"
+        onClick={() => setShowSortModal(false)}
+        style={{ marginTop: "16px" }}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
 
       {/* CSS */}
       <style jsx>{`
