@@ -15,6 +15,14 @@ function toLocal(ts) {
 }
 
 export default function ManagerPage() {
+  const [salesSummary, setSalesSummary] = useState(null);
+  const [salesHourly, setSalesHourly] = useState([]);
+  const [salesOrders, setSalesOrders] = useState([]);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesError, setSalesError] = useState(null);
+
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 	const [activeTab, setActiveTab] = useState("sales");
 	const [query, setQuery] = useState("");
 
@@ -716,14 +724,7 @@ async function handleUpdateMenuItem() {
 
   // TAB COMPONENTS ===================================================
 // ===== SALES TAB =====
-const [salesSummary, setSalesSummary] = useState(null);
-const [salesHourly, setSalesHourly] = useState([]);
-const [salesOrders, setSalesOrders] = useState([]);
-const [salesLoading, setSalesLoading] = useState(false);
-const [salesError, setSalesError] = useState(null);
 
-const [startDate, setStartDate] = useState("");
-const [endDate, setEndDate] = useState("");
 
 // Fetch sales data (with range or all-time)
 async function fetchSales() {
