@@ -276,7 +276,50 @@ function WeatherWidget({ accessibilityMode }) {
 }
 
 // === Main Page ===
+// Force Google Translate to re-apply the current language when needed
+
+
+// === Force-refresh Google Translate ===
+function forceGoogleTranslate(langCode) {
+  const iframe =
+    document.querySelector("iframe.goog-te-menu-frame") ||
+    document.querySelector("iframe.goog-te-menu2-frame");
+
+  if (!iframe) {
+    setTimeout(() => forceGoogleTranslate(langCode), 200);
+    return;
+  }
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+  if (!iframeDoc) {
+    setTimeout(() => forceGoogleTranslate(langCode), 200);
+    return;
+  }
+
+  const items = Array.from(
+    iframeDoc.querySelectorAll(".goog-te-menu2-item span.text")
+  );
+
+  if (items.length === 0) {
+    setTimeout(() => forceGoogleTranslate(langCode), 200);
+    return;
+  }
+
+  const target = items.find((item) => {
+    const text = item.innerText.trim().toLowerCase();
+    return (
+      text === langCode.toLowerCase() ||
+      text.includes(langCode.toLowerCase()) ||
+      text.includes(langCode.replace("-", " ").toLowerCase())
+    );
+  });
+
+  if (target) target.click();
+}
+
+// === MAIN PAGE COMPONENT ===
 export default function KioskPage() {
+
   const [accessibilityMode, setAccessibilityMode] = useState(false);
   const [narrationOn, setNarrationOn] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -287,8 +330,14 @@ export default function KioskPage() {
   const [activeCategory, setActiveCategory] = useState(null);
 
   const [lastOrderId, setLastOrderId] = useState(null);
-
   const [screen, setScreen] = useState("menu");
+
+// Re-apply translation ONLY when the user actually changes languages
+useEffect(() => {
+  if (language && typeof window !== "undefined") {
+    setTimeout(() => forceGoogleTranslate(language), 300);
+  }
+}, [language]);
   const [detailsItem, setDetailsItem] = useState(null);
   const [cart, setCart] = useState([]);
   const [toppings, setToppings] = useState([]);
@@ -425,46 +474,34 @@ export default function KioskPage() {
 
 
 
-  // language widget
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-    document.body.appendChild(script);
 
-    window.googleTranslateElementInit = () => {
-      new window.google.translate.TranslateElement(
-        {
-          pageLanguage: "en",
-          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
-        },
-        "google_translate_element"
-      );
-    };
-  }, []);
 
-  async function handleLanguageChange(langCode) {
-    if (!langCode) return;
-    setLanguage(langCode);
+async function handleLanguageChange(langCode) {
+  if (!langCode) return;
 
-    const labelOn = await translateText(
-      "Accessibility Mode: ON",
-      langCode
-    );
-    const labelOff = await translateText(
-      "Accessibility Mode: OFF",
-      langCode
-    );
+  setLanguage(langCode);
 
-    setAccessibilityLabel({
-      on: labelOn,
-      off: labelOff,
-    });
+  // Update translated accessibility labels
+  const labelOn = await translateText("Accessibility Mode: ON", langCode);
+  const labelOff = await translateText("Accessibility Mode: OFF", langCode);
 
-    document.cookie = `googtrans=/en/${langCode};path=/`;
-    window.location.reload();
-  }
+  setAccessibilityLabel({
+    on: labelOn,
+    off: labelOff,
+  });
 
+  // Set Google Translate cookies so it knows what language to use
+  document.cookie = `googtrans=/en/${langCode};path=/`;
+  document.cookie = `googtrans=/en/${langCode};domain=${window.location.hostname};path=/`;
+
+  // === Refresh Google Translate WITHOUT reloading the page ===
+  // The correct refresh method is to simulate selecting the language
+  // inside the hidden Google Translate iframe.
+
+
+  // Trigger refresh shortly after setting cookies
+  setTimeout(() => forceGoogleTranslate(langCode), 300);
+}
   const handlePress = (item) => {
     setSelectedItem(item.id);
 
@@ -1900,7 +1937,7 @@ const AllergyFilterPanel = ({ accessibilityMode }) => {
               padding: accessibilityMode ? "16px" : "12px 0",
               marginBottom: accessibilityMode ? "14px" : "0",
               backgroundColor: accessibilityMode ? "#FFD700" : "transparent",
-              color: accessibilityMode ? "#000" : "#000",
+              color: "#000",
               borderRadius: accessibilityMode ? "10px" : "0",
               borderBottom: accessibilityMode ? "none" : "1px solid #ddd",
               fontSize: accessibilityMode ? "22px" : "18px",
@@ -1942,711 +1979,236 @@ const AllergyFilterPanel = ({ accessibilityMode }) => {
   );
 };
 
-  // === MAIN RENDER SWITCH ===
-  if (screen === "details")
-    return (
-      <DrinkDetailsPage accessibilityMode={accessibilityMode} />
-    );
+// === FINAL RENDER ===
+return (
+  <>
+    {/* Persistent Google Translate container */}
+    <div id="google_translate_element" style={{ display: "none" }} />
 
-  if (screen === "cart")
-    return (
-      <CartScreen
-        accessibilityMode={accessibilityMode}
-        speak={speak}
-        narrationOn={narrationOn}
-        language={language}
-        setOrderSummary={setOrderSummary}
-      />
-    );
+    {/* MAIN RENDER SWITCH */}
+    {screen === "details" && (
+      <DrinkDetailsPage />
+    )}
 
-  if (screen === "payment")
-    return (
-      <PaymentScreen
-        accessibilityMode={accessibilityMode}
-      />
-    );
+    {screen === "cart" && (
+      <CartScreen />
+    )}
 
-  if (screen === "success") {
-    return (
+    {screen === "payment" && (
+      <PaymentScreen accessibilityMode={accessibilityMode} />
+    )}
+
+    {screen === "success" && (
       <SuccessScreen
         accessibilityMode={accessibilityMode}
         orderId={lastOrderId}
         orderSummary={orderSummary}
         lastPointsSummary={lastPointsSummary}
       />
-    );
-  }
+    )}
 
-  // === MAIN MENU SCREEN ===
-  return (
-    <div
-      style={{
-        textAlign: "center",
-        backgroundColor: accessibilityMode
-          ? "#000"
-          : "#f8f0d7ff",
-        color: accessibilityMode ? "#fff" : "#000",
-        minHeight: "100vh",
-        padding: accessibilityMode ? "40px" : "20px",
-        position: "relative",
-        transition: "all 0.3s ease",
-      }}
-    >
-      <WeatherWidget accessibilityMode={accessibilityMode} />
-      {allergyFilterOpen && (
-        <AllergyFilterPanel accessibilityMode={accessibilityMode} />
-      )}
-
-      {/* Sign-in bar for rewards */}
+    {/* MENU SCREEN */}
+    {screen === "menu" && (
       <div
         style={{
-          position: "absolute",
-          top: accessibilityMode ? "28px" : "20px",
-          right: accessibilityMode ? "240px" : "200px",
-          backgroundColor: accessibilityMode
-            ? "#111"
-            : "#ffffff",
+          textAlign: "center",
+          backgroundColor: accessibilityMode ? "#000" : "#f8f0d7ff",
           color: accessibilityMode ? "#fff" : "#000",
-          borderRadius: "12px",
-          padding: accessibilityMode ? "12px 16px" : "8px 12px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-          fontSize: accessibilityMode ? "18px" : "14px",
-          display: "flex",
-          alignItems: "center",
-          gap: accessibilityMode ? "12px" : "8px",
-          zIndex: 12,
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          minHeight: "100vh",
+          padding: accessibilityMode ? "40px" : "20px",
+          position: "relative",
+          transition: "all 0.3s ease",
         }}
       >
-        {!session ? (
-          <>
-            <span>Sign in for rewards:</span>
+        <WeatherWidget accessibilityMode={accessibilityMode} />
 
-            <button
-              onClick={() =>
-                signIn("google", { callbackUrl: "/kiosk" })
-              }
-              style={{
-                padding: accessibilityMode
-                  ? "10px 16px"
-                  : "6px 10px",
-                borderRadius: "8px",
-                border: "none",
-                backgroundColor: accessibilityMode
-                  ? "#b00000"
-                  : "#500000",
-                color: "#fff",
-                cursor: "pointer",
-                fontSize: accessibilityMode ? "18px" : "14px",
-                fontWeight: "bold",
-              }}
-            >
-              Sign in
-            </button>
-          </>
-        ) : (
-          <span>
-            Signed in as {session.user.email}
-            {typeof loyaltyPoints === "number" && (
-              <> · Points: {loyaltyPoints}</>
-            )}
-            {pointsError && (
-              <>
-                {" "}
-                ·{" "}
-                <span style={{ color: "red" }}>
-                  Points unavailable
-                </span>
-              </>
-            )}
-          </span>
+        {allergyFilterOpen && (
+          <AllergyFilterPanel accessibilityMode={accessibilityMode} />
         )}
-      </div>
 
-      {/* Narration toggle */}
-      <button
-        onClick={toggleNarration}
-        aria-label="Toggle narration mode"
-        style={{
-          position: "absolute",
-          top: "125px",
-          left: "20px",
-          transform: "translateY(-50%)",
-          backgroundColor: narrationOn
-            ? "#FFD700"
-            : accessibilityMode
-            ? "#555"
-            : "#500000",
-          color: narrationOn ? "#000" : "#fff",
-          border: "none",
-          borderRadius: "50%",
-          width: accessibilityMode ? "90px" : "70px",
-          height: accessibilityMode ? "90px" : "70px",
-          fontSize: accessibilityMode ? "36px" : "28px",
-          cursor: "pointer",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-          zIndex: 10,
-          transition: "all 0.25s ease",
-        }}
-      >
-        🔊
-      </button>
-
-      <div
-        id="google_translate_element"
-        style={{ display: "none" }}
-      />
-
-      <div
-        style={{
-          position: "absolute",
-          top: "20px",
-          left: "20px",
-          zIndex: 1000,
-        }}
-      >
-        <select
-          defaultValue=""
-          onChange={(e) =>
-            handleLanguageChange(e.target.value)
-          }
+        {/* Sign-in bar for rewards */}
+        <div
           style={{
-            padding: "10px",
-            fontSize: "16px",
-            borderRadius: "8px",
-            backgroundColor: "#fff",
-            color: "#000",
-            border: "1px solid #ccc",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+            position: "absolute",
+            top: accessibilityMode ? "28px" : "20px",
+            right: accessibilityMode ? "240px" : "200px",
+            backgroundColor: accessibilityMode ? "#111" : "#ffffff",
+            color: accessibilityMode ? "#fff" : "#000",
+            borderRadius: "12px",
+            padding: accessibilityMode ? "12px 16px" : "8px 12px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            fontSize: accessibilityMode ? "18px" : "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: accessibilityMode ? "12px" : "8px",
+            zIndex: 12,
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
-          <option value="">Select Language</option>
-          <option value="en">English</option>
-          <option value="es">Spanish</option>
-          <option value="zh-CN">
-            Chinese (Simplified)
-          </option>
-          <option value="fr">French</option>
-          <option value="de">German</option>
-          <option value="ja">Japanese</option>
-          <option value="ru">Russian</option>
-          <option value="pt">Portuguese</option>
-          <option value="ar">Arabic</option>
-          <option value="hi">Hindi</option>
-        </select>
-      </div>
+          {!session ? (
+            <>
+              <span>Sign in for rewards:</span>
 
-      <h1
-        tabIndex="0"
-        aria-label="Welcome to Sharetea Self-Order Kiosk"
-        style={{
-          fontSize: accessibilityMode ? "48px" : "36px",
-          marginBottom: accessibilityMode ? "30px" : "20px",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-        }}
-      >
-        Sharetea Self-Order Kiosk
-      </h1>
+              <button
+                onClick={() => signIn("google", { callbackUrl: "/kiosk" })}
+                style={{
+                  padding: accessibilityMode ? "10px 16px" : "6px 10px",
+                  borderRadius: "8px",
+                  border: "none",
+                  backgroundColor: accessibilityMode ? "#b00000" : "#500000",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontSize: accessibilityMode ? "18px" : "14px",
+                  fontWeight: "bold",
+                }}
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
+            <span>
+              Signed in as {session.user.email}
+              {typeof loyaltyPoints === "number" && <> · Points: {loyaltyPoints}</>}
+              {pointsError && (
+                <>
+                  {" "}
+                  · <span style={{ color: "red" }}>Points unavailable</span>
+                </>
+              )}
+            </span>
+          )}
+        </div>
 
-      <p
-        style={{
-          fontSize: accessibilityMode ? "24px" : "18px",
-          marginBottom: accessibilityMode ? "30px" : "20px",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-        }}
-      >
-        Welcome! Tap a drink to start your order.
-      </p>
+        {/* Narration toggle */}
+        <button
+          onClick={toggleNarration}
+          aria-label="Toggle narration mode"
+          style={{
+            position: "absolute",
+            top: "125px",
+            left: "20px",
+            transform: "translateY(-50%)",
+            backgroundColor: narrationOn
+              ? "#FFD700"
+              : accessibilityMode
+              ? "#555"
+              : "#500000",
+            color: narrationOn ? "#000" : "#fff",
+            border: "none",
+            borderRadius: "50%",
+            width: accessibilityMode ? "90px" : "70px",
+            height: accessibilityMode ? "90px" : "70px",
+            fontSize: accessibilityMode ? "36px" : "28px",
+            cursor: "pointer",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+            zIndex: 10,
+            transition: "all 0.25s ease",
+          }}
+        >
+          🔊
+        </button>
 
-      {/* Category buttons */}
-
-      <button
-      onClick={() => setShowSortModal(true)}
-      style={{
-        padding: "12px 20px",
-        borderRadius: "8px",
-        backgroundColor: "#500000",
-        color: "#fff",
-        border: "none",
-        cursor: "pointer",
-        fontSize: "18px",
-        marginBottom: "20px",
-      }}
-    >
-      Sort by Price
-    </button>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "20px",
-          marginBottom: "30px",
-        }}
-      >
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
+        {/* Language dropdown */}
+        <div
+          style={{
+            position: "absolute",
+            top: "20px",
+            left: "20px",
+            zIndex: 1000,
+          }}
+        >
+          <select
+            defaultValue=""
+            onChange={(e) => handleLanguageChange(e.target.value)}
             style={{
-              padding: "12px 20px",
-              borderRadius: "8px",
-              backgroundColor:
-                activeCategory === cat
-                  ? "#FFD700"
-                  : "#500000",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
+              padding: "10px",
               fontSize: "16px",
-              transition: "all 0.2s ease",
+              borderRadius: "8px",
+              backgroundColor: "#fff",
+              color: "#000",
+              border: "1px solid #ccc",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
             }}
           >
-            {cat}
-          </button>
-        ))}
-      </div>
+            <option value="">Select Language</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="zh-CN">Chinese (Simplified)</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="ja">Japanese</option>
+            <option value="ru">Russian</option>
+            <option value="pt">Portuguese</option>
+            <option value="ar">Arabic</option>
+            <option value="hi">Hindi</option>
+          </select>
+        </div>
 
-      {/* Accessibility + Allergy filter */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: accessibilityMode ? "25px" : "15px",
-          marginBottom: accessibilityMode ? "40px" : "25px",
-        }}
-      >
-        <button
-          onClick={() =>
-            setAccessibilityMode(!accessibilityMode)
-          }
-          aria-pressed={accessibilityMode}
-          aria-label="Toggle Accessibility Mode"
+        <h1
+          tabIndex="0"
+          aria-label="Welcome to Sharetea Self-Order Kiosk"
           style={{
-            padding: accessibilityMode
-              ? "18px 30px"
-              : "10px 20px",
-            fontSize: accessibilityMode ? "20px" : "18px",
-            borderRadius: "10px",
-            backgroundColor: accessibilityMode
-              ? "#FFD700"
-              : "#500000",
-            color: accessibilityMode ? "#000" : "#fff",
-            border: "none",
-            cursor: "pointer",
-            width: "220px",
-            transition: "all 0.2s ease",
+            fontSize: accessibilityMode ? "48px" : "36px",
+            marginBottom: accessibilityMode ? "30px" : "20px",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
-          {accessibilityMode
-            ? "Accessibility Mode: ON"
-            : "Accessibility Mode: OFF"}
-        </button>
+          Sharetea Self-Order Kiosk
+        </h1>
 
-        <button
-          onClick={() => setAllergyFilterOpen(true)}
-          aria-label="Open Allergy Filter"
+        <p
           style={{
-            padding: accessibilityMode
-              ? "18px 30px"
-              : "10px 20px",
-            fontSize: accessibilityMode ? "20px" : "18px",
-            borderRadius: "10px",
-            backgroundColor: accessibilityMode
-              ? "#FFD700"
-              : "#800000",
-            color: accessibilityMode ? "#000" : "#fff",
-            border: "none",
-            cursor: "pointer",
-            width: "220px",
-            transition: "all 0.2s ease",
+            fontSize: accessibilityMode ? "24px" : "18px",
+            marginBottom: accessibilityMode ? "30px" : "20px",
+            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
           }}
         >
-          Allergy Filter
+          Welcome! Tap a drink to start your order.
+        </p>
+
+        {/* Sort by price button */}
+        <button
+          onClick={() => setShowSortModal(true)}
+          style={{
+            padding: "12px 20px",
+            borderRadius: "8px",
+            backgroundColor: "#500000",
+            color: "#fff",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "18px",
+            marginBottom: "20px",
+          }}
+        >
+          Sort by Price
         </button>
-      </div>
 
-      {loading && <p>Loading menu...</p>}
-      {error && (
-        <p style={{ color: "red" }}>{error}</p>
-      )}
-
-      {!loading && !error && screen === "menu" && (
+        {/* Category buttons */}
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
+            justifyContent: "center",
             gap: "20px",
+            marginBottom: "30px",
           }}
         >
-          {categories.map((cat) => {
-            const sampleItem = menuItems.find(
-              (item) => item.category === cat
-            );
-
-            return (
-              <div key={cat}>
-                <button
-                  onClick={() =>
-                    setActiveCategory(
-                      activeCategory === cat ? null : cat
-                    )
-                  }
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    width: "100%",
-                    padding: "20px",
-                    borderRadius: "12px",
-                    backgroundColor:
-                      activeCategory === cat
-                        ? "#FFD700"
-                        : "#500000",
-                    color: "#fff",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: accessibilityMode
-                      ? "28px"
-                      : "22px",
-                    textAlign: "left",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  {sampleItem && (
-                    <img
-                      src={sampleItem.image}
-                      alt={cat}
-                      onError={(e) => {
-                        e.target.src =
-                          "/images/default.png";
-                      }}
-                      style={{
-                        width: "120px",
-                        height: "120px",
-                        objectFit: "cover",
-                        borderRadius: "10px",
-                        marginRight: "20px",
-                      }}
-                    />
-                  )}
-                  <span>{cat}</span>
-                </button>
-
-                {activeCategory === cat && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fill, minmax(220px, 1fr))",
-                      justifyItems: "center",
-                      gap: accessibilityMode
-                        ? "40px"
-                        : "25px",
-                      marginTop: "20px",
-                      marginBottom: "30px",
-                    }}
-                  >
-                    {filteredMenuItems
-                      .filter(
-                        (item) => item.category === cat
-                      )
-                      .map((item) => {
-                        const isPressed =
-                          selectedItem === item.id;
-                        return (
-                          <div
-                            key={item.id}
-                            onClick={() => {
-                              handlePress(item);
-                              setDetailsItem(item);
-                              setScreen("details");
-                            }}
-                            role="button"
-                            aria-label={`Select ${item.name}`}
-                            tabIndex="0"
-                            style={{
-                              borderRadius: "20px",
-                              padding: accessibilityMode
-                                ? "35px"
-                                : "25px",
-                              backgroundColor: isPressed
-                                ? "#ffe680"
-                                : accessibilityMode
-                                ? "#222"
-                                : "#fff",
-                              color: accessibilityMode
-                                ? "#fff"
-                                : "#000",
-                              boxShadow: isPressed
-                                ? "0 0 0 4px #FFD700"
-                                : "0 4px 12px rgba(0,0,0,0.1)",
-                              textAlign: "left",
-                              transform: isPressed
-                                ? "scale(0.97)"
-                                : "scale(1)",
-                              transition: "all 0.2s ease",
-                              cursor: "pointer",
-                              userSelect: "none",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "100%",
-                                height: "180px",
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                overflow: "hidden",
-                                backgroundColor:
-                                  "#f5f5f5",
-                                borderRadius: "15px",
-                                marginBottom: "15px",
-                              }}
-                            >
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                onError={(e) => {
-                                  e.target.src =
-                                    "/images/default.png";
-                                }}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                }}
-                              />
-                            </div>
-
-                            <h3
-                              style={{
-                                fontSize: accessibilityMode
-                                  ? "28px"
-                                  : "22px",
-                                marginBottom: "10px",
-                              }}
-                            >
-                              {item.name}
-                            </h3>
-                            <p
-                              style={{
-                                fontSize: accessibilityMode
-                                  ? "22px"
-                                  : "18px",
-                              }}
-                            >
-                              $
-                              {Number(
-                                item.finalPrice ||
-                                  item.price
-                              ).toFixed(2)}
-                            </p>
-                            {item.description && (
-                              <p
-                                style={{
-                                  fontSize:
-                                    accessibilityMode
-                                      ? "18px"
-                                      : "14px",
-                                  opacity: 0.8,
-                                }}
-                              >
-                                {item.description}
-                              </p>
-                            )}
-
-                            {/* ALLERGY ICONS */}
-                            {item.allergies &&
-                              item.allergies.length >
-                                0 && (
-                                <div
-                                  style={{
-                                    marginTop:
-                                      "10px",
-                                    display:
-                                      "flex",
-                                    gap: "8px",
-                                  }}
-                                >
-                                  {item.allergies.includes(
-                                    "Dairy"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize:
-                                          "20px",
-                                      }}
-                                    >
-                                      🥛
-                                    </span>
-                                  )}
-                                  {item.allergies.includes(
-                                    "Nuts"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize:
-                                          "20px",
-                                      }}
-                                    >
-                                      🥜
-                                    </span>
-                                  )}
-                                  {item.allergies.includes(
-                                    "Soy"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize:
-                                          "20px",
-                                      }}
-                                    >
-                                      🌱
-                                    </span>
-                                  )}
-                                  {item.allergies.includes(
-                                    "Gluten"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize:
-                                          "20px",
-                                      }}
-                                    >
-                                      🌾
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              style={{
+                padding: "12px 20px",
+                borderRadius: "8px",
+                backgroundColor:
+                  activeCategory === cat ? "#FFD700" : "#500000",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "16px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-      )}
-
-      {screen === "menu" && cart.length > 0 && (
-        <button
-          onClick={() => setScreen("cart")}
-          style={{
-            position: "fixed",
-            bottom: "30px",
-            right: "30px",
-            backgroundColor: "#FFD700",
-            color: "#fff",
-            borderRadius: "50%",
-            width: "90px",
-            height: "90px",
-            fontSize: "32px",
-            border: "none",
-            boxShadow:
-              "0 4px 12px rgba(0,0,0,0.3)",
-            cursor: "pointer",
-            zIndex: 2000,
-          }}
-        >
-          🛒 {cart.length}
-        </button>
-      )}
-
-      {/* Back to home button */}
-      <button
-        onClick={() => {
-          window.location.href = "/";
-        }}
-        style={{
-          position: "absolute",
-          top: "200px",
-          left: "20px",
-          padding: "16px 24px",
-          backgroundColor: "#500000",
-          color: "#fff",
-          borderRadius: "999px",
-          border: "none",
-          fontSize: "20px",
-          fontWeight: "600",
-          boxShadow:
-            "0 4px 12px rgba(0,0,0,0.3)",
-          cursor: "pointer",
-          zIndex: 2000,
-        }}
-      >
-        ← Back
-      </button>
-
-      {/* SORT MODAL */}
-{showSortModal && (
-  <div
-    style={{
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100vw",
-      height: "100vh",
-      backgroundColor: "rgba(0,0,0,0.75)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 99999,
-    }}
-  >
-    <div
-      style={{
-        backgroundColor: accessibilityMode ? "#000" : "#fff",
-        color: accessibilityMode ? "#fff" : "#000",
-        padding: "24px",
-        borderRadius: "12px",
-        width: "90%",
-        maxWidth: "500px",
-        maxHeight: "70vh",
-        overflowY: "auto",
-        fontSize: accessibilityMode ? "28px" : "20px",
-      }}
-    >
-      <h2 style={{ textAlign: "center", marginBottom: "16px" }}>
-        Menu Sorted by Price (High → Low)
-      </h2>
-
-      {menuItems
-        .slice()
-        .sort((a, b) => Number(b.price) - Number(a.price))
-        .map((item) => (
-          <div
-            key={item.id}
-            style={{
-              padding: "10px 0",
-              borderBottom: "1px solid #ddd",
-            }}
-          >
-            {item.name} — ${Number(item.price).toFixed(2)}
-          </div>
-        ))}
-
-      <button
-        onClick={() => setShowSortModal(false)}
-        style={{
-          marginTop: "20px",
-          padding: "12px 20px",
-          backgroundColor: "#b00000",
-          color: "#fff",
-          border: "none",
-          borderRadius: "10px",
-          cursor: "pointer",
-          width: "100%",
-          fontSize: accessibilityMode ? "26px" : "20px",
-        }}
-      >
-        Close
-      </button>
-    </div>
-  </div>
-)}
-
-    </div>
-  );
-}

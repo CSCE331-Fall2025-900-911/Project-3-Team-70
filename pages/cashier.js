@@ -212,7 +212,7 @@ export default function CashierPage() {
       return {
         menuID: i.id,
         quantity: i.qty,
-        priceAtPurchase: Number(i.price || 0),
+        priceAtPurchase: Number(i.modifications?.finalPrice ?? i.price ?? 0),
 
         size: i.modifications?.size ?? null,
 
