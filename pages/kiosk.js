@@ -216,13 +216,10 @@ export default function KioskPage() {
   
 
 
-  const categories = [
-    "Ice-Blended",
-    "Fruity Beverage",
-    "Fresh Brew",
-    "Milky Series",
-    "Non-Caffeinated",
-  ];
+// Generate categories dynamically from menu data
+const categories = Array.from(
+  new Set(menuItems.map((item) => item.category))
+).sort();
 
 
   const [accessibilityLabel, setAccessibilityLabel] = useState({
