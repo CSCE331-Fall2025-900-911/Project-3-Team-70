@@ -10,3 +10,4 @@ env
 ENV
 .vercel
 .env.local
+.env*.local

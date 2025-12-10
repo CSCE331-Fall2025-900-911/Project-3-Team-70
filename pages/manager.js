@@ -154,7 +154,7 @@ const [inventory, setInventory] = useState([]);
 	const [xReportRows, setXReportRows] = useState([]);
 	const [zReportRows, setZReportRows] = useState([]);
 
-	// NEW — X REPORT ============================================
+  // NEW — X REPORT (US Central Time, DST aware) ============================================
   async function generateXReport() {
     try {
       const res = await fetch("/api/sales");
@@ -163,24 +163,60 @@ const [inventory, setInventory] = useState([]);
       const data = await res.json();
       const orders = data.orders || [];
 
-      const today = new Date().toLocaleDateString("en-CA");
+      // ====== HELPER: convert ISO string to Central Time Date ======
+      function toCentral(dateStr) {
+        const dt = new Date(dateStr);
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Chicago",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          hour12: false,
+          minute: "numeric",
+          second: "numeric",
+        }).formatToParts(dt);
 
-      // Select ONLY today’s orders (LOCAL)
+        const y = Number(parts.find(p => p.type === "year").value);
+        const m = Number(parts.find(p => p.type === "month").value) - 1;
+        const d = Number(parts.find(p => p.type === "day").value);
+        const h = Number(parts.find(p => p.type === "hour").value);
+        const min = Number(parts.find(p => p.type === "minute").value);
+        const s = Number(parts.find(p => p.type === "second").value);
+
+        return new Date(y, m, d, h, min, s); // local Date in Central Time
+      }
+
+      // ====== TODAY IN CENTRAL TIME ======
+      const nowCentral = toCentral(new Date().toISOString());
+      const startOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        0, 0, 0, 0
+      );
+      const endOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        23, 59, 59, 999
+      );
+
+      // ===== FILTER ORDERS BY TODAY (Central Time) =====
       const todaysOrders = orders.filter(o => {
         if (!o.orderdate) return false;
-
-        const tsLocal = toLocal(o.orderdate);
-        return isSameLocalDay(o.orderdate, new Date());
+        const tsCentral = toCentral(o.orderdate);
+        return tsCentral >= startOfDay && tsCentral <= endOfDay;
       });
 
-      // ===== GROUP INTO HOUR BLOCKS =====
+      // ===== GROUP INTO HOURLY BLOCKS =====
       const hourlyMap = {};
 
       todaysOrders.forEach(order => {
-        const tsLocal = toLocal(order.orderdate);
-        let hour = tsLocal.getHours();  // 0–23
+        const tsCentral = toCentral(order.orderdate);
+        const hour = tsCentral.getHours(); // hour in Central Time
 
-        // Build AM/PM range label
+        // Build AM/PM label
         const startHour12 = ((hour + 11) % 12) + 1;
         const endHour24 = hour + 1;
         const endHour12 = ((endHour24 + 11) % 12) + 1;
@@ -201,7 +237,7 @@ const [inventory, setInventory] = useState([]);
         hourlyMap[hourLabel].revenue += Number(order.ordertotal || 0);
       });
 
-      // Convert object to sorted array (sort by actual hour number)
+      // ===== SORT AND MAP TO ROWS =====
       const rows = Object.values(hourlyMap)
         .sort((a, b) => a.hour - b.hour)
         .map(h => ({
@@ -212,10 +248,13 @@ const [inventory, setInventory] = useState([]);
 
       setZReportRows([]);
       setXReportRows(rows);
+
     } catch (err) {
       console.error("Error generating X-Report:", err);
     }
   }
+
+
 
 
   	// === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
@@ -249,39 +288,77 @@ const [inventory, setInventory] = useState([]);
   }, []);
 
 
-  // NEW — Z REPORT (End of Day Reset) =========================
-async function generateZReport() {
-  try {
-    const res = await fetch("/api/sales");
-    if (!res.ok) throw new Error("Failed to load sales");
+  // NEW — Z REPORT (End of Day Reset, US Central Time aware) =========================
+  async function generateZReport() {
+    try {
+      const res = await fetch("/api/sales");
+      if (!res.ok) throw new Error("Failed to load sales");
 
-    const data = await res.json();
-    const orders = data.orders || [];
+      const data = await res.json();
+      console.log("Sales data:", data);
+      const orders = data.orders || [];
 
-    // Local date for today (YYYY-MM-DD)
-    const today = new Date().toLocaleDateString("en-CA");
+      // ====== HELPER: convert ISO string to Central Time Date ======
+      function toCentral(dateStr) {
+        const dt = new Date(dateStr);
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Chicago",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          hour12: false,
+          minute: "numeric",
+          second: "numeric",
+        }).formatToParts(dt);
 
-    // Select only today's orders (LOCAL time)
-    const todaysOrders = orders.filter(o => {
-      if (!o.orderdate) return false;
+        const y = Number(parts.find(p => p.type === "year").value);
+        const m = Number(parts.find(p => p.type === "month").value) - 1;
+        const d = Number(parts.find(p => p.type === "day").value);
+        const h = Number(parts.find(p => p.type === "hour").value);
+        const min = Number(parts.find(p => p.type === "minute").value);
+        const s = Number(parts.find(p => p.type === "second").value);
 
-      const tsLocal = toLocal(o.orderdate);  // convert UTC → local
-      return isSameLocalDay(o.orderdate, new Date());
-    });
+        return new Date(y, m, d, h, min, s); // Central Time date
+      }
 
-    // Compute total revenue
-    const totalRevenue = todaysOrders.reduce(
-      (sum, o) => sum + Number(o.ordertotal),
-      0
-    );
+      // ====== TODAY IN CENTRAL TIME ======
+      const nowCentral = toCentral(new Date().toISOString());
+      const startOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        0, 0, 0, 0
+      );
+      const endOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        23, 59, 59, 999
+      );
 
-    setXReportRows([]);
-    setZReportRows([{ label: "Total Revenue", total: totalRevenue }]);
+      // ===== FILTER ORDERS BY TODAY (Central Time) =====
+      const todaysOrders = orders.filter(o => {
+        if (!o.orderdate) return false;
+        const tsCentral = toCentral(o.orderdate);
+        return tsCentral >= startOfDay && tsCentral <= endOfDay;
+      });
 
-  } catch (err) {
-    console.error("Error generating Z-Report:", err);
+      // ===== COMPUTE TOTAL REVENUE =====
+      const totalRevenue = todaysOrders.reduce(
+        (sum, o) => sum + Number(o.ordertotal || 0),
+        0
+      );
+
+      // ===== UPDATE STATE =====
+      setXReportRows([]);
+      setZReportRows([{ label: "Total Revenue", total: totalRevenue }]);
+
+    } catch (err) {
+      console.error("Error generating Z-Report:", err);
+    }
   }
-}
+
 
 
 
