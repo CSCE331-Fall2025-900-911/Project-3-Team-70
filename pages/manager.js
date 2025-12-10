@@ -64,6 +64,7 @@ export default function ManagerPage() {
   const [invUnit, setInvUnit] = useState("");
   const [invMin, setInvMin] = useState("");
   const [invAllergy, setInvAllergy] = useState("");
+  const [invIsTopping, setInvIsTopping] = useState(false);
 
   const [newCategoryInput, setNewCategoryInput] = useState("");
   const [newMenuName, setNewMenuName] = useState("");
@@ -758,7 +759,7 @@ async function handleUpdateMenuItem() {
       unit: invUnit,
       allergy: invAllergy || null,
       restockOrdered: isEditingInventory ? inventory.find(x => x.id === invID)?.restockOrdered || 0 : 0,
-      isTopping: inventory.find(x => x.id === invID)?.isTopping ?? false
+      isTopping: invIsTopping
     };
 
     const method = isEditingInventory ? "PUT" : "POST";
@@ -1041,6 +1042,7 @@ useEffect(() => {
                   setInvMin(i.restockMin);
                   setInvAllergy(i.allergy || "");
                   setShowInventoryModal(true);
+                  setInvIsTopping(i.isTopping ?? false);
                 }}
                 style={{ cursor: "pointer" }}
               >
@@ -1393,6 +1395,16 @@ useEffect(() => {
             />
           </div>
 
+          <div className={styles.modalField}>
+            <label>
+              <input
+                type="checkbox"
+                checked={invIsTopping}
+                onChange={(e) => setInvIsTopping(e.target.checked)}
+              />
+              Is Topping?
+            </label>
+          </div>
           <div className={styles.modalField}>
             <label>Allergy (optional)</label>
             <div style={{ display: "flex", gap: "20px", marginTop: "8px" }}>
