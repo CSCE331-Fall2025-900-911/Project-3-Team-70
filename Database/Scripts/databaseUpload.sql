@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS menu (
     menuDescription VARCHAR,
     seasonalStart TIMESTAMP,
     seasonalEnd TIMESTAMP,
-    isActive BOOLEAN NOT NULL DEFAULT true
+    isactive BOOLEAN NOT NULL DEFAULT true
 );
 
 DROP TABLE IF EXISTS staging_menu;
@@ -28,9 +28,9 @@ CREATE TEMP TABLE staging_menu (
 
 \copy staging_menu FROM 'Database/DatabaseSeed/menu.csv' CSV HEADER;
 
-INSERT INTO menu (menuID, menuName, category, price, menuImage, menuDescription, seasonalStart, seasonalEnd, isActive)
+INSERT INTO menu (menuID, menuName, category, price, menuImage, menuDescription, seasonalStart, seasonalEnd, isactive)
 SELECT menuID, menuName, category, price, menuImage, menuDescription, seasonalStart, seasonalEnd,
-       COALESCE(isActive, true)
+       true  -- default value for isactive
 FROM staging_menu
 ON CONFLICT (menuID) DO UPDATE
 SET menuName = EXCLUDED.menuName,
@@ -40,7 +40,7 @@ SET menuName = EXCLUDED.menuName,
     menuDescription = EXCLUDED.menuDescription,
     seasonalStart = EXCLUDED.seasonalStart,
     seasonalEnd = EXCLUDED.seasonalEnd,
-    isActive = EXCLUDED.isActive;
+    isactive = EXCLUDED.isactive;
 
 
 ------------------------------------------------------------
