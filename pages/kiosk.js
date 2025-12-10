@@ -3,6 +3,30 @@ import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { QRCodeCanvas } from "qrcode.react";
 
+const MODIFIER_MAP = {
+  sweetness: {
+    "0%": 41,
+    "25%": 42,
+    "50%": 43,
+    "75%": 44,
+    "100%": 45,
+    "125%": 52,
+    "150%": 53,
+  },
+
+  ice: {
+    "Regular Ice": 46,
+    "Less Ice": 47,
+    "No Ice": 48,
+    "Extra Ice": 49,
+  },
+
+  temp: {
+    "Cold": 50,
+    "Hot": 51,
+  },
+};
+
 // Texas state sales tax: 6.25%
 const TAX_RATE = 0.0625;
 
@@ -23,14 +47,45 @@ async function sendOrderToSystem(
       priceAtPurchase: Number(item.finalPrice || item.price || 0),
       size: item.size ?? null,
 
-      modifications: item.toppings
-      ? item.toppings.map((t) => ({
-          inventoryID: t.id,
-          name: t.name,
-          cost: Number(t.price),
-          quantity: 1,
-        }))
-      : [],
+    modifications: [
+      // Real toppings
+      ...(item.toppings || []).map((t) => ({
+        inventoryID: t.id,
+        name: t.name,
+        cost: Number(t.price),
+        modificationQuantity: 1,
+      })),
+
+      // Sweetness → inventory item
+      ...(item.sweetness
+        ? [{
+            inventoryID: MODIFIER_MAP.sweetness[item.sweetness],
+            name: `Sweetness: ${item.sweetness}`,
+            cost: 0,
+            modificationQuantity: 1,
+          }]
+        : []),
+
+      // Temperature → inventory item
+      ...(item.temperature
+        ? [{
+            inventoryID: MODIFIER_MAP.temp[item.temperature],
+            name: `Temperature: ${item.temperature}`,
+            cost: 0,
+            modificationQuantity: 1,
+          }]
+        : []),
+
+      // Ice level → inventory item
+      ...(item.iceLevel
+        ? [{
+            inventoryID: MODIFIER_MAP.ice[item.iceLevel],
+            name: `Ice: ${item.iceLevel}`,
+            cost: 0,
+            modificationQuantity: 1,
+          }]
+        : []),
+    ],
     }));
 
     // Fallback if no summary provided
@@ -481,7 +536,7 @@ export default function KioskPage() {
         ...detailsItem,
         toppings: selectedToppings,
         sweetness,
-        iceLevel,
+        iceLevel: temperature === "Hot" ? null : iceLevel,
         temperature,
         size,
         finalPrice,
@@ -659,23 +714,25 @@ export default function KioskPage() {
         )}
 
         {/* SWEETNESS */}
-        <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
-        <select
-          value={sweetness}
-          onChange={(e) => setSweetness(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "20px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-          }}
-        >
-          <option>0%</option>
-          <option>25%</option>
-          <option>50%</option>
-          <option>75%</option>
-          <option>100%</option>
-        </select>
+      <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
+      <select
+        value={sweetness}
+        onChange={(e) => setSweetness(e.target.value)}
+        style={{
+          padding: "10px",
+          fontSize: "20px",
+          borderRadius: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <option>0%</option>
+        <option>25%</option>
+        <option>50%</option>
+        <option>75%</option>
+        <option>100%</option>
+        <option>125%</option>
+        <option>150%</option>
+      </select>
 
         {/* TEMPERATURE */}
         <h2 style={{ marginTop: "20px" }}>Temperature</h2>
