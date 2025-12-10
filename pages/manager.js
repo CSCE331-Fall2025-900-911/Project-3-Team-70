@@ -138,7 +138,7 @@ const [inventory, setInventory] = useState([]);
 	const [xReportRows, setXReportRows] = useState([]);
 	const [zReportRows, setZReportRows] = useState([]);
 
-	// NEW — X REPORT ============================================
+  // NEW — X REPORT ============================================
   async function generateXReport() {
     try {
       const res = await fetch("/api/sales");
@@ -147,24 +147,25 @@ const [inventory, setInventory] = useState([]);
       const data = await res.json();
       const orders = data.orders || [];
 
-      const today = new Date().toLocaleDateString("en-CA");
+      // Get today's UTC date boundaries
+      const nowUTC = new Date();
+      const startOfDayUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(), 0, 0, 0, 0));
+      const endOfDayUTC = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(), 23, 59, 59, 999));
 
-      // Select ONLY today’s orders (LOCAL)
+      // Select ONLY today's orders (UTC)
       const todaysOrders = orders.filter(o => {
         if (!o.orderdate) return false;
 
-        const tsLocal = toLocal(o.orderdate);
-        const dateOnly = tsLocal.toLocaleDateString("en-CA");
-
-        return dateOnly === today;
+        const tsUTC = new Date(o.orderdate); // orderdate is UTC
+        return tsUTC >= startOfDayUTC && tsUTC <= endOfDayUTC;
       });
 
       // ===== GROUP INTO HOUR BLOCKS =====
       const hourlyMap = {};
 
       todaysOrders.forEach(order => {
-        const tsLocal = toLocal(order.orderdate);
-        let hour = tsLocal.getHours();  // 0–23
+        const tsUTC = new Date(order.orderdate);
+        const hour = tsUTC.getUTCHours(); // use UTC hour
 
         // Build AM/PM range label
         const startHour12 = ((hour + 11) % 12) + 1;
@@ -204,6 +205,7 @@ const [inventory, setInventory] = useState([]);
   }
 
 
+
   	// === LOAD REAL KIOSK ORDERS INTO SALES TAB ===
 
   useEffect(() => {
@@ -241,6 +243,7 @@ async function generateZReport() {
     if (!res.ok) throw new Error("Failed to load sales");
 
     const data = await res.json();
+    console.log("Sales data:", data);
     const orders = data.orders || [];
 
     // Local date for today (YYYY-MM-DD)
