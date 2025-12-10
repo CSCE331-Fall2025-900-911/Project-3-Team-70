@@ -237,7 +237,7 @@ const [inventory, setInventory] = useState([]);
   // NEW — Z REPORT (End of Day Reset) =========================
 async function generateZReport() {
   try {
-    const res = await fetch("/api/sales");
+    const res = await fetch("/api/manager/sales");
     if (!res.ok) throw new Error("Failed to load sales");
 
     const data = await res.json();
