@@ -367,7 +367,7 @@ export default function CashierPage() {
                       <div className="mods">
                         Toppings:{" "}
                         {line.modifications.toppings
-                          .map((t) => `${t} (+$1)`)
+                          .map((t) => `${t.name} (+$1)`)
                           .join(", ")}
                       </div>
                     )}
@@ -407,19 +407,19 @@ export default function CashierPage() {
                 </p>
               ) : (
                 toppingOptions.map((t) => (
-                  <label key={t} className="checkbox-row">
+                  <label key={t.id} className="checkbox-row">
                     <input
                       type="checkbox"
-                      checked={modToppings.includes(t)}
+                      checked={modToppings.some((x) => x.id === t.id)}
                       onChange={(e) => {
                         setModToppings((prev) =>
                           e.target.checked
                             ? [...prev, t]
-                            : prev.filter((x) => x !== t)
+                            : prev.filter((x) => x.id !== t.id)
                         );
                       }}
                     />
-                    {t} — <strong>+$1.00</strong>
+                    {t.name} — <strong>+$1.00</strong>
                   </label>
                 ))
               )}
