@@ -43,7 +43,13 @@ async function handleCreateOrder(req, res) {
     }
 
     // Compute order total
-    const orderTotal = Number(req.body.finalTotal ?? 0);
+    const orderTotal = items.reduce(
+      (sum, item) =>
+        sum +
+        Number(item.priceAtPurchase || 0) *
+          Number(item.quantity || 0),
+      0
+    );
 
     const nextOrderResult = await query(
       "SELECT COALESCE(MAX(orderID), 0) + 1 AS nextId FROM ordertest"
