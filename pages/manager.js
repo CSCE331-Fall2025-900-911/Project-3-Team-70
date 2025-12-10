@@ -723,7 +723,6 @@ useEffect(() => {
 			<thead>
 			<tr>
 				<th>Order ID</th>
-				<th>Employee ID</th>
 				<th>Location</th>
 				<th>Date</th>
 				<th>Total ($)</th>
@@ -737,7 +736,6 @@ useEffect(() => {
 
 				return (
 					String(row.orderid).includes(q) ||
-					String(row.employeeid).includes(q) ||
 					(row.orderlocation || "").toLowerCase().includes(q) ||
 					(row.orderdate || "").toString().includes(q)
 				);
@@ -745,7 +743,6 @@ useEffect(() => {
 				.map((row) => (
 				<tr key={row.orderid}>
 					<td>{row.orderid}</td>
-					<td>{row.employeeid}</td>
 					<td>{row.orderlocation}</td>
 					<td>
 					{row.orderdate
