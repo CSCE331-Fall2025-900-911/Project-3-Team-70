@@ -8,8 +8,8 @@ async function sendOrderToSystem(orderItems, session) {
 
   try {
     const items = rawItems.map((i) => ({
-      menuID: i.id, // kiosk items store id
-      quantity: 1,  // each customization is its own line
+      menuID: i.id,
+      quantity: 1,
       priceAtPurchase: Number(i.finalPrice ?? i.price ?? 0),
       modifications: i.modifications || null,
     }));
@@ -33,7 +33,6 @@ async function sendOrderToSystem(orderItems, session) {
     }
 
     const data = await res.json();
-    // Expecting { success, orderID, orderTotal }
     return {
       orderID: data.orderID,
       orderTotal: data.orderTotal,
@@ -45,7 +44,7 @@ async function sendOrderToSystem(orderItems, session) {
   }
 }
 
-// === Narration helper with language support ===
+// === Narration helper ===
 const narrationVoices = {
   en: "en-US",
   es: "es-ES",
@@ -71,9 +70,7 @@ const speak = (text, lang = "en") => {
 async function translateText(text, targetLang) {
   try {
     const response = await fetch(
-      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURI(
-        text
-      )}`
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
     );
     const result = await response.json();
     return result[0][0][0];
@@ -86,7 +83,7 @@ async function translateText(text, targetLang) {
 // === Weather Widget ===
 function WeatherWidget({ accessibilityMode }) {
   const [weather, setWeather] = useState({
-    emoji: "☀️",
+    emoji: "Sun",
     temp: "--",
     feels_like: "--",
     wind: "--",
@@ -100,32 +97,22 @@ function WeatherWidget({ accessibilityMode }) {
         const res = await fetch("/api/weather");
         const data = await res.json();
 
-        const kelvinToF = (k) =>
-          Math.round(((k - 273.15) * 9) / 5 + 32);
+        const kelvinToF = (k) => Math.round(((k - 273.15) * 9) / 5 + 32);
 
         const iconMap = {
-          "01d": "☀️",
-          "01n": "🌙",
-          "02d": "🌤️",
-          "02n": "🌤️",
-          "03d": "☁️",
-          "03n": "☁️",
-          "04d": "☁️",
-          "04n": "☁️",
-          "09d": "🌧️",
-          "09n": "🌧️",
-          "10d": "🌦️",
-          "10n": "🌦️",
-          "11d": "⛈️",
-          "11n": "⛈️",
-          "13d": "❄️",
-          "13n": "❄️",
-          "50d": "🌫️",
-          "50n": "🌫️",
+          "01d": "Sun", "01n": "Moon",
+          "02d": "Cloudy Sun", "02n": "Cloudy Sun",
+          "03d": "Cloud", "03n": "Cloud",
+          "04d": "Cloud", "04n": "Cloud",
+          "09d": "Heavy Rain", "09n": "Heavy Rain",
+          "10d": "Light Rain", "10n": "Light Rain",
+          "11d": "Thunderstorm", "11n": "Thunderstorm",
+          "13d": "Snow", "13n": "Snow",
+          "50d": "Fog", "50n": "Fog",
         };
 
         setWeather({
-          emoji: iconMap[data.weather[0].icon] || "☀️",
+          emoji: iconMap[data.weather[0].icon] || "Sun",
           temp: kelvinToF(data.main.temp),
           feels_like: kelvinToF(data.main.feels_like),
           wind: data.wind.speed,
@@ -136,7 +123,7 @@ function WeatherWidget({ accessibilityMode }) {
     }
 
     fetchWeather();
-    intervalId = setInterval(fetchWeather, 600000); // 10 min
+    intervalId = setInterval(fetchWeather, 600000);
 
     return () => clearInterval(intervalId);
   }, []);
@@ -183,7 +170,7 @@ export default function KioskPage() {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [menuItems, setMenuItems] = useState([]);
-  const [filteredMenuItems, stFilteredMenuItems] = useState([]);
+  const [filteredMenuItems, setFilteredMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -194,7 +181,7 @@ export default function KioskPage() {
   });
 
   const [activeCategory, setActiveCategory] = useState(null);
-  const [screen, setScreen] = useState("menu"); // menu | details | cart | checkout | payment | success
+  const [screen, setScreen] = useState("menu");
   const [detailsItem, setDetailsItem] = useState(null);
 
   const [cart, setCart] = useState([]);
@@ -219,29 +206,16 @@ export default function KioskPage() {
     "Non-Caffeinated",
   ];
 
-
-  const [accessibilityLabel, setAccessibilityLabel] = useState({
-    on: "Accessibility Mode: ON",
-    off: "Accessibility Mode: OFF",
-  });
-
-  // Single source of truth for session (for rewards + sign-in)
-  const { data: session } = useSession();
-
-  const [loyaltyPoints, setLoyaltyPoints] = useState(null);
-  const [pointsError, setPointsError] = useState(null);
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
-
   function filterByAllergies(items, excludedAllergies) {
-  if (excludedAllergies.length === 0) return items;
+    if (excludedAllergies.length === 0) return items;
 
     return items.filter((item) => {
       if (!item.allergies || item.allergies.length === 0) return true;
-      return !item.allergies.some((a) => excluded.includes(a));
+      return !item.allergies.some((a) => excludedAllergies.includes(a));
     });
   }
 
-  // === LOAD REWARDS WHEN SIGNED IN ===
+  // === LOAD REWARDS ===
   useEffect(() => {
     if (!session?.user?.email) {
       setLoyaltyPoints(null);
@@ -261,7 +235,6 @@ export default function KioskPage() {
         setPointsError("Could not load points");
       }
     }
-
     loadPoints();
   }, [session]);
 
@@ -321,7 +294,7 @@ export default function KioskPage() {
     fetchToppings();
   }, []);
 
-  // === UPDATE FILTERED MENU WHEN ALLERGY SELECTION CHANGES ===
+  // === UPDATE FILTERED MENU ON ALLERGY CHANGE ===
   useEffect(() => {
     setFilteredMenuItems(filterByAllergies(menuItems, excludedAllergies));
   }, [menuItems, excludedAllergies]);
@@ -329,8 +302,7 @@ export default function KioskPage() {
   // === GOOGLE TRANSLATE WIDGET ===
   useEffect(() => {
     const script = document.createElement("script");
-    script.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     document.body.appendChild(script);
 
     window.googleTranslateElementInit = () => {
@@ -348,19 +320,10 @@ export default function KioskPage() {
     if (!langCode) return;
     setLanguage(langCode);
 
-    const labelOn = await translateText(
-      "Accessibility Mode: ON",
-      langCode
-    );
-    const labelOff = await translateText(
-      "Accessibility Mode: OFF",
-      langCode
-    );
+    const labelOn = await translateText("Accessibility Mode: ON", langCode);
+    const labelOff = await translateText("Accessibility Mode: OFF", langCode);
 
-    setAccessibilityLabel({
-      on: labelOn,
-      off: labelOff,
-    });
+    setAccessibilityLabel({ on: labelOn, off: labelOff });
 
     document.cookie = `googtrans=/en/${langCode};path=/`;
     window.location.reload();
@@ -371,9 +334,7 @@ export default function KioskPage() {
 
     if (narrationOn) {
       speak(
-        `${item.name}. Price ${item.finalPrice || item.price} dollars. ${
-          item.description || ""
-        }`,
+        `${item.name}. Price ${item.finalPrice || item.price} dollars. ${item.description || ""}`,
         language
       );
     }
@@ -384,22 +345,17 @@ export default function KioskPage() {
   const toggleNarration = () => {
     const newState = !narrationOn;
     setNarrationOn(newState);
-
-    if (newState) {
-      speak(
-        "Narration enabled. Tap a drink to hear its description.",
-        language
-      );
-    } else {
-      speak("Narration disabled.", language);
-    }
+    speak(
+      newState
+        ? "Narration enabled. Tap a drink to hear its description."
+        : "Narration disabled.",
+      language
+    );
   };
 
   const addToCart = (item) => {
     setCart((prev) => [...prev, item]);
-    if (narrationOn) {
-      speak(`${item.name} added to cart.`, language);
-    }
+    if (narrationOn) speak(`${item.name} added to cart.`, language);
   };
 
   const removeFromCart = (indexToRemove) => {
@@ -411,7 +367,7 @@ export default function KioskPage() {
     0
   );
 
-  // === DRINK DETAILS / CUSTOMIZATION SCREEN ===
+  // === DRINK DETAILS SCREEN ===
   const DrinkDetailsPage = () => {
     const [selectedToppings, setSelectedToppings] = useState([]);
     const [sweetness, setSweetness] = useState("100%");
@@ -431,18 +387,14 @@ export default function KioskPage() {
 
     const basePrice =
       Number(detailsItem.price) +
-      selectedToppings.reduce(
-        (sum, t) => sum + Number(t.price),
-        0
-      );
+      selectedToppings.reduce((sum, t) => sum + Number(t.price), 0);
 
     let finalPrice = basePrice;
     if (size === "Small") finalPrice -= 0.5;
     if (size === "Large") finalPrice += 0.5;
 
     const finalize = () => {
-      const appliedIce =
-        temperature === "Hot" ? "No Ice (Hot)" : iceLevel;
+      const appliedIce = temperature === "Hot" ? "No Ice (Hot)" : iceLevel;
 
       const modifications = {
         toppings: selectedToppings.map((t) => t.name),
@@ -494,15 +446,13 @@ export default function KioskPage() {
             cursor: "pointer",
           }}
         >
-          ← Back
+          Back
         </button>
 
         <img
           src={detailsItem.image}
           alt={detailsItem.name}
-          onError={(e) => {
-            e.target.src = "/images/default.png";
-          }}
+          onError={(e) => { e.target.src = "/images/default.png"; }}
           style={{
             width: "60%",
             maxWidth: "400px",
@@ -513,41 +463,20 @@ export default function KioskPage() {
         />
 
         <h1 style={{ fontSize: "36px" }}>{detailsItem.name}</h1>
-
         <p style={{ fontSize: "24px", opacity: 0.9 }}>
           Base Price: ${Number(detailsItem.price).toFixed(2)}
         </p>
 
-        {/* TOPPINGS */}
-        <h2 style={{ fontSize: "30px", marginTop: "20px" }}>
-          Toppings
-        </h2>
-
-        <div
-          style={{
-            margin: "20px auto",
-            width: "80%",
-            textAlign: "left",
-          }}
-        >
-          {toppingsError && (
-            <p style={{ color: "red" }}>{toppingsError}</p>
-          )}
+        {/* Toppings */}
+        <h2 style={{ fontSize: "30px", marginTop: "20px" }}>Toppings</h2>
+        <div style={{ margin: "20px auto", width: "80%", textAlign: "left" }}>
+          {toppingsError && <p style={{ color: "red" }}>{toppingsError}</p>}
           {toppings.map((top) => {
             const checked = selectedToppings.some((t) => t.id === top.id);
 
-            // Determine if valid allergen info exists
-            const hasAllergen =
-              top.allergy &&
-              top.allergy.trim() !== "" &&
-              top.allergy.trim().toLowerCase() !== "none";
-
-            // Split allergens cleanly (supports "Dairy, Nuts")
+            const hasAllergen = top.allergy && top.allergy.trim() !== "" && top.allergy.trim().toLowerCase() !== "none";
             const cleanAllergies = hasAllergen
-              ? top.allergy
-                  .split(",")
-                  .map((a) => a.trim())
-                  .filter((a) => a && a.toLowerCase() !== "none")
+              ? top.allergy.split(",").map(a => a.trim()).filter(a => a && a.toLowerCase() !== "none")
               : [];
 
             return (
@@ -562,13 +491,7 @@ export default function KioskPage() {
                     fontSize: "18px",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
-                  >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -576,62 +499,44 @@ export default function KioskPage() {
                       style={{ width: "20px", height: "20px" }}
                     />
                     {top.name}
-                  </label>
-                  
+                  </div>
                   <span style={{ fontSize: accessibilityMode ? "22px" : "18px" }}>
                     + ${Number(top.price).toFixed(2)}
                   </span>
                 </label>
-                  
+
                 {cleanAllergies.length > 0 && (
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "bold",
-                      color: "red",
-                      marginTop: "5px",
-                    }}
-                  >
-                    ⚠ Contains {cleanAllergies.join(", ")}
+                  <p style={{ fontSize: "14px", fontWeight: "bold", color: "red", marginTop: "5px" }}>
+                    Warning: Contains {cleanAllergies.join(", ")}
                   </p>
                 )}
               </div>
             );
           })}
         </div>
-      )}
-      {/* SWEETNESS */}
-      <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
-      <select
-        value={sweetness}
-        onChange={(e) => setSweetness(e.target.value)}
-        style={{
-          padding: "10px",
-          fontSize: "20px",
-          borderRadius: "10px",
-          marginBottom: "20px",
-        }}
-      >
-        <option>0%</option>
-        <option>25%</option>
-        <option>50%</option>
-        <option>75%</option>
-        <option>100%</option>
-      </select>
 
-        {/* ICE LEVEL (only when Cold) */}
+        {/* Sweetness */}
+        <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
+        <select
+          value={sweetness}
+          onChange={(e) => setSweetness(e.target.value)}
+          style={{ padding: "10px", fontSize: "20px", borderRadius: "10px", marginBottom: "20px" }}
+        >
+          <option>0%</option>
+          <option>25%</option>
+          <option>50%</option>
+          <option>75%</option>
+          <option>100%</option>
+        </select>
+
+        {/* Ice Level (only for Cold) */}
         {temperature === "Cold" && (
           <>
             <h2>Ice Level</h2>
             <select
               value={iceLevel}
               onChange={(e) => setIceLevel(e.target.value)}
-              style={{
-                padding: "10px",
-                fontSize: "20px",
-                borderRadius: "10px",
-                marginBottom: "20px",
-              }}
+              style={{ padding: "10px", fontSize: "20px", borderRadius: "10px", marginBottom: "20px" }}
             >
               <option>Regular Ice</option>
               <option>Less Ice</option>
@@ -641,44 +546,29 @@ export default function KioskPage() {
           </>
         )}
 
-        {/* SWEETNESS */}
-        <h2 style={{ marginTop: "20px" }}>Sweetness</h2>
+        {/* Temperature */}
+        <h2 style={{ marginTop: "20px" }}>Temperature</h2>
         <select
-          value={sweetness}
-          onChange={(e) => setSweetness(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "20px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-          }}
+          value={temperature}
+          onChange={(e) => setTemperature(e.target.value)}
+          style={{ padding: "10px", fontSize: "20px", borderRadius: "10px", marginBottom: "20px" }}
         >
-          <option>0%</option>
-          <option>25%</option>
-          <option>50%</option>
-          <option>75%</option>
-          <option>100%</option>
+          <option>Cold</option>
+          <option>Hot</option>
         </select>
 
-
-        {/* SIZE */}
+        {/* Size */}
         <h2 style={{ marginTop: "20px" }}>Size</h2>
         <select
           value={size}
           onChange={(e) => setSize(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "20px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-          }}
+          style={{ padding: "10px", fontSize: "20px", borderRadius: "10px", marginBottom: "20px" }}
         >
           <option value="Small">Small (-$0.50)</option>
           <option value="Medium">Medium</option>
           <option value="Large">Large (+$0.50)</option>
         </select>
 
-        {/* FINAL TOTAL */}
         <h2 style={{ marginTop: "30px", fontSize: "30px" }}>
           Total: ${finalPrice.toFixed(2)}
         </h2>
@@ -700,7 +590,6 @@ export default function KioskPage() {
       </div>
     );
   };
-
   // === CART SCREEN ===
   const CartScreen = () => {
     useEffect(() => {
@@ -1600,26 +1489,18 @@ export default function KioskPage() {
 
       {loading && <p>Loading menu...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
-
+              
       {!loading && !error && screen === "menu" && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "20px",
-          }}
-        >
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {categories.map((cat) => {
-            const sampleItem = menuItems.find(
-              (item) => item.category === cat
-            );
+            const sampleItem = menuItems.find((item) => item.category === cat);
+          
             return (
               <div key={cat}>
+                {/* Category Button */}
                 <button
                   onClick={() =>
-                    setActiveCategory(
-                      activeCategory === cat ? null : cat
-                    )
+                    setActiveCategory(activeCategory === cat ? null : cat)
                   }
                   style={{
                     display: "flex",
@@ -1627,19 +1508,11 @@ export default function KioskPage() {
                     width: "100%",
                     padding: "20px",
                     borderRadius: "12px",
-                    backgroundColor:
-                      activeCategory === cat
-                        ? "#FFD700"
-                        : "#500000",
-                      activeCategory === cat
-                        ? "#FFD700"
-                        : "#500000",
+                    backgroundColor: activeCategory === cat ? "#FFD700" : "#500000",
                     color: "#fff",
                     border: "none",
                     cursor: "pointer",
-                    fontSize: accessibilityMode
-                      ? "28px"
-                      : "22px",
+                    fontSize: accessibilityMode ? "28px" : "22px",
                     textAlign: "left",
                     transition: "all 0.2s ease",
                   }}
@@ -1662,13 +1535,13 @@ export default function KioskPage() {
                   )}
                   <span>{cat}</span>
                 </button>
-
+                
+                {/* Items Grid */}
                 {activeCategory === cat && (
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fill, minmax(220px, 1fr))",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
                       justifyItems: "center",
                       gap: accessibilityMode ? "40px" : "25px",
                       marginTop: "20px",
@@ -1678,8 +1551,8 @@ export default function KioskPage() {
                     {filteredMenuItems
                       .filter((item) => item.category === cat)
                       .map((item) => {
-                        const isPressed =
-                          selectedItem === item.id;
+                        const isPressed = selectedItem === item.id;
+                      
                         return (
                           <div
                             key={item.id}
@@ -1690,27 +1563,21 @@ export default function KioskPage() {
                             }}
                             role="button"
                             aria-label={`Select ${item.name}`}
-                            tabIndex="0"
+                            tabIndex={0}
                             style={{
                               borderRadius: "20px",
-                              padding: accessibilityMode
-                                ? "35px"
-                                : "25px",
+                              padding: accessibilityMode ? "35px" : "25px",
                               backgroundColor: isPressed
                                 ? "#ffe680"
                                 : accessibilityMode
                                 ? "#222"
                                 : "#fff",
-                              color: accessibilityMode
-                                ? "#fff"
-                                : "#000",
+                              color: accessibilityMode ? "#fff" : "#000",
                               boxShadow: isPressed
                                 ? "0 0 0 4px #FFD700"
                                 : "0 4px 12px rgba(0,0,0,0.1)",
                               textAlign: "left",
-                              transform: isPressed
-                                ? "scale(0.97)"
-                                : "scale(1)",
+                              transform: isPressed ? "scale(0.97)" : "scale(1)",
                               transition: "all 0.2s ease",
                               cursor: "pointer",
                               userSelect: "none",
@@ -1733,8 +1600,7 @@ export default function KioskPage() {
                                 src={item.image}
                                 alt={item.name}
                                 onError={(e) => {
-                                  e.target.src =
-                                    "/images/default.png";
+                                  e.target.src = "/images/default.png";
                                 }}
                                 style={{
                                   width: "100%",
@@ -1743,98 +1609,40 @@ export default function KioskPage() {
                                 }}
                               />
                             </div>
-
+                              
                             <h3
                               style={{
-                                fontSize: accessibilityMode
-                                  ? "28px"
-                                  : "22px",
+                                fontSize: accessibilityMode ? "28px" : "22px",
                                 marginBottom: "10px",
                               }}
                             >
                               {item.name}
                             </h3>
-                            <p
-                              style={{
-                                fontSize: accessibilityMode
-                                  ? "22px"
-                                  : "18px",
-                              }}
-                            >
-                              $
-                              {Number(
-                                item.finalPrice ?? item.price ?? 0
-                              ).toFixed(2)}
+                            
+                            <p style={{ fontSize: accessibilityMode ? "22px" : "18px" }}>
+                              ${Number(item.finalPrice ?? item.price ?? 0).toFixed(2)}
                             </p>
+                            
                             {item.description && (
                               <p
                                 style={{
-                                  fontSize: accessibilityMode
-                                    ? "18px"
-                                    : "14px",
+                                  fontSize: accessibilityMode ? "18px" : "14px",
                                   opacity: 0.8,
                                 }}
                               >
                                 {item.description}
                               </p>
                             )}
-
-                            {/* Allergy icons */}
-                            {item.allergies &&
-                              item.allergies.length > 0 && (
-                                <div
-                                  style={{
-                                    marginTop: "10px",
-                                    display: "flex",
-                                    gap: "8px",
-                                  }}
-                                >
-                                  {item.allergies.includes(
-                                    "Dairy"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize: "20px",
-                                      }}
-                                    >
-                                      🥛
-                                    </span>
-                                  )}
-                                  {item.allergies.includes(
-                                    "Nuts"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize: "20px",
-                                      }}
-                                    >
-                                      🥜
-                                    </span>
-                                  )}
-                                  {item.allergies.includes(
-                                    "Soy"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize: "20px",
-                                      }}
-                                    >
-                                      🌱
-                                    </span>
-                                  )}
-                                  {item.allergies.includes(
-                                    "Gluten"
-                                  ) && (
-                                    <span
-                                      style={{
-                                        fontSize: "20px",
-                                      }}
-                                    >
-                                      🌾
-                                    </span>
-                                  )}
-                                </div>
-                              )}
+      
+                            {/* Allergy Icons */}
+                            {item.allergies && item.allergies.length > 0 && (
+                              <div style={{ marginTop: "10px", display: "flex", gap: "8px" }}>
+                                {item.allergies.includes("Dairy") && <span style={{ fontSize: "20px" }}>Milk</span>}
+                                {item.allergies.includes("Nuts") && <span style={{ fontSize: "20px" }}>Nuts</span>}
+                                {item.allergies.includes("Soy") && <span style={{ fontSize: "20px" }}>Soy</span>}
+                                {item.allergies.includes("Gluten") && <span style={{ fontSize: "20px" }}>Wheat</span>}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
