@@ -22,6 +22,15 @@ async function sendOrderToSystem(
       quantity: item.quantity || 1,
       priceAtPurchase: Number(item.finalPrice || item.price || 0),
       size: item.size ?? null,
+
+      modifications: item.toppings
+      ? item.toppings.map((t) => ({
+          inventoryID: t.id,
+          name: t.name,
+          cost: Number(t.price),
+          quantity: 1,
+        }))
+      : [],
     }));
 
     // Fallback if no summary provided
@@ -239,6 +248,9 @@ export default function KioskPage() {
   const [loyaltyPoints, setLoyaltyPoints] = useState(null);
   const [pointsError, setPointsError] = useState(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
+
+  const [showSortModal, setShowSortModal] = useState(false);
+
 
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
@@ -1775,86 +1787,107 @@ export default function KioskPage() {
     );
   };
 
-  const AllergyFilterPanel = () => {
-    const allergens = ["Dairy", "Nuts"];
+const AllergyFilterPanel = ({ accessibilityMode }) => {
+  const allergens = ["Dairy", "Nuts"];
 
-    const toggleAllergen = (a) => {
-      setExcludedAllergies((prev) =>
-        prev.includes(a)
-          ? prev.filter((x) => x !== a)
-          : [...prev, a]
-      );
-    };
-
-    return (
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          backgroundColor: "rgba(0,0,0,0.75)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 9999,
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "#fff",
-            padding: "30px",
-            borderRadius: "14px",
-            width: "90%",
-            maxWidth: "400px",
-            textAlign: "center",
-            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-          }}
-        >
-          <h2 style={{ marginBottom: "20px" }}>
-            Select Allergies to Avoid
-          </h2>
-
-          {allergens.map((a) => (
-            <label
-              key={a}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "12px 0",
-                borderBottom: "1px solid #ddd",
-                fontSize: "18px",
-              }}
-            >
-              <span>{a}</span>
-              <input
-                type="checkbox"
-                checked={excludedAllergies.includes(a)}
-                onChange={() => toggleAllergen(a)}
-              />
-            </label>
-          ))}
-
-          <button
-            onClick={() => setAllergyFilterOpen(false)}
-            style={{
-              marginTop: "20px",
-              padding: "12px 20px",
-              backgroundColor: "#500000",
-              color: "#fff",
-              borderRadius: "10px",
-              border: "none",
-              fontSize: "18px",
-              cursor: "pointer",
-            }}
-          >
-            Apply Filters
-          </button>
-        </div>
-      </div>
+  const toggleAllergen = (a) => {
+    setExcludedAllergies((prev) =>
+      prev.includes(a)
+        ? prev.filter((x) => x !== a)
+        : [...prev, a]
     );
   };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(0,0,0,0.75)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: accessibilityMode ? "#000" : "#fff",
+          color: accessibilityMode ? "#fff" : "#000",
+          padding: accessibilityMode ? "40px" : "30px",
+          borderRadius: "14px",
+          width: "90%",
+          maxWidth: "420px",
+          textAlign: "center",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          border: accessibilityMode ? "3px solid #FFD700" : "none",
+          transition: "all 0.3s ease",
+        }}
+      >
+        <h2
+          style={{
+            marginBottom: "20px",
+            fontSize: accessibilityMode ? "28px" : "22px",
+            color: accessibilityMode ? "#FFD700" : "#000",
+          }}
+        >
+          Select Allergies to Avoid
+        </h2>
+
+        {allergens.map((a) => (
+          <label
+            key={a}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: accessibilityMode ? "16px" : "12px 0",
+              marginBottom: accessibilityMode ? "14px" : "0",
+              backgroundColor: accessibilityMode ? "#FFD700" : "transparent",
+              color: accessibilityMode ? "#000" : "#000",
+              borderRadius: accessibilityMode ? "10px" : "0",
+              borderBottom: accessibilityMode ? "none" : "1px solid #ddd",
+              fontSize: accessibilityMode ? "22px" : "18px",
+              fontWeight: accessibilityMode ? "bold" : "normal",
+            }}
+          >
+            <span>{a}</span>
+            <input
+              type="checkbox"
+              checked={excludedAllergies.includes(a)}
+              onChange={() => toggleAllergen(a)}
+              style={{
+                width: accessibilityMode ? "28px" : "18px",
+                height: accessibilityMode ? "28px" : "18px",
+              }}
+            />
+          </label>
+        ))}
+
+        <button
+          onClick={() => setAllergyFilterOpen(false)}
+          style={{
+            marginTop: "25px",
+            padding: accessibilityMode ? "16px 24px" : "12px 20px",
+            backgroundColor: accessibilityMode ? "#FFD700" : "#500000",
+            color: accessibilityMode ? "#000" : "#fff",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: accessibilityMode ? "22px" : "18px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            width: "100%",
+          }}
+        >
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  );
+};
 
   // === MAIN RENDER SWITCH ===
   if (screen === "details")
@@ -1907,7 +1940,9 @@ export default function KioskPage() {
       }}
     >
       <WeatherWidget accessibilityMode={accessibilityMode} />
-      {allergyFilterOpen && <AllergyFilterPanel />}
+      {allergyFilterOpen && (
+        <AllergyFilterPanel accessibilityMode={accessibilityMode} />
+      )}
 
       {/* Sign-in bar for rewards */}
       <div
@@ -2071,6 +2106,23 @@ export default function KioskPage() {
       </p>
 
       {/* Category buttons */}
+
+      <button
+      onClick={() => setShowSortModal(true)}
+      style={{
+        padding: "12px 20px",
+        borderRadius: "8px",
+        backgroundColor: "#500000",
+        color: "#fff",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "18px",
+        marginBottom: "20px",
+      }}
+    >
+      Sort by Price
+    </button>
+
       <div
         style={{
           display: "flex",
@@ -2473,6 +2525,75 @@ export default function KioskPage() {
       >
         ← Back
       </button>
+
+      {/* SORT MODAL */}
+{showSortModal && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(0,0,0,0.75)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 99999,
+    }}
+  >
+    <div
+      style={{
+        backgroundColor: accessibilityMode ? "#000" : "#fff",
+        color: accessibilityMode ? "#fff" : "#000",
+        padding: "24px",
+        borderRadius: "12px",
+        width: "90%",
+        maxWidth: "500px",
+        maxHeight: "70vh",
+        overflowY: "auto",
+        fontSize: accessibilityMode ? "28px" : "20px",
+      }}
+    >
+      <h2 style={{ textAlign: "center", marginBottom: "16px" }}>
+        Menu Sorted by Price (High → Low)
+      </h2>
+
+      {menuItems
+        .slice()
+        .sort((a, b) => Number(b.price) - Number(a.price))
+        .map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: "10px 0",
+              borderBottom: "1px solid #ddd",
+            }}
+          >
+            {item.name} — ${Number(item.price).toFixed(2)}
+          </div>
+        ))}
+
+      <button
+        onClick={() => setShowSortModal(false)}
+        style={{
+          marginTop: "20px",
+          padding: "12px 20px",
+          backgroundColor: "#b00000",
+          color: "#fff",
+          border: "none",
+          borderRadius: "10px",
+          cursor: "pointer",
+          width: "100%",
+          fontSize: accessibilityMode ? "26px" : "20px",
+        }}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
