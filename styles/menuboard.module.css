@@ -34,7 +34,7 @@
 .main {
   flex: 1;
   display: grid;
-  grid-template-columns: 3fr 1.5fr;
+  grid-template-columns: 1fr; /* full width for category grid */
   gap: 20px;
   padding: 20px 36px;
 }
