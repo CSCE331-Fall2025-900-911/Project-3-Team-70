@@ -269,38 +269,56 @@ async function generateZReport() {
     );
   }, [query, inventory]);
 
-  // Event Handlers ===================================================
-  function handleAddMenuItem() {
-      // Pre-load auto-included ingredients
-      setNewMenuIngredients(
-          ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
-              inventoryID: id,
-              quantity: 1   // Or 0 if you prefer
-          }))
-      );
+// Event Handlers ===================================================
+function handleAddMenuItem() {
+  // Pre-load auto-included ingredients
+  setNewMenuIngredients(
+    ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
+      inventoryID: id,
+      quantity: 1    // or 0 if you prefer
+    }))
+  );
 
-      setShowAddMenuModal(true);
-    }
-    function handleUpdateMenuItem() {
-    if (!selectedMenuItem) {
-      alert("Select a menu item to update.");
-      return;
-    }
+  setIsEditingMenu(false);
+  setShowAddMenuModal(true);
+}
 
-    setIsEditingMenu(true);
-    setShowAddMenuModal(true);
-
-    // Prefill modal fields with existing menu data
-    setNewMenuName(selectedMenuItem.name);
-    setNewMenuCategory(selectedMenuItem.category);
-    setNewCategoryInput("");  // in case they switch to "new category"
-    setNewMenuPrice(selectedMenuItem.price);
-    setNewMenuDescription(selectedMenuItem.description || "");
-    setNewMenuStart(selectedMenuItem.seasonalStart?.slice(0, 10));
-    setNewMenuEnd(selectedMenuItem.seasonalEnd?.slice(0, 10));
-
-    // TODO: ingredients — can add after kiosk/cashier work is merged
+async function handleUpdateMenuItem() {
+  if (!selectedMenuItem) {
+    alert("Select a menu item to update.");
+    return;
   }
+
+  setIsEditingMenu(true);
+
+  // Prefill modal fields
+  setNewMenuName(selectedMenuItem.name);
+  setNewMenuCategory(selectedMenuItem.category);
+  setNewCategoryInput("");
+  setNewMenuPrice(selectedMenuItem.price);
+  setNewMenuDescription(selectedMenuItem.description || "");
+  setNewMenuStart(selectedMenuItem.seasonalStart?.slice(0, 10));
+  setNewMenuEnd(selectedMenuItem.seasonalEnd?.slice(0, 10));
+
+  // === LOAD INGREDIENTS FROM DB ===
+  try {
+    const res = await fetch(`/api/menu/ingredients?menuID=${selectedMenuItem.id}`);
+    const ingredients = await res.json();
+
+    // Correct quantity field mapping
+    setNewMenuIngredients(
+      ingredients.map(i => ({
+        inventoryID: i.inventoryid,
+        quantity: Number(i.quantity || 0)
+      }))
+    );
+  } catch (err) {
+    console.error("Error loading ingredients:", err);
+  }
+
+  // Only show modal after data is fully loaded
+  setShowAddMenuModal(true);
+}
 
   function handleAddInventory() {
     setIsEditingInventory(false);
@@ -347,18 +365,47 @@ async function generateZReport() {
       const updatedData = await refreshed.json();
 
       setMenuItems(
-        updatedData.map(item => ({
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          price: Number(item.price),
-          seasonalStart: item.seasonalstart,
-          seasonalEnd: item.seasonalend,
-          seasonal: item.seasonalstart && item.seasonalend
-            ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
-            : "All Year"
-        }))
+        updatedData.map(item => {
+          const startMD = item.seasonalstart ? getMonthDay(item.seasonalstart) : null;
+          const endMD   = item.seasonalend   ? getMonthDay(item.seasonalend)   : null;
+
+          let seasonalDisplay = "All Year";
+
+          if (startMD && endMD) {
+            const isAllYear =
+              startMD === "01-01" &&
+              endMD === "12-31";
+
+            if (!isAllYear) {
+              const startStr = new Date(item.seasonalstart).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+              });
+
+              const endStr = new Date(item.seasonalend).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+              });
+
+              seasonalDisplay = `${startStr} - ${endStr}`;
+            }
+          }
+
+          return {
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            price: Number(item.price),
+            seasonalStart: item.seasonalstart,
+            seasonalEnd: item.seasonalend,
+            seasonal: seasonalDisplay,
+            description: item.description
+          };
+        })
       );
+
 
       setSelectedMenuId(null);
 
@@ -485,18 +532,45 @@ async function generateZReport() {
           const updated = await refreshed.json();
 
           setMenuItems(
-            updated.map(item => ({
-              id: item.id,
-              name: item.name,
-              category: item.category,
-              price: Number(item.price),
-              seasonalStart: item.seasonalstart,
-              seasonalEnd: item.seasonalend,
-              seasonal: item.seasonalstart && item.seasonalend
-                ? `${new Date(item.seasonalstart).toLocaleDateString()} - ${new Date(item.seasonalend).toLocaleDateString()}`
-                : "All Year",
-              description: item.description
-            }))
+            updated.map(item => {
+              const startMD = item.seasonalstart ? getMonthDay(item.seasonalstart) : null;
+              const endMD   = item.seasonalend   ? getMonthDay(item.seasonalend)   : null;
+
+              let seasonalDisplay = "All Year";
+
+              if (startMD && endMD) {
+                const isAllYear =
+                  startMD === "01-01" &&
+                  endMD === "12-31";
+
+                if (!isAllYear) {
+                  const startStr = new Date(item.seasonalstart).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric"
+                  });
+
+                  const endStr = new Date(item.seasonalend).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric"
+                  });
+
+                  seasonalDisplay = `${startStr} - ${endStr}`;
+                }
+              }
+
+              return {
+                id: item.id,
+                name: item.name,
+                category: item.category,
+                price: Number(item.price),
+                seasonalStart: item.seasonalstart,
+                seasonalEnd: item.seasonalend,
+                seasonal: seasonalDisplay,
+                description: item.description
+              };
+            })
           );
 
           return;
