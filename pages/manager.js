@@ -1012,7 +1012,6 @@ useEffect(() => {
         <h2>Inventory</h2>
         <div className={styles.actions}>
           <button className={`${styles.btn} ${styles.primary}`} onClick={handleAddInventory}>Add</button>
-          <button className={styles.btn} onClick={handleUpdateInventory}>Update</button>
         </div>
       </div>
 
