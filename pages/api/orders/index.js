@@ -60,11 +60,11 @@ async function handleCreateOrder(req, res) {
     await query(
       `
       INSERT INTO ordertest
-        (orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete)
+        orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, orderSource)
       VALUES
-        ($1, $2, $3, NOW(), $4, FALSE)
+        ($1, $2, $3, NOW(), $4, FALSE, $5)
       `,
-      [orderID, employeeID, orderLocation, orderTotal]
+      [orderID, employeeID, orderLocation, orderTotal, source]
     );
 
     // 3) Prepare orderItem insert
