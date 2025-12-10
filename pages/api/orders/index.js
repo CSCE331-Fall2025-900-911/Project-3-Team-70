@@ -59,7 +59,7 @@ async function handleCreateOrder(req, res) {
     // 2) Insert into ordertest
     await query(
       `
-      INSERT INTO ordertest
+      INSERT INTO ordertest(
         orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete, orderSource)
       VALUES
         ($1, $2, $3, NOW(), $4, FALSE, $5)
