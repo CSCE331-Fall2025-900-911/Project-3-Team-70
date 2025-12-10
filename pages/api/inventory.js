@@ -23,7 +23,7 @@ export default async function handler(req, res) {
         }
 
         if (req.method === "POST") {
-            const { name, quantity, restockMin, unit, allergy } = req.body;
+            const { name, quantity, restockMin, unit, allergy, isTopping } = req.body;
 
             const next = await query(
                 `SELECT COALESCE(MAX(inventoryID), 0) + 1 AS id FROM inventory`
@@ -32,21 +32,22 @@ export default async function handler(req, res) {
 
             const result = await query(
                 `
-                INSERT INTO inventory (
-                    inventoryID,
-                    inventoryName,
-                    quantityAvailable,
-                    restockPrice,
-                    addOnPrice,
-                    restockOrdered,
-                    unit,
-                    allergy,
-                    restockMin
-                )
-                VALUES ($1, $2, $3, 0, 0, 0, $4, $5, $6)
-                RETURNING *;
+              INSERT INTO inventory (
+                  inventoryID, 
+                  inventoryName, 
+                  quantityAvailable,
+                  restockPrice,
+                  addOnPrice,
+                  restockOrdered,
+                  unit,
+                  allergy,
+                  restockMin,
+                  isTopping
+              )
+              VALUES ($1,$2,$3,0,0,0,$4,$5,$6,$7)
+              RETURNING *;
                 `,
-                [newID, name, quantity ?? 0, unit, allergy ?? null, restockMin ?? 0]
+                [newID, name, quantity ?? 0, unit, allergy ?? null, restockMin ?? 0, isTopping ?? false]
             );
 
             return res.status(201).json(result.rows[0]);
@@ -57,15 +58,16 @@ export default async function handler(req, res) {
                 
             const result = await query(
                 `
-                UPDATE inventory
-                SET
-                    inventoryName = $1,
-                    quantityAvailable = $2,
-                    restockMin = $3,
-                    unit = $4,
-                    allergy = $5,
-                    restockOrdered = $6
-                WHERE inventoryID = $7
+            UPDATE inventory
+            SET
+                inventoryName = $1,
+                quantityAvailable = $2,
+                restockMin = $3,
+                unit = $4,
+                allergy = $5,
+                restockOrdered = $6,
+                isTopping = $7
+            WHERE inventoryID = $8
                 RETURNING *;
                 `,
                 [name, quantity, restockMin, unit, allergy, restockOrdered, id]
