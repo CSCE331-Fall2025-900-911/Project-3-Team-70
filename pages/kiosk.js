@@ -22,6 +22,15 @@ async function sendOrderToSystem(
       quantity: item.quantity || 1,
       priceAtPurchase: Number(item.finalPrice || item.price || 0),
       size: item.size ?? null,
+
+      modifications: item.toppings
+      ? item.toppings.map((t) => ({
+          inventoryID: t.id,
+          name: t.name,
+          cost: Number(t.price),
+          quantity: 1,
+        }))
+      : [],
     }));
 
     // Fallback if no summary provided

@@ -101,6 +101,35 @@ async function handleCreateOrder(req, res) {
       `,
       params
     );
+
+    // 4) Insert modifications for each item
+    let insertedItemIndex = 0;
+
+    for (const item of items) {
+      // Compute the orderItemID generated earlier
+      const orderItemID = (nextOrderItemID - items.length) + insertedItemIndex;
+      insertedItemIndex++;
+    
+      if (item.modifications && item.modifications.length > 0) {
+        for (const mod of item.modifications) {
+          await query(
+            `
+            INSERT INTO modification
+              (modificationID, inventoryID, orderItemID, modificationQuantity, cost)
+            VALUES
+              ((SELECT COALESCE(MAX(modificationID), 0) + 1 FROM modification),
+               $1, $2, $3, $4)
+            `,
+            [
+              mod.inventoryID,
+              orderItemID,
+              Number(mod.modificationQuantity || 1),
+              Number(mod.cost || 0)
+            ]
+          );
+        }
+      }
+    }
     for (const item of items) {
       const ingredientRows = await query(
         `

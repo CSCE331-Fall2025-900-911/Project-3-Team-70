@@ -124,63 +124,64 @@ export default function KitchenPage() {
                 </p>
               )}
 
-              {/* ---------- ORDER ITEMS ---------- */}
-              <div className="order-items">
-                <strong>Items:</strong>
+            {/* ---------- ORDER ITEMS ---------- */}
+            <div className="order-items">
+              <strong>Items:</strong>
 
-                {o.items && o.items.length > 0 ? (
-                  o.items.map((item, idx) => (
-                    <div className="order-line" key={idx}>
-                      {/* Base item */}
-                      <div className="line-main">
-                        <span className="line-name">{item.menuname}</span>
-                        <span className="line-qty">x{item.quantitypurchased}</span>
-                      </div>
-
-                      {/* Size */}
-                      {item.ordersize && (
-                        <div className="line-mod">
-                          Size: {{ 1: "Small", 2: "Medium", 3: "Large" }[item.ordersize]}
-                        </div>
-                      )}
-
-
-                      {/* Toppings / Add-ons */}
-                      {item.modifications && item.modifications.length > 0 && (
-                        <div className="line-mod">
-                          Modifications:{" "}
-                          {item.modifications.map((mod, i) => (
-                            <span key={i}>
-                              {mod.inventoryname} x{mod.modificationquantity || 1}
-                              {mod.cost ? ` ($${(mod.cost * mod.modificationquantity).toFixed(2)})` : ""}
-                              {i < item.modifications.length - 1 ? ", " : ""}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Line total for base + add-ons */}
-                      <div className="line-price">
-                        ${(
-                          Number(item.priceatpurchase || 0) * Number(item.quantitypurchased || 0) +
-                          item.modifications.reduce(
-                            (sum, mod) => sum + Number(mod.cost || 0) * Number(mod.modificationquantity || 1),
-                            0
-                          )
-                        ).toFixed(2)}
-                      </div>
-
-                      <hr />
+              {o.items && o.items.length > 0 ? (
+                o.items.map((item, idx) => (
+                  <div className="order-line" key={idx}>
+                  
+                    {/* Base item */}
+                    <div className="line-main">
+                      <span className="line-name">{item.menuname}</span>
+                      <span className="line-qty">x{item.quantitypurchased}</span>
                     </div>
+                
+                    {/* Size */}
+                    {item.ordersize && (
+                      <div className="line-mod">
+                        Size: {{ 1: "Small", 2: "Medium", 3: "Large" }[item.ordersize]}
+                      </div>
+                    )}
 
-                  ))
+                    {/* --- FIXED — Show modifications safely --- */}
+                    {Array.isArray(item.modifications) && item.modifications.length > 0 && (
+                      <div className="line-mod">
+                        <strong>Add-ons:</strong>{" "}
+                        {item.modifications.map((mod, i) => (
+                          <span key={i}>
+                            {mod.inventoryname}
+                            {mod.modificationquantity ? ` x${mod.modificationquantity}` : ""}
+                            {mod.cost ? ` ($${(mod.cost * (mod.modificationquantity || 1)).toFixed(2)})` : ""}
+                            {i < item.modifications.length - 1 ? ", " : ""}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
-                ) : (
-                  <p style={{ fontSize: "13px", opacity: 0.6 }}>
-                    (No item details available)
-                  </p>
-                )}
-              </div>
+                    {/* Line total (base + add-ons) */}
+                    <div className="line-price">
+                      ${(
+                        Number(item.priceatpurchase || 0) * Number(item.quantitypurchased || 0) +
+                        (Array.isArray(item.modifications)
+                          ? item.modifications.reduce(
+                              (sum, mod) =>
+                                sum + Number(mod.cost || 0) * Number(mod.modificationquantity || 1),
+                             0
+                            )
+                          : 0)
+                      ).toFixed(2)}
+                    </div>
+                    
+                    <hr />
+                  </div>
+                ))
+              ) : (
+                <p style={{ fontSize: "13px", opacity: 0.6 }}>(No item details available)</p>
+              )}
+            </div>
+            
             </div>
                 {tab === "current" && (
                   <button
