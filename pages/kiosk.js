@@ -1775,86 +1775,107 @@ export default function KioskPage() {
     );
   };
 
-  const AllergyFilterPanel = () => {
-    const allergens = ["Dairy", "Nuts"];
+const AllergyFilterPanel = ({ accessibilityMode }) => {
+  const allergens = ["Dairy", "Nuts"];
 
-    const toggleAllergen = (a) => {
-      setExcludedAllergies((prev) =>
-        prev.includes(a)
-          ? prev.filter((x) => x !== a)
-          : [...prev, a]
-      );
-    };
-
-    return (
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          backgroundColor: "rgba(0,0,0,0.75)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 9999,
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "#fff",
-            padding: "30px",
-            borderRadius: "14px",
-            width: "90%",
-            maxWidth: "400px",
-            textAlign: "center",
-            fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-          }}
-        >
-          <h2 style={{ marginBottom: "20px" }}>
-            Select Allergies to Avoid
-          </h2>
-
-          {allergens.map((a) => (
-            <label
-              key={a}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "12px 0",
-                borderBottom: "1px solid #ddd",
-                fontSize: "18px",
-              }}
-            >
-              <span>{a}</span>
-              <input
-                type="checkbox"
-                checked={excludedAllergies.includes(a)}
-                onChange={() => toggleAllergen(a)}
-              />
-            </label>
-          ))}
-
-          <button
-            onClick={() => setAllergyFilterOpen(false)}
-            style={{
-              marginTop: "20px",
-              padding: "12px 20px",
-              backgroundColor: "#500000",
-              color: "#fff",
-              borderRadius: "10px",
-              border: "none",
-              fontSize: "18px",
-              cursor: "pointer",
-            }}
-          >
-            Apply Filters
-          </button>
-        </div>
-      </div>
+  const toggleAllergen = (a) => {
+    setExcludedAllergies((prev) =>
+      prev.includes(a)
+        ? prev.filter((x) => x !== a)
+        : [...prev, a]
     );
   };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(0,0,0,0.75)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: accessibilityMode ? "#000" : "#fff",
+          color: accessibilityMode ? "#fff" : "#000",
+          padding: accessibilityMode ? "40px" : "30px",
+          borderRadius: "14px",
+          width: "90%",
+          maxWidth: "420px",
+          textAlign: "center",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          border: accessibilityMode ? "3px solid #FFD700" : "none",
+          transition: "all 0.3s ease",
+        }}
+      >
+        <h2
+          style={{
+            marginBottom: "20px",
+            fontSize: accessibilityMode ? "28px" : "22px",
+            color: accessibilityMode ? "#FFD700" : "#000",
+          }}
+        >
+          Select Allergies to Avoid
+        </h2>
+
+        {allergens.map((a) => (
+          <label
+            key={a}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: accessibilityMode ? "16px" : "12px 0",
+              marginBottom: accessibilityMode ? "14px" : "0",
+              backgroundColor: accessibilityMode ? "#FFD700" : "transparent",
+              color: accessibilityMode ? "#000" : "#000",
+              borderRadius: accessibilityMode ? "10px" : "0",
+              borderBottom: accessibilityMode ? "none" : "1px solid #ddd",
+              fontSize: accessibilityMode ? "22px" : "18px",
+              fontWeight: accessibilityMode ? "bold" : "normal",
+            }}
+          >
+            <span>{a}</span>
+            <input
+              type="checkbox"
+              checked={excludedAllergies.includes(a)}
+              onChange={() => toggleAllergen(a)}
+              style={{
+                width: accessibilityMode ? "28px" : "18px",
+                height: accessibilityMode ? "28px" : "18px",
+              }}
+            />
+          </label>
+        ))}
+
+        <button
+          onClick={() => setAllergyFilterOpen(false)}
+          style={{
+            marginTop: "25px",
+            padding: accessibilityMode ? "16px 24px" : "12px 20px",
+            backgroundColor: accessibilityMode ? "#FFD700" : "#500000",
+            color: accessibilityMode ? "#000" : "#fff",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: accessibilityMode ? "22px" : "18px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            width: "100%",
+          }}
+        >
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  );
+};
 
   // === MAIN RENDER SWITCH ===
   if (screen === "details")
@@ -1907,7 +1928,9 @@ export default function KioskPage() {
       }}
     >
       <WeatherWidget accessibilityMode={accessibilityMode} />
-      {allergyFilterOpen && <AllergyFilterPanel />}
+      {allergyFilterOpen && (
+        <AllergyFilterPanel accessibilityMode={accessibilityMode} />
+      )}
 
       {/* Sign-in bar for rewards */}
       <div
