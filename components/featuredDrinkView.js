@@ -104,7 +104,7 @@ export default function FeaturedDrinkView({
 
               {showHotBadge && (
                 <div className={styles.tagsRow}>
-                  <span className={styles.badge}>HOT</span>
+                  <span className={styles.badge}>Order it hot!</span>
                 </div>
               )}
 
