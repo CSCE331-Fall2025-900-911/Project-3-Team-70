@@ -114,7 +114,6 @@ async function handleGet(req, res) {
   return res.status(200).json(orders);
 }
 
-
 async function handlePatch(req, res) {
   const { id } = req.query;
 
@@ -122,7 +121,6 @@ async function handlePatch(req, res) {
     return res.status(400).json({ error: "Missing order id" });
   }
 
-  // Mark complete only if not already complete
   const updated = await query(
     `
     UPDATE ordertest
@@ -145,9 +143,8 @@ async function handlePatch(req, res) {
   const total = Number(row.ordertotal || 0);
   const email = row.customeremail;
 
-  // Award points to the customer on completion
   if (email && total > 0) {
-    const pointsToAdd = Math.floor(total); // 1 point per $1
+    const pointsToAdd = Math.floor(total);
     await query(
       `
       UPDATE app_users

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getSession } from "next-auth/react";
 
-// 🔐 Protect kitchen: employee OR manager
 export async function getServerSideProps(ctx) {
   const session = await getSession(ctx);
 
@@ -103,85 +102,99 @@ export default function KitchenPage() {
                     {o.ordersource === "cashier" ? "Cashier" : "Kiosk"}
                   </span>
                 </div>
-            <div className="order-body">
-              <p>
-                <strong>Total:</strong>{" "}
-                ${Number(o.ordertotal).toFixed(2)}
-              </p>
-              <p>
-                <strong>Placed:</strong>{" "}
-                {new Date(o.orderdate).toLocaleTimeString()}
-              </p>
-
-              {o.customeremail && (
-                <p>
-                  <strong>Customer:</strong> {o.customeremail}
-                </p>
-              )}
-              {o.employeeid && (
-                <p>
-                  <strong>Employee ID:</strong> {o.employeeid}
-                </p>
-              )}
-
-              {/* ---------- ORDER ITEMS ---------- */}
-              <div className="order-items">
-                <strong>Items:</strong>
-
-                {o.items && o.items.length > 0 ? (
-                  o.items.map((item, idx) => (
-                    <div className="order-line" key={idx}>
-                      {/* Base item */}
-                      <div className="line-main">
-                        <span className="line-name">{item.menuname}</span>
-                        <span className="line-qty">x{item.quantitypurchased}</span>
-                      </div>
-
-                      {/* Size */}
-                      {item.ordersize && (
-                        <div className="line-mod">
-                          Size: {{ 1: "Small", 2: "Medium", 3: "Large" }[item.ordersize]}
-                        </div>
-                      )}
-
-
-                      {/* Toppings / Add-ons */}
-                      {item.modifications && item.modifications.length > 0 && (
-                        <div className="line-mod">
-                          Modifications:{" "}
-                          {item.modifications.map((mod, i) => (
-                            <span key={i}>
-                              {mod.inventoryname} x{mod.modificationquantity || 1}
-                              {mod.cost ? ` ($${(mod.cost * mod.modificationquantity).toFixed(2)})` : ""}
-                              {i < item.modifications.length - 1 ? ", " : ""}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Line total for base + add-ons */}
-                      <div className="line-price">
-                        ${(
-                          Number(item.priceatpurchase || 0) * Number(item.quantitypurchased || 0) +
-                          item.modifications.reduce(
-                            (sum, mod) => sum + Number(mod.cost || 0) * Number(mod.modificationquantity || 1),
-                            0
-                          )
-                        ).toFixed(2)}
-                      </div>
-
-                      <hr />
-                    </div>
-
-                  ))
-
-                ) : (
-                  <p style={{ fontSize: "13px", opacity: 0.6 }}>
-                    (No item details available)
+                <div className="order-body">
+                  <p>
+                    <strong>Total:</strong>{" "}
+                    ${Number(o.ordertotal || 0).toFixed(2)}
                   </p>
-                )}
-              </div>
-            </div>
+                  <p>
+                    <strong>Placed:</strong>{" "}
+                    {new Date(o.orderdate).toLocaleTimeString()}
+                  </p>
+
+                  {o.customeremail && (
+                    <p>
+                      <strong>Customer:</strong> {o.customeremail}
+                    </p>
+                  )}
+                  {o.employeeid && (
+                    <p>
+                      <strong>Employee ID:</strong> {o.employeeid}
+                    </p>
+                  )}
+
+                  <div className="order-items">
+                    <strong>Items:</strong>
+
+                    {o.items && o.items.length > 0 ? (
+                      o.items.map((item, idx) => (
+                        <div className="order-line" key={idx}>
+                          <div className="line-main">
+                            <span className="line-name">
+                              {item.menuname}
+                            </span>
+                            <span className="line-qty">
+                              x{item.quantitypurchased}
+                            </span>
+                          </div>
+
+                          {item.ordersize && (
+                            <div className="line-mod">
+                              Size:{" "}
+                              {{
+                                1: "Small",
+                                2: "Medium",
+                                3: "Large",
+                              }[item.ordersize]}
+                            </div>
+                          )}
+
+                          {item.modifications &&
+                            item.modifications.length > 0 && (
+                              <div className="line-mod">
+                                Modifications:{" "}
+                                {item.modifications.map((mod, i) => (
+                                  <span key={mod.modificationid}>
+                                    {mod.inventoryname} x
+                                    {mod.modificationquantity || 1}
+                                    {mod.cost
+                                      ? ` ($${(
+                                          Number(mod.cost || 0) *
+                                          Number(
+                                            mod.modificationquantity ||
+                                              1
+                                          )
+                                        ).toFixed(2)})`
+                                      : ""}
+                                    {i <
+                                    item.modifications.length - 1
+                                      ? ", "
+                                      : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                          <div className="line-price">
+                            $
+                            {(
+                              Number(
+                                item.priceatpurchase || 0
+                              ) *
+                              Number(item.quantitypurchased || 0)
+                            ).toFixed(2)}
+                          </div>
+
+                          <hr />
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ fontSize: "13px", opacity: 0.6 }}>
+                        (No item details available)
+                      </p>
+                    )}
+                  </div>
+                </div>
                 {tab === "current" && (
                   <button
                     className="btn complete"
@@ -287,39 +300,33 @@ export default function KitchenPage() {
           background: #fee2e2;
           color: #991b1b;
         }
-          .order-items {
-            margin-top: 8px;
-            font-size: 14px;
-          }
-
-          .order-line {
-            padding: 6px 0;
-          }
-
-          .line-main {
-            display: flex;
-            justify-content: space-between;
-          }
-
-          .line-name {
-            font-weight: 600;
-          }
-
-          .line-qty {
-            font-weight: 600;
-          }
-
-          .line-mod {
-            font-size: 13px;
-            margin-left: 6px;
-            opacity: 0.8;
-          }
-
-          .line-price {
-            font-size: 13px;
-            font-weight: 700;
-            margin-top: 2px;
-          }
+        .order-items {
+          margin-top: 8px;
+          font-size: 14px;
+        }
+        .order-line {
+          padding: 6px 0;
+        }
+        .line-main {
+          display: flex;
+          justify-content: space-between;
+        }
+        .line-name {
+          font-weight: 600;
+        }
+        .line-qty {
+          font-weight: 600;
+        }
+        .line-mod {
+          font-size: 13px;
+          margin-left: 6px;
+          opacity: 0.8;
+        }
+        .line-price {
+          font-size: 13px;
+          font-weight: 700;
+          margin-top: 2px;
+        }
         .order-body p {
           margin: 2px 0;
           font-size: 14px;

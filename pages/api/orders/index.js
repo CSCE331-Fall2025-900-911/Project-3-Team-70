@@ -2,18 +2,16 @@
 import { query } from "../../../lib/db-connector.js";
 
 export default async function handler(req, res) {
-  if (req.method === "POST") {
-    return handleCreateOrder(req, res);
+  if (req.method !== "POST") {
+    res.setHeader("Allow", ["POST"]);
+    return res
+      .status(405)
+      .json({ error: `Method ${req.method} Not Allowed` });
   }
-
-  res.setHeader("Allow", ["POST"]);
-  return res.status(405).json({
-    error: `Method ${req.method} Not Allowed`,
-  });
+  return handleCreateOrder(req, res);
 }
 
-// Helper: map string size to integer code for DB
-// Adjust these codes if your schema expects something different.
+// map kiosk size string -> DB integer code (adjust if needed)
 function mapSizeToInt(size) {
   if (!size) return null;
   switch (size) {
@@ -24,7 +22,7 @@ function mapSizeToInt(size) {
     case "Large":
       return 3;
     default:
-      return null; // unknown size → store NULL instead of crashing
+      return null;
   }
 }
 
@@ -33,87 +31,140 @@ async function handleCreateOrder(req, res) {
     const {
       source = "kiosk",
       orderLocation = "Kiosk",
+      customerEmail = null,
+      employeeID = null,
       items = [],
-      employeeID = null,         // cashier can send this later if desired
-      customerEmail = null,      // optional; used for rewards, etc.
+      orderSubtotal,
+      taxAmount,
+      discountAmount,
+      finalTotal,
     } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "No items in order" });
     }
 
-    // Compute order total
-    const orderTotal = items.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.priceAtPurchase || 0) *
-          Number(item.quantity || 0),
+    // Normalize items & toppings
+    const normalizedItems = items.map((item) => {
+      const menuID = item.menuID ?? item.menuid ?? item.id;
+      const quantity = Number(item.quantity || 1);
+      const priceAtPurchase = Number(
+        item.priceAtPurchase ??
+          item.finalPrice ??
+          item.price ??
+          0
+      );
+      const sizeInt = mapSizeToInt(item.size);
+
+      const toppings = Array.isArray(item.toppings)
+        ? item.toppings.map((t) => ({
+            inventoryID: t.inventoryID ?? t.id,
+            quantity: Number(t.quantity || 1),
+            price: Number(t.price || 0),
+          }))
+        : [];
+
+      return {
+        menuID,
+        quantity,
+        priceAtPurchase,
+        sizeInt,
+        toppings,
+      };
+    });
+
+    const computedSubtotal = normalizedItems.reduce(
+      (sum, it) => sum + it.priceAtPurchase * it.quantity,
       0
     );
 
-    const nextOrderResult = await query(
-      "SELECT COALESCE(MAX(orderID), 0) + 1 AS nextId FROM ordertest"
-    );
-    const orderID = Number(nextOrderResult.rows[0].nextid);
+    const subtotal = orderSubtotal ?? computedSubtotal;
+    const discount = discountAmount ?? 0;
+    const tax =
+      taxAmount ??
+      Number(((subtotal - discount) * 0.0625).toFixed(2));
+    const total =
+      finalTotal ??
+      Number((subtotal - discount + tax).toFixed(2));
 
-    // 2) Insert into ordertest
-    await query(
+    // 1) Insert into ordertest and let DB choose orderID
+    const orderInsert = await query(
       `
       INSERT INTO ordertest
-        (orderID, employeeID, orderLocation, orderDate, orderTotal, orderComplete)
+        (employeeID, orderLocation, orderDate, orderTotal, orderComplete, customerEmail, orderSource)
       VALUES
-        ($1, $2, $3, NOW(), $4, FALSE)
+        ($1, $2, NOW(), $3, FALSE, $4, $5)
+      RETURNING orderID
       `,
-      [orderID, employeeID, orderLocation, orderTotal]
+      [employeeID, orderLocation, total, customerEmail, source]
     );
+    const orderID = orderInsert.rows[0].orderid;
 
-    // 3) Prepare orderItem insert
-    const nextItemResult = await query(
-      "SELECT COALESCE(MAX(orderItemID), 0) AS maxId FROM orderItem"
-    );
-    let nextOrderItemID = Number(nextItemResult.rows[0].maxid) + 1;
+    // 2) Insert each item into orderitem and track orderItemID
+    const itemsWithOrderItemIds = [];
 
-    const valueStrings = [];
-    const params = [];
+    for (const it of normalizedItems) {
+      if (it.menuID == null) continue;
 
-    for (const item of items) {
-      valueStrings.push(
-        `($${params.length + 1}, $${params.length + 2}, $${params.length + 3}, $${params.length + 4}, $${params.length + 5}, $${params.length + 6})`
+      const itemInsert = await query(
+        `
+        INSERT INTO orderitem
+          (orderID, menuID, priceAtPurchase, quantityPurchased, orderSize)
+        VALUES
+          ($1, $2, $3, $4, $5)
+        RETURNING orderItemID
+        `,
+        [
+          orderID,
+          it.menuID,
+          it.priceAtPurchase,
+          it.quantity,
+          it.sizeInt,
+        ]
       );
+      const orderItemID = itemInsert.rows[0].orderitemid;
 
-      params.push(
-        nextOrderItemID++,                 
-        item.menuID,
-        Number(item.priceAtPurchase || 0),
-        Number(item.quantity || 0),
-        orderID,
-        mapSizeToInt(item.size)
-      );
+      itemsWithOrderItemIds.push({ orderItemID, item: it });
     }
 
-    // Insert all order items at once
-    await query(
-      `
-      INSERT INTO orderItem
-        (orderItemID, menuID, priceAtPurchase, quantityPurchased, orderID, orderSize)
-      VALUES
-        ${valueStrings.join(", ")}
-      `,
-      params
-    );
-    for (const item of items) {
+    // 3) Insert modifications for toppings
+    for (const { orderItemID, item } of itemsWithOrderItemIds) {
+      for (const top of item.toppings) {
+        if (!top.inventoryID || top.quantity <= 0) continue;
+
+        await query(
+          `
+          INSERT INTO modification
+            (inventoryID, orderItemID, modificationQuantity, cost)
+          VALUES
+            ($1, $2, $3, $4)
+          `,
+          [
+            top.inventoryID,
+            orderItemID,
+            top.quantity,
+            top.price,
+          ]
+        );
+      }
+    }
+
+    // 4) Update inventory based on base recipe
+    for (const it of normalizedItems) {
+      if (it.menuID == null) continue;
+
       const ingredientRows = await query(
         `
         SELECT inventoryID, menuInfoQuantity
         FROM menuInfo
         WHERE menuID = $1
         `,
-        [item.menuID]
+        [it.menuID]
       );
 
       for (const ing of ingredientRows.rows) {
         const subtractAmount =
-          Number(ing.menuinfoquantity) * Number(item.quantity || 0);
+          Number(ing.menuinfoquantity) * Number(it.quantity);
 
         await query(
           `
@@ -126,15 +177,19 @@ async function handleCreateOrder(req, res) {
       }
     }
 
-    // DONE
     return res.status(201).json({
       success: true,
       orderID,
-      orderTotal: Number(orderTotal),
+      orderTotal: total,
+      subtotal,
+      discount,
+      tax,
     });
-
   } catch (err) {
     console.error("Error creating order:", err);
-    return res.status(500).json({ error: "Failed to create order" });
+    return res.status(500).json({
+      error: "Failed to create order",
+      details: String(err.message || err),
+    });
   }
 }

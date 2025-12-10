@@ -6,6 +6,7 @@ import { QRCodeCanvas } from "qrcode.react";
 // Texas state sales tax: 6.25%
 const TAX_RATE = 0.0625;
 
+
 // === SEND ORDERS TO BACKEND (DB-backed orderID) ===
 async function sendOrderToSystem(
   cart,
@@ -18,10 +19,21 @@ async function sendOrderToSystem(
     if (!cart || cart.length === 0) return null;
 
     const items = cart.map((item) => ({
-      menuID: item.id,
+      // slightly more robust: supports menuID/menuid/id
+      menuID: item.menuID ?? item.menuid ?? item.id,
       quantity: item.quantity || 1,
-      priceAtPurchase: Number(item.finalPrice || item.price || 0),
+      priceAtPurchase: Number(
+        item.priceAtPurchase ?? item.finalPrice ?? item.price ?? 0
+      ),
       size: item.size ?? null,
+      // NEW: send toppings so /api/orders can insert into `modification`
+      toppings: Array.isArray(item.toppings)
+        ? item.toppings.map((t) => ({
+            inventoryID: t.inventoryID ?? t.id,
+            price: Number(t.price || 0),
+            quantity: Number(t.quantity || 1),
+          }))
+        : [],
     }));
 
     // Fallback if no summary provided
@@ -62,12 +74,13 @@ async function sendOrderToSystem(
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      console.error("Order submission failed:", data.error);
+      console.error("Order submission failed:", data.error || data);
       alert("Sorry, we couldn't process your order. Please try again.");
       return null;
     }
 
     const data = await res.json();
+
     return {
       orderID: data.orderID,
       orderTotal: data.orderTotal,
@@ -81,6 +94,9 @@ async function sendOrderToSystem(
     return null;
   }
 }
+
+
+
 
 // === Narration helper with language support ===
 const narrationVoices = {
