@@ -1269,7 +1269,7 @@ const DrinkDetailsPage = () => {
             <div style={{ textAlign: "center", margin: "20px 0" }}>
               <p style={{ fontSize: "14px", marginBottom: "8px" }}>Scan to view your order:</p>
               <QRCodeCanvas
-                value={`/receipt?orderid=${orderId}`}
+                value={`https://project-3-team-70.vercel.app/receipt?orderid=${orderId}`}
                 size={160}
                 includeMargin={true}
                 fgColor="#000"
