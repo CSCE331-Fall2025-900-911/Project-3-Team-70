@@ -22,6 +22,8 @@ export default function FeaturedDrinkView({
   mode,
   index,
   total,
+  overrideOpen,
+  setOverrideOpen
 }) {
   const tempF = getTempF(weather);
   const desc = weather?.weather?.[0]?.description ?? "";
@@ -54,12 +56,32 @@ export default function FeaturedDrinkView({
           </div>
         </div>
 
-        <div style={{ textAlign: "right" }}>
+        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
           <div style={{ fontWeight: 600, fontSize: "18px" }}>
             {tempF !== null && `${Math.round(tempF)}°F • ${desc}`}
           </div>
-          <div style={{ color: "#bbb", fontSize: "13px" }}>{clientTime}</div>
+          <div style={{ color: "#bbb", fontSize: "13px", marginBottom: "4px" }}>
+            {clientTime}
+          </div>
+
+          {/* Override Button (Demo Mode) */}
+          <button
+            onClick={() => setOverrideOpen(!overrideOpen)}
+            style={{
+              padding: "4px 10px",
+              background: "#333",
+              color: "white",
+              fontSize: "12px",
+              borderRadius: "6px",
+              border: "1px solid #666",
+              cursor: "pointer",
+              opacity: 0.8
+            }}
+          >
+            {overrideOpen ? "Hide Demo Controls" : "Demo Mode"}
+          </button>
         </div>
+
       </div>
 
       {/* BODY */}

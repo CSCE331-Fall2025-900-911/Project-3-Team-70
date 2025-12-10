@@ -14,11 +14,15 @@ function getTempF(w) {
 }
 
 // Build recommended drinks list
-function pickRecommendations(menu, weather) {
+function pickRecommendations(menu, weather, overrideTempF = null, overrideHour = null) {
   if (!menu || menu.length === 0) return { recs: [], mode: "default" };
 
-  const temp = getTempF(weather);
-  const hour = new Date().getHours();
+  const temp = overrideTempF !== null
+    ? overrideTempF
+    : getTempF(weather);
+  const hour = overrideHour !== null
+    ? overrideHour
+    : new Date().getHours();
 
   const isLate = hour >= 20 || hour < 6;
   const isHot = temp !== null && temp >= 80;
@@ -73,6 +77,11 @@ export default function WeatherRecommendationsPage() {
   const [mode, setMode] = useState("default");
   const [index, setIndex] = useState(0);
 
+  // For override
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideTempF, setOverrideTempF] = useState(null);
+  const [overrideHour, setOverrideHour] = useState(null);
+
   // Timestamp update
   useEffect(() => {
     setClientTime(new Date().toLocaleString());
@@ -90,7 +99,11 @@ export default function WeatherRecommendationsPage() {
       setMenu(m);
       setWeather(w);
 
-      const { recs, mode } = pickRecommendations(m, w);
+      const syntheticWeather = overrideTempF !== null
+        ? { main: { temp: (overrideTempF - 32) * (5/9) + 273.15 } } // convert F → Kelvin
+        : w;
+
+      const { recs, mode } = pickRecommendations(m, syntheticWeather, overrideTempF, overrideHour);
       setRecs(recs);
       setMode(mode);
     }
@@ -110,7 +123,120 @@ export default function WeatherRecommendationsPage() {
 
   const currentDrink = recs[index] ?? null;
 
-  return (
+return (
+  <>
+
+    {/* OVERRIDE PANEL (only visible when open) */}
+    {overrideOpen && (
+      <div
+        style={{
+          padding: "20px",
+          margin: "20px auto",
+          background: "#eee",
+          borderRadius: "10px",
+          maxWidth: "480px",
+          textAlign: "center",
+        }}
+      >
+        <h3 style={{ marginBottom: "10px" }}>
+          Weather & Time Override (Demo Mode)
+        </h3>
+
+        {/* TEMP OVERRIDE */}
+        <div style={{ marginBottom: "15px" }}>
+          <label style={{ fontWeight: "bold" }}>Temperature (°F):</label>
+          <input
+            type="number"
+            placeholder="e.g., 95"
+            value={overrideTempF ?? ""}
+            onChange={(e) =>
+              setOverrideTempF(
+                e.target.value === "" ? null : Number(e.target.value)
+              )
+            }
+            style={{
+              width: "160px",
+              padding: "8px",
+              marginLeft: "10px",
+              borderRadius: "6px",
+              border: "1px solid #ccc"
+            }}
+          />
+        </div>
+
+        {/* TIME OVERRIDE */}
+        <div style={{ marginBottom: "15px" }}>
+          <label style={{ fontWeight: "bold" }}>Hour Override (0–23):</label>
+          <input
+            type="number"
+            min="0"
+            max="23"
+            placeholder="e.g., 22"
+            value={overrideHour ?? ""}
+            onChange={(e) =>
+              setOverrideHour(
+                e.target.value === "" ? null : Number(e.target.value)
+              )
+            }
+            style={{
+              width: "160px",
+              padding: "8px",
+              marginLeft: "10px",
+              borderRadius: "6px",
+              border: "1px solid #ccc"
+            }}
+          />
+        </div>
+
+        {/* APPLY + RESET BUTTONS */}
+        <div style={{ marginTop: "20px" }}>
+          <button
+            onClick={() => {
+              const syntheticWeather = overrideTempF !== null
+                ? { main: { temp: (overrideTempF - 32) * (5/9) + 273.15 } }
+                : weather;
+
+              const result = pickRecommendations(menu, syntheticWeather, overrideTempF, overrideHour);
+              setRecs(result.recs);
+              setMode(result.mode);
+            }}
+            style={{
+              padding: "10px 18px",
+              background: "#500000",
+              color: "white",
+              borderRadius: "8px",
+              border: "none",
+              cursor: "pointer",
+              marginRight: "10px"
+            }}
+          >
+            Apply Overrides
+          </button>
+
+          <button
+            onClick={() => {
+              setOverrideTempF(null);
+              setOverrideHour(null);
+              const result = pickRecommendations(menu, weather, null, null);
+              setRecs(result.recs);
+              setMode(result.mode);
+            }}
+            style={{
+              padding: "10px 18px",
+              background: "#777",
+              color: "white",
+              borderRadius: "8px",
+              border: "none",
+              cursor: "pointer"
+            }}
+          >
+            Reset to Real Weather/Time
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* ORIGINAL DISPLAY COMPONENT */}
     <FeaturedDrinkView
       drink={currentDrink}
       weather={weather}
@@ -118,6 +244,10 @@ export default function WeatherRecommendationsPage() {
       mode={mode}
       index={index}
       total={recs.length}
+      overrideOpen={overrideOpen}
+      setOverrideOpen={setOverrideOpen}
     />
-  );
+  </>
+);
+
 }
