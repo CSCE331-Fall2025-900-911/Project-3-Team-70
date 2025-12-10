@@ -24,7 +24,7 @@ export default function EmployeeAccessPage() {
     setLoading(true);
     try {
       // 1) Verify employee password
-      const res = await fetch("/api/verify-password", {
+      const res = await fetch("/api/staff/verify-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: "employee", password }),

@@ -1,6 +1,6 @@
 // pages/staff/after-login.js
 import { getSession } from "next-auth/react";
-import { query } from "../../../lib/db-connector.js"
+import { query } from "../../lib/db-connector.js"
 
 export async function getServerSideProps(ctx) {
   const session = await getSession(ctx);
