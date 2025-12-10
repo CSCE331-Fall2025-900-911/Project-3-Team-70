@@ -138,7 +138,7 @@ const [inventory, setInventory] = useState([]);
 	const [xReportRows, setXReportRows] = useState([]);
 	const [zReportRows, setZReportRows] = useState([]);
 
-  // NEW — X REPORT (US Central Time) ============================================
+  // NEW — X REPORT (US Central Time, DST aware) ============================================
   async function generateXReport() {
     try {
       const res = await fetch("/api/sales");
@@ -147,40 +147,60 @@ const [inventory, setInventory] = useState([]);
       const data = await res.json();
       const orders = data.orders || [];
 
-      // ======= CURRENT DATE IN US CENTRAL TIME =======
-      const centralOffset = -6; // US Central Standard Time UTC offset (-6)
-      const nowUTC = new Date();
+      // ====== HELPER: convert ISO string to Central Time Date ======
+      function toCentral(dateStr) {
+        const dt = new Date(dateStr);
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Chicago",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          hour12: false,
+          minute: "numeric",
+          second: "numeric",
+        }).formatToParts(dt);
 
-      // Calculate current time in CST (or CDT manually if needed)
-      const nowCentral = new Date(nowUTC.getTime() + centralOffset * 60 * 60 * 1000);
+        const y = Number(parts.find(p => p.type === "year").value);
+        const m = Number(parts.find(p => p.type === "month").value) - 1;
+        const d = Number(parts.find(p => p.type === "day").value);
+        const h = Number(parts.find(p => p.type === "hour").value);
+        const min = Number(parts.find(p => p.type === "minute").value);
+        const s = Number(parts.find(p => p.type === "second").value);
 
-      // Start and end of "today" in Central Time
-      const startOfDayCentral = new Date(
-        Date.UTC(nowCentral.getUTCFullYear(), nowCentral.getUTCMonth(), nowCentral.getUTCDate(), -centralOffset, 0, 0, 0)
+        return new Date(y, m, d, h, min, s); // local Date in Central Time
+      }
+
+      // ====== TODAY IN CENTRAL TIME ======
+      const nowCentral = toCentral(new Date().toISOString());
+      const startOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        0, 0, 0, 0
       );
-      const endOfDayCentral = new Date(
-        Date.UTC(nowCentral.getUTCFullYear(), nowCentral.getUTCMonth(), nowCentral.getUTCDate(), -centralOffset, 23, 59, 59, 999)
+      const endOfDay = new Date(
+        nowCentral.getFullYear(),
+        nowCentral.getMonth(),
+        nowCentral.getDate(),
+        23, 59, 59, 999
       );
 
-      // ===== FILTER ORDERS BY TODAY IN CENTRAL TIME =====
+      // ===== FILTER ORDERS BY TODAY (Central Time) =====
       const todaysOrders = orders.filter(o => {
         if (!o.orderdate) return false;
-
-        const tsUTC = new Date(o.orderdate);
-        // Convert order timestamp to central
-        const tsCentral = new Date(tsUTC.getTime() + centralOffset * 60 * 60 * 1000);
-        return tsCentral >= startOfDayCentral && tsCentral <= endOfDayCentral;
+        const tsCentral = toCentral(o.orderdate);
+        return tsCentral >= startOfDay && tsCentral <= endOfDay;
       });
 
-      // ===== GROUP INTO HOUR BLOCKS IN CENTRAL TIME =====
+      // ===== GROUP INTO HOURLY BLOCKS =====
       const hourlyMap = {};
 
       todaysOrders.forEach(order => {
-        const tsUTC = new Date(order.orderdate);
-        const tsCentral = new Date(tsUTC.getTime() + centralOffset * 60 * 60 * 1000);
-        const hour = tsCentral.getHours(); // hour in central time
+        const tsCentral = toCentral(order.orderdate);
+        const hour = tsCentral.getHours(); // hour in Central Time
 
-        // Build AM/PM range label
+        // Build AM/PM label
         const startHour12 = ((hour + 11) % 12) + 1;
         const endHour24 = hour + 1;
         const endHour12 = ((endHour24 + 11) % 12) + 1;
@@ -201,7 +221,7 @@ const [inventory, setInventory] = useState([]);
         hourlyMap[hourLabel].revenue += Number(order.ordertotal || 0);
       });
 
-      // Convert object to sorted array (sort by actual hour number)
+      // ===== SORT AND MAP TO ROWS =====
       const rows = Object.values(hourlyMap)
         .sort((a, b) => a.hour - b.hour)
         .map(h => ({
