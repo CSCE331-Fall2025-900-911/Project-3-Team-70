@@ -303,30 +303,34 @@ const categories = Array.from(
     fetchMenu();
   }, []);
 
-  // Load toppings from DB (/api/toppings)
+  // Load toppings from DB (/api/modifiers)
   useEffect(() => {
     async function fetchToppings() {
       try {
-        const res = await fetch("/api/toppings");
-        if (!res.ok) throw new Error("Failed");
+        const res = await fetch("/api/modifiers");
+        if (!res.ok) throw new Error("Failed to load modifiers");
+
         const data = await res.json();
 
-        // Convert API shape → UI shape
-        const formatted = data.map((t) => ({
-          id: t.inventoryID,
-          name: t.inventoryName,
-          price: Number(t.addOnPrice),
-          allergy: t.allergy,
+        // Convert { toppings: [...] } → array of UI-friendly objects
+        const formatted = (data.toppings || []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          price: Number(t.price),
+          allergy: t.allergy || "",
         }));
 
         setToppings(formatted);
+        setToppingsError(null);
       } catch (err) {
         console.error("Error loading toppings:", err);
         setToppingsError("Could not load toppings");
       }
     }
+
     fetchToppings();
   }, []);
+
 
 
   // language widget
