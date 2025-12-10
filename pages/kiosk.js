@@ -288,7 +288,7 @@ export default function KioskPage() {
             price: item.finalPrice || item.price,
             description: item.menudescription ?? item.description,
             category: item.category,
-            image: `/Images/${id}.png`,
+            image: `/images/${id}.png`,
             allergies: item.allergies || [],   // ★ NEW
           };
         });
@@ -486,7 +486,7 @@ const DrinkDetailsPage = () => {
         src={detailsItem.image}
         alt={detailsItem.name}
         onError={(e) => {
-          e.target.src = "/Images/default.png";
+          e.target.src = "/images/default.png";
         }}
         style={{
           width: "60%",
@@ -1835,7 +1835,7 @@ const DrinkDetailsPage = () => {
                                 src={item.image}
                                 alt={item.name}
                                 onError={(e) => {
-                                  e.target.src = "/Images/default.png";
+                                  e.target.src = "/images/default.png";
                                 }}
                                 style={{
                                   width: "100%",
