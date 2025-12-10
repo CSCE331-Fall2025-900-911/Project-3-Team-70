@@ -1024,7 +1024,7 @@ useEffect(() => {
         <button
           className={styles.btn}
           style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
-          onClick={generateXReport}
+          onPointerUp={generateXReport}
         >
           Run X Report
         </button>
@@ -1032,7 +1032,7 @@ useEffect(() => {
         <button
           className={styles.btn}
           style={{ backgroundColor: "#900", color: "#fff", marginLeft: "10px" }}
-          onClick={generateZReport}
+          onPointerUp={generateZReport}
         >
           Run Z Report
         </button>
