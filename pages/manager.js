@@ -379,7 +379,7 @@ const [inventory, setInventory] = useState([]);
     const q = query.trim().toLowerCase();
 
     // Hide all modifier-only inventory items
-    const visible = inventory.filter(i => i.unit !== "mod");
+    const visible = inventory.filter(i => i.unit !== "mod" && i.unit !== "archived")
 
     if (!q) return visible;
 
@@ -392,32 +392,17 @@ const [inventory, setInventory] = useState([]);
 
 // Event Handlers ===================================================
 function handleAddMenuItem() {
-  // ---- CLEAR EDITING STATE ----
-  setIsEditingMenu(false);
-  setSelectedMenuItem(null);
-  setSelectedMenuId(null);
-
-  // ---- CLEAR FORM FIELDS ----
-  setNewMenuName("");
-  setNewMenuCategory("");
-  setNewCategoryInput("");
-  setNewMenuPrice("");
-  setNewMenuDescription("");
-  setNewMenuStart("2025-01-01");
-  setNewMenuEnd("2025-12-31");
-
-  // ---- RESET INGREDIENTS (auto-included only) ----
+  // Pre-load auto-included ingredients
   setNewMenuIngredients(
     ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
       inventoryID: id,
-      quantity: 1
+      quantity: 1    // or 0 if you prefer
     }))
   );
 
-  // ---- OPEN MODAL ----
+  setIsEditingMenu(false);
   setShowAddMenuModal(true);
 }
-
 
 async function handleUpdateMenuItem() {
   if (!selectedMenuItem) {
@@ -843,6 +828,43 @@ async function handleUpdateMenuItem() {
 
 
 // Fetch sales data (with range or all-time)
+
+async function handleDeleteInventory() {
+  if (!invID) {
+    alert("Select an inventory item first.");
+    return;
+  }
+
+  const ok = confirm(
+    "This will delete this inventory item. Continue?"
+  );
+  if (!ok) return;
+
+  const res = await fetch("/api/inventory", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: invID,
+      name: invName,
+      quantity: invQty,
+      restockMin: invMin,
+      unit: "archived",          // ← THIS IS THE DELETE
+      allergy: invAllergy || null,
+      restockOrdered: 0,
+      isTopping: false
+    }),
+  });
+
+  if (!res.ok) {
+    alert("Failed to delete inventory item.");
+    return;
+  }
+
+  setShowInventoryModal(false);
+  refreshInventory();
+}
+
+
 async function fetchSales() {
 	try {
 		setSalesLoading(true);
@@ -1085,7 +1107,7 @@ useEffect(() => {
 
       <ul className={styles.restockList}>
         {inventory
-          .filter(i => i.unit !== "mod")
+          .filter(i => i.unit !== "mod" && i.unit !== "archived")
           .map((i) => (
           <li key={i.id} className={styles.restockItem}>
             <div className={styles.restockMain}>
@@ -1473,6 +1495,16 @@ useEffect(() => {
 
           <div className={styles.modalButtons}>
             <button onClick={() => setShowInventoryModal(false)}>Cancel</button>
+
+            {isEditingInventory && (
+              <button
+                className={styles.danger}
+                onClick={handleDeleteInventory}
+              >
+                Delete
+              </button>
+            )}
+
             <button className={styles.primary} onClick={submitInventoryChanges}>
               {isEditingInventory ? "Update" : "Add"}
             </button>
