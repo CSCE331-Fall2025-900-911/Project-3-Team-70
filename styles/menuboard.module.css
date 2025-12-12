@@ -202,3 +202,51 @@
   margin-top: 2px;
   align-self: flex-end;
 }
+
+.headerRight {
+  display: flex;
+  align-items: center;      /* vertical alignment */
+  gap: 16px;                /* space between Back and weather */
+}
+
+/* Weather + time stacked */
+.weatherBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* Back button styling */
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+
+  color: #eee;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+
+  cursor: pointer;
+  transition: background 0.2s ease, border 0.2s ease;
+}
+
+.backBtn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.weather {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.time {
+  color: #bbb;
+  font-size: 13px;
+}
+

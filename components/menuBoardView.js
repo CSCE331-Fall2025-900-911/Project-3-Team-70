@@ -43,42 +43,34 @@ export default function MenuBoardView({ menu, weather, clientTime, router }) {
   return (
     <div className={styles.menuBoard}>
       {/* HEADER */}
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Sharetea Digital Menu</h1>
-          <div className={styles.subtitle}>
-            Full menu • Weather-aware recommendations available on rotation
-          </div>
-        </div>
-
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontWeight: 600, fontSize: "18px" }}>
-            {tempF !== null && `${Math.round(tempF)}°F • ${desc}`}
-          </div>
-          <div style={{ color: "#bbb", fontSize: "13px" }}>{clientTime}</div>
+    <div className={styles.header}>
+      <div>
+        <h1 className={styles.title}>Sharetea Digital Menu</h1>
+        <div className={styles.subtitle}>
+          Full menu • Weather-aware recommendations available on rotation
         </div>
       </div>
 
-      {router && (
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            position: "fixed",
-            bottom: "20px",
-            right: "20px",
-            padding: "8px 16px",
-            background: "#000",
-            color: "white",
-            fontSize: "14px",
-            borderRadius: "6px",
-            border: "none",
-            cursor: "pointer",
-            zIndex: "999"
-          }}
-        >
-          Back to Home
-        </button>
-      )}
+      <div className={styles.headerRight}>
+        {router && (
+          <button
+            onClick={() => router.push("/")}
+            className={styles.backBtn}
+          >
+            ← Back
+          </button>
+        )}
+
+        <div className={styles.weatherBlock}>
+          <div className={styles.weather}>
+            {tempF !== null && `${Math.round(tempF)}°F • ${desc}`}
+          </div>
+          <div className={styles.time}>{clientTime}</div>
+        </div>
+      </div>
+
+    </div>
+
 
       {/* MAIN GRID */}
       <div className={styles.main}>
@@ -114,27 +106,6 @@ export default function MenuBoardView({ menu, weather, clientTime, router }) {
           })}
         </div>
       </div>
-
-      {router && (
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            position: "fixed",
-            bottom: "20px",
-            right: "20px",
-            padding: "8px 16px",
-            background: "#000",
-            color: "white",
-            fontSize: "14px",
-            borderRadius: "6px",
-            border: "none",
-            cursor: "pointer",
-            zIndex: "999"
-          }}
-        >
-          Back to Home
-        </button>
-      )}
     </div>
   );
 }

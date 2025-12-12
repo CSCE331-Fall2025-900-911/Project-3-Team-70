@@ -885,7 +885,7 @@ async function handleUpdateMenuItem() {
       // Add if not present
       setNewMenuIngredients(prev => [
         ...prev,
-        { inventoryID: id, quantity: 0 }
+        { inventoryID: id, quantity: "" }
       ]);
     } else {
       // Remove it
@@ -1395,7 +1395,7 @@ useEffect(() => {
               <label>Price ($)</label>
               <input
                 type="number"
-                step="0.01"
+                step="1"
                 value={newMenuPrice}
                 onChange={(e) => setNewMenuPrice(e.target.value)}
               />
@@ -1462,17 +1462,21 @@ useEffect(() => {
                     </label>
 
                     {selected && (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className={styles.qtyInput}
-                        value={selected.quantity}
-                        onChange={(e) =>
-                          updateIngredientQty(inv.id, Number(e.target.value))
-                        }
-                        placeholder="Qty"
-                      />
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      className={styles.qtyInput}
+                      value={selected.quantity}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateIngredientQty(
+                          inv.id,
+                          val === "" ? "" : Math.max(0, Math.floor(Number(val)))
+                        );
+                      }}
+                      placeholder="Qty"
+                    />
                     )}
                   </div>
                 );
