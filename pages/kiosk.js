@@ -867,12 +867,27 @@ export default function KioskPage() {
 
     // Keep a summary ready for payment & receipt
     useEffect(() => {
-      setOrderSummary({
-        subtotal: Number(cartSubtotal.toFixed(2)),
-        discount: applied,
-        tax: taxAmount,
-        total: finalTotal,
-        pointsSpent: applied,
+      setOrderSummary(prev => {
+        const next = {
+          subtotal: Number(cartSubtotal.toFixed(2)),
+          discount: applied,
+          tax: taxAmount,
+          total: finalTotal,
+          pointsSpent: applied,
+        };
+
+        // shallow equality check
+        if (
+          prev.subtotal === next.subtotal &&
+          prev.discount === next.discount &&
+          prev.tax === next.tax &&
+          prev.total === next.total &&
+          prev.pointsSpent === next.pointsSpent
+        ) {
+          return prev; 
+        }
+
+        return next;
       });
     }, [cartSubtotal, applied, taxAmount, finalTotal]);
 
@@ -936,21 +951,23 @@ export default function KioskPage() {
                 }}
               >
                 <button
-                  onPointerUp={() => removeItem(index)}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    removeItem(index);
+                  }}
                   style={{
-                    position: "absolute",
-                    top: accessibilityMode ? "15px" : "10px",
-                    right: accessibilityMode ? "15px" : "10px",
+                    minWidth: "64px",
+                    minHeight: "48px",
+                    padding: "10px 16px",
+                    borderRadius: "10px",
                     backgroundColor: "#b00000",
-                    color: "white",
+                    color: "#fff",
                     border: "none",
-                    padding: accessibilityMode
-                      ? "12px 18px"
-                      : "8px 14px",
-                    borderRadius: "8px",
-                    fontSize: accessibilityMode ? "20px" : "16px",
+                    fontSize: "18px",
+                    fontWeight: "600",
                     cursor: "pointer",
-                    marginTop: "10px",
+                    touchAction: "manipulation",
+                    userSelect: "none",
                   }}
                 >
                   Remove
@@ -978,19 +995,22 @@ export default function KioskPage() {
                   <strong>Quantity:</strong>{" "}
                   <button
                     type="button"
-                    onPointerUp={() =>
-                      updateQuantity(
-                        index,
-                        Number(item.quantity || 1) - 1
-                      )
-                    }
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      updateQuantity(index,Number(item.quantity || 1) - 1)
+                    }}
                     style={{
-                      marginRight: "8px",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
+                      minWidth: "56px",
+                      minHeight: "56px",
+                      padding: "12px",
+                      borderRadius: "12px",
                       border: "1px solid #ccc",
                       backgroundColor: "#fff",
+                      fontSize: "28px",
+                      fontWeight: "bold",
                       cursor: "pointer",
+                      touchAction: "manipulation",
+                      userSelect: "none",
                     }}
                   >
                     -
@@ -1000,20 +1020,26 @@ export default function KioskPage() {
                   </span>
                   <button
                     type="button"
-                    onPointerUp={() =>
-                      updateQuantity(
-                        index,
-                        Number(item.quantity || 1) + 1
-                      )
-                    }
-                    style={{
-                      marginLeft: "8px",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      border: "1px solid #ccc",
-                      backgroundColor: "#fff",
-                      cursor: "pointer",
-                    }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    updateQuantity(
+                      index,
+                      Number(item.quantity || 1) + 1
+                    );
+                  }}
+                  style={{
+                    minWidth: "56px",
+                    minHeight: "56px",
+                    padding: "12px",
+                    borderRadius: "12px",
+                    border: "1px solid #ccc",
+                    backgroundColor: "#fff",
+                    fontSize: "28px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    touchAction: "manipulation",
+                    userSelect: "none",
+                  }}
                   >
                     +
                   </button>
@@ -1141,17 +1167,22 @@ export default function KioskPage() {
                   >
                     <button
                       type="button"
-                      onPointerUp={() => changePointsBy(-1)}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        changePointsBy(-1);
+                      }}
                       style={{
-                        width: accessibilityMode ? "70px" : "56px",
-                        height: accessibilityMode ? "70px" : "56px",
+                        width: "70px",
+                        height: "70px",
                         borderRadius: "50%",
                         border: "none",
-                        fontSize: accessibilityMode ? "32px" : "26px",
+                        fontSize: "32px",
                         fontWeight: "bold",
                         backgroundColor: "#500000",
                         color: "#fff",
                         cursor: "pointer",
+                        touchAction: "manipulation",
+                        userSelect: "none",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1187,20 +1218,25 @@ export default function KioskPage() {
 
                     <button
                       type="button"
-                      onPointerUp={() => changePointsBy(1)}
-                      style={{
-                        width: accessibilityMode ? "70px" : "56px",
-                        height: accessibilityMode ? "70px" : "56px",
-                        borderRadius: "50%",
-                        border: "none",
-                        fontSize: accessibilityMode ? "32px" : "26px",
-                        fontWeight: "bold",
-                        backgroundColor: "#500000",
-                        color: "#fff",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        changePointsBy(1);
+                      }}
+                        style={{
+                          width: "70px",
+                          height: "70px",
+                          borderRadius: "50%",
+                          border: "none",
+                          fontSize: "32px",
+                          fontWeight: "bold",
+                          backgroundColor: "#500000",
+                          color: "#fff",
+                          cursor: "pointer",
+                          touchAction: "manipulation",
+                          userSelect: "none",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                       }}
                     >
                       +
@@ -1219,30 +1255,44 @@ export default function KioskPage() {
                   >
                     <button
                       type="button"
-                      onPointerUp={() =>
-                        setPointsToRedeem(maxRedeemable)
-                      }
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        setPointsToRedeem(maxRedeemable);
+                      }}
                       style={{
-                        padding: "8px 14px",
-                        borderRadius: "8px",
+                        minHeight: "48px",
+                        padding: "10px 18px",
+                        borderRadius: "10px",
                         border: "none",
                         backgroundColor: "#500000",
                         color: "#fff",
+                        fontSize: "18px",
+                        fontWeight: "600",
                         cursor: "pointer",
+                        touchAction: "manipulation",
+                        userSelect: "none",
                       }}
                     >
                       Use max
                     </button>
                     <button
                       type="button"
-                      onPointerUp={() => setPointsToRedeem(0)}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        setPointsToRedeem(0);
+                      }}
                       style={{
-                        padding: "8px 14px",
-                        borderRadius: "8px",
+                        minHeight: "48px",
+                        padding: "10px 18px",
+                        borderRadius: "10px",
                         border: "none",
                         backgroundColor: "#ccc",
                         color: "#000",
+                        fontSize: "18px",
+                        fontWeight: "600",
                         cursor: "pointer",
+                        touchAction: "manipulation",
+                        userSelect: "none",
                       }}
                     >
                       Clear
@@ -1294,20 +1344,23 @@ export default function KioskPage() {
 
         <button
           type="button"
-          onPointerUp={() => setScreen("payment")}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setScreen("payment");
+          }}
           disabled={cart.length === 0}
           style={{
-            padding: accessibilityMode ? "28px 50px" : "20px 40px",
+            minHeight: "72px",
+            padding: "24px 48px",
             backgroundColor: "#FFD700",
             border: "none",
-            borderRadius: "10px",
-            fontSize: accessibilityMode ? "32px" : "24px",
-            marginTop: "20px",
-            cursor:
-              cart.length === 0 ? "not-allowed" : "pointer",
+            borderRadius: "14px",
+            fontSize: "28px",
+            fontWeight: "700",
+            cursor: cart.length === 0 ? "not-allowed" : "pointer",
             opacity: cart.length === 0 ? 0.6 : 1,
-            fontFamily:
-              "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            touchAction: "manipulation",
+            userSelect: "none",
           }}
         >
           Proceed to Payment
@@ -1315,7 +1368,10 @@ export default function KioskPage() {
 
         <button
           type="button"
-          onPointerUp={() => setScreen("menu")}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setScreen("menu");
+          }}
           style={{
             padding: accessibilityMode ? "22px 40px" : "15px 30px",
             backgroundColor: accessibilityMode ? "#555" : "#ccc",
@@ -1338,6 +1394,8 @@ export default function KioskPage() {
   // === PAYMENT SCREEN WITH POINTS + TAX AWARENESS ===
   const PaymentScreen = ({ accessibilityMode }) => {
     const [confirmMethod, setConfirmMethod] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+
     const paymentMethods = [
       "Card",
       "Tap to Pay",
@@ -1346,21 +1404,25 @@ export default function KioskPage() {
     ];
 
     const handlePayment = async () => {
-      setLastPointsSummary(null);
+      if (isProcessing) return; // prevent double submission
+      setIsProcessing(true);
 
-      // 1) Create the order in DB with breakdown
-      const result = await sendOrderToSystem(
-        cart,
-        "kiosk",
-        "Kiosk",
-        session?.user?.email ?? null,
-        orderSummary
-      );
+      try {
+        setLastPointsSummary(null);
 
-      if (!result || !result.orderID) {
-        alert("Order failed: no order ID returned.");
-        return;
-      }
+        const result = await sendOrderToSystem(
+          cart,
+          "kiosk",
+          "Kiosk",
+          session?.user?.email ?? null,
+          orderSummary
+        );
+
+        if (!result || !result.orderID) {
+          alert("Order failed: no order ID returned.");
+          setIsProcessing(false);
+          return;
+        }
 
       // 2) If the user is signed in, update loyalty points
       if (session?.user?.email) {
@@ -1403,9 +1465,15 @@ export default function KioskPage() {
         }
       }
 
-      // 3) Show receipt / success screen
       setLastOrderId(result.orderID);
       setScreen("success");
+
+      // 3) Show receipt / success screen
+      } catch (err) {
+        console.error(err);
+        alert("Payment failed. Please try again.");
+        setIsProcessing(false);
+      }
     };
 
     if (!accessibilityMode) {
@@ -1423,25 +1491,26 @@ export default function KioskPage() {
           </p>
 
           {paymentMethods.map((method) => (
-            <button
-              key={method}
-              onClick={handlePayment}
-              style={{
-                display: "block",
-                width: "80%",
-                padding: "20px",
-                margin: "10px auto",
-                backgroundColor: "#500000",
-                color: "#fff",
-                border: "none",
-                borderRadius: "10px",
-                fontSize: "24px",
-                fontFamily:
-                  "'Helvetica Neue', Helvetica, Arial, sans-serif",
-              }}
-            >
-              {method}
-            </button>
+          <button
+            key={method}
+            onClick={handlePayment}
+            disabled={isProcessing}
+            style={{
+              display: "block",
+              width: "80%",
+              padding: "20px",
+              margin: "10px auto",
+              backgroundColor: isProcessing ? "#999" : "#500000",
+              color: "#fff",
+              border: "none",
+              borderRadius: "10px",
+              fontSize: "24px",
+              cursor: isProcessing ? "not-allowed" : "pointer",
+              opacity: isProcessing ? 0.7 : 1,
+            }}
+          >
+            {isProcessing ? "Processing..." : method}
+          </button>
           ))}
 
           <button
@@ -1494,6 +1563,8 @@ export default function KioskPage() {
           <button
             key={method}
             onClick={() => {
+              if (isProcessing) return; // ignore taps while processing
+
               if (narrationOn) speak(method, language);
 
               if (confirmMethod !== method) {
@@ -1501,8 +1572,10 @@ export default function KioskPage() {
                 return;
               }
 
-              // Second tap = confirm and pay
-              handlePayment();
+              // Second tap = confirm
+              setIsProcessing(true);   // ← THIS LINE
+              handlePayment();         // ← AND THIS LINE
+
             }}
             style={{
               width: "90%",
