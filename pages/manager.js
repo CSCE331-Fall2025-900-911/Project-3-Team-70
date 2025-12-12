@@ -46,6 +46,8 @@ export default function ManagerPage() {
 
 	const [menuItems, setMenuItems] = useState([]);
   const [selectedMenuId, setSelectedMenuId] = useState(null);
+  const [usageRows, setUsageRows] = useState([]);
+  const [usageLoading, setUsageLoading] = useState(false);
 
   const ALWAYS_INCLUDED_INGREDIENTS = [28, 29, 30, 31, 32];
   // ===== ADD MENU ITEM MODAL STATE =====
@@ -148,8 +150,85 @@ export default function ManagerPage() {
 }, []);
 
 
-const [inventory, setInventory] = useState([]);
+async function fetchUsage() {
+  if (!startDate || !endDate) {
+    alert("Select a date range");
+    return;
+  }
 
+  try {
+    setUsageLoading(true);
+
+    const res = await fetch(
+      `/api/usage?start=${startDate} 00:00:00&end=${endDate} 23:59:59`
+    );
+
+    if (!res.ok) throw new Error("Failed to load usage");
+
+    const data = await res.json();
+    setUsageRows(data);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setUsageLoading(false);
+  }
+}
+
+const UsageTab = (
+  <section className={styles.panel}>
+    <h2>Product Usage</h2>
+
+    <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+      <div>
+        <label>Start Date</label>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label>End Date</label>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+        />
+      </div>
+
+      <button onClick={fetchUsage}>Generate</button>
+    </div>
+
+    {usageLoading && <p>Loading usage…</p>}
+
+    {usageRows.length > 0 && (
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th>Total Used</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {usageRows.map(row => (
+              <tr key={row.inventoryid}>
+                <td>{row.inventoryname}</td>
+                <td>{Number(row.totalused).toFixed(2)}</td>
+                <td>{row.unit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+);
+
+
+const [inventory, setInventory] = useState([]);
 
 	// NEW — Report State =======================================
 	const [xReportRows, setXReportRows] = useState([]);
@@ -1524,6 +1603,12 @@ useEffect(() => {
           >
             Sales
           </button>
+          <button
+            className={`${styles.tab} ${activeTab === "usage" ? styles.active : ""}`}
+            onClick={() => setActiveTab("usage")}
+          >
+            Product Usage
+          </button>
 
           <button
             className={`${styles.tab} ${activeTab === "menu" ? styles.active : ""}`}
@@ -1558,9 +1643,11 @@ useEffect(() => {
         <section className={styles.content}>
           {activeTab === "sales" && SalesTab}
           {activeTab === "menu" && MenuTab}
+          {activeTab === "usage" && UsageTab}
           {activeTab === "inventory" && InventoryTab}
           {activeTab === "restock" && RestockTab}
           {activeTab === "reports" && ReportsTab}
+          
         </section>
       </main>
     </div>
