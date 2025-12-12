@@ -221,15 +221,20 @@ export default function CashierPage() {
       };
     });
 
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "cashier",
-          orderLocation: "Front Counter",
-          items,
-        }),
-      });
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "cashier",
+        orderLocation: "Front Counter",
+        items,
+
+        orderSubtotal: subtotal,
+        taxAmount,
+        discountAmount: 0,
+        finalTotal,
+      }),
+    });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -257,9 +262,14 @@ export default function CashierPage() {
   };
 
   // Calculate total
-  const total = order
-    .reduce((acc, i) => acc + Number(i.price || 0) * i.qty, 0)
-    .toFixed(2);
+  const subtotal = order.reduce(
+    (acc, i) => acc + Number(i.price || 0) * i.qty,
+    0
+  );
+
+  const TAX_RATE = 0.0625;
+  const taxAmount = Number((subtotal * TAX_RATE).toFixed(2));
+  const finalTotal = Number((subtotal + taxAmount).toFixed(2));
 
   // Open modifier popup
   const handleOpenModifier = (item) => {
@@ -483,7 +493,9 @@ export default function CashierPage() {
           </div>
 
           <div className="order-footer">
-            <div className="total">Total: ${total}</div>
+            <div className="total">
+              Total: ${finalTotal.toFixed(2)}
+            </div>
             <button className="btn success" onClick={submitOrder}>
               Submit Order
             </button>

@@ -34,8 +34,9 @@ async function handleCreateOrder(req, res) {
       source = "kiosk",
       orderLocation = "Kiosk",
       items = [],
-      employeeID = null,         // cashier can send this later if desired
-      customerEmail = null,      // optional; used for rewards, etc.
+      employeeID = null,
+      customerEmail = null,
+      finalTotal,
     } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -44,21 +45,7 @@ async function handleCreateOrder(req, res) {
 
     // Compute order total
     // Compute total from base item price + modifications, identical to Kitchen logic
-    const orderTotal = items.reduce((orderSum, item) => {
-      const basePrice = Number(item.priceAtPurchase ?? item.price ?? 0);
-      const qty = Number(item.quantity ?? 0);
-
-      const modsTotal = Array.isArray(item.modifications)
-        ? item.modifications.reduce((modSum, mod) => {
-            const modCost = Number(mod.cost ?? 0);
-            const modQty = Number(mod.quantity ?? mod.modificationQuantity ?? 1);
-            return modSum + modCost * modQty;
-          }, 0)
-        : 0;
-
-      return orderSum + (basePrice + modsTotal) * qty;
-    }, 0);
-
+    const orderTotal = Number(finalTotal);
 
     const nextOrderResult = await query(
       "SELECT COALESCE(MAX(orderID), 0) + 1 AS nextId FROM ordertest"

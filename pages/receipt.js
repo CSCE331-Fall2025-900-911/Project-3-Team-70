@@ -51,13 +51,7 @@ export async function getServerSideProps(context) {
       size: r.ordersize || null,
     }));
 
-    const orderTotal =
-      first.ordertotal != null
-        ? Number(first.ordertotal)
-        : items.reduce(
-            (sum, item) => sum + item.priceAtPurchase * item.quantity,
-            0
-          );
+    const orderTotal = Number(first.ordertotal);
 
     const order = {
       orderId: first.orderid,
@@ -213,7 +207,6 @@ export default function ReceiptPage({ order, items }) {
             </div>
           ))}
         </div>
-
         <div
           style={{
             borderTop: "1px solid #000",
@@ -224,10 +217,7 @@ export default function ReceiptPage({ order, items }) {
             fontSize: "18px",
             fontWeight: "bold",
           }}
-        >
-          <span>Total</span>
-          <span>${order.orderTotal.toFixed(2)}</span>
-        </div>
+        ></div>
 
         <button
           onClick={() => {
