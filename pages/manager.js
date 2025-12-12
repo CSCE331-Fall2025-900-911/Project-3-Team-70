@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/router";
 import Link from "next/link";
 import styles from "./manager.module.css";  // CSS MODULE
 
@@ -31,6 +32,7 @@ function isSameLocalDay(tsA, tsB) {
 
 
 export default function ManagerPage() {
+  const router = useRouter();
   const [salesSummary, setSalesSummary] = useState(null);
   const [salesHourly, setSalesHourly] = useState([]);
   const [salesOrders, setSalesOrders] = useState([]);
@@ -1321,6 +1323,20 @@ useEffect(() => {
         <nav className={styles.links}>
           <Link className={styles.link} href="/cashier">Cashier</Link>
           <Link className={styles.link} href="/kiosk">Kiosk</Link>
+          <button
+            onClick={() => router.push("/")}
+            className={styles.link}
+            style={{
+              background: "none",
+              border: "1px solid var(--border)",
+              cursor: "pointer",
+              padding: "6px 10px",
+              borderRadius: "999px",
+              fontFamily: "inherit"
+            }}
+          >
+            Back to Home
+          </button>
         </nav>
       </header>
 

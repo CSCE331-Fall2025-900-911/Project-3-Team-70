@@ -1,8 +1,10 @@
 // pages/menuboard.js
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import MenuBoardView from "../components/menuBoardView";
 
 export default function MenuboardPage() {
+  const router = useRouter();
   const [menu, setMenu] = useState([]);
   const [weather, setWeather] = useState(null);
   const [clientTime, setClientTime] = useState("");
@@ -35,6 +37,8 @@ export default function MenuboardPage() {
   }
 
   return (
-    <MenuBoardView menu={menu} weather={weather} clientTime={clientTime} />
+    <>
+      <MenuBoardView menu={menu} weather={weather} clientTime={clientTime} router={router} />
+    </>
   );
 }

@@ -23,7 +23,8 @@ export default function FeaturedDrinkView({
   index,
   total,
   overrideOpen,
-  setOverrideOpen
+  setOverrideOpen,
+  router
 }) {
   const tempF = getTempF(weather);
   const desc = weather?.weather?.[0]?.description ?? "";
@@ -127,6 +128,27 @@ export default function FeaturedDrinkView({
           </div>
         )}
       </div>
+
+      {router && (
+        <button
+          onClick={() => router.push("/")}
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            right: "20px",
+            padding: "8px 16px",
+            background: "#000",
+            color: "white",
+            fontSize: "14px",
+            borderRadius: "6px",
+            border: "none",
+            cursor: "pointer",
+            zIndex: "999"
+          }}
+        >
+          Back to Home
+        </button>
+      )}
     </div>
   );
 }

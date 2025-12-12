@@ -1,5 +1,6 @@
 // pages/weathermenu.js
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import FeaturedDrinkView from "../components/featuredDrinkView";
 
 const HOT = ["Fruity Beverage", "Ice-Blended", "Non-Caffeinated"];
@@ -70,6 +71,7 @@ function pickRecommendations(menu, weather, overrideTempF = null, overrideHour =
 }
 
 export default function WeatherRecommendationsPage() {
+  const router = useRouter();
   const [menu, setMenu] = useState([]);
   const [weather, setWeather] = useState(null);
   const [clientTime, setClientTime] = useState("");
@@ -125,7 +127,6 @@ export default function WeatherRecommendationsPage() {
 
 return (
   <>
-
     {/* OVERRIDE PANEL (only visible when open) */}
     {overrideOpen && (
       <div
@@ -246,6 +247,7 @@ return (
       total={recs.length}
       overrideOpen={overrideOpen}
       setOverrideOpen={setOverrideOpen}
+      router={router}
     />
   </>
 );

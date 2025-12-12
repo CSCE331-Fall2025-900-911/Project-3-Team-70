@@ -29,7 +29,7 @@ function groupMenu(items) {
   return map;
 }
 
-export default function MenuBoardView({ menu, weather, clientTime }) {
+export default function MenuBoardView({ menu, weather, clientTime, router }) {
   const grouped = groupMenu(menu || []);
 
   const categories = [
@@ -58,6 +58,27 @@ export default function MenuBoardView({ menu, weather, clientTime }) {
           <div style={{ color: "#bbb", fontSize: "13px" }}>{clientTime}</div>
         </div>
       </div>
+
+      {router && (
+        <button
+          onClick={() => router.push("/")}
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            right: "20px",
+            padding: "8px 16px",
+            background: "#000",
+            color: "white",
+            fontSize: "14px",
+            borderRadius: "6px",
+            border: "none",
+            cursor: "pointer",
+            zIndex: "999"
+          }}
+        >
+          Back to Home
+        </button>
+      )}
 
       {/* MAIN GRID */}
       <div className={styles.main}>
@@ -93,6 +114,27 @@ export default function MenuBoardView({ menu, weather, clientTime }) {
           })}
         </div>
       </div>
+
+      {router && (
+        <button
+          onClick={() => router.push("/")}
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            right: "20px",
+            padding: "8px 16px",
+            background: "#000",
+            color: "white",
+            fontSize: "14px",
+            borderRadius: "6px",
+            border: "none",
+            cursor: "pointer",
+            zIndex: "999"
+          }}
+        >
+          Back to Home
+        </button>
+      )}
     </div>
   );
 }
