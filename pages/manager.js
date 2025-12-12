@@ -473,17 +473,31 @@ const [inventory, setInventory] = useState([]);
 
 // Event Handlers ===================================================
 function handleAddMenuItem() {
-  // Pre-load auto-included ingredients
+  // CLEAR any previous selection
+  setSelectedMenuItem(null);
+  setSelectedMenuId(null);
+
+  // RESET form fields
+  setNewMenuName("");
+  setNewMenuCategory("");
+  setNewCategoryInput("");
+  setNewMenuPrice("");
+  setNewMenuDescription("");
+  setNewMenuStart("2025-01-01");
+  setNewMenuEnd("2025-12-31");
+
+  // Pre-load auto-included ingredients ONLY
   setNewMenuIngredients(
     ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
       inventoryID: id,
-      quantity: 1    // or 0 if you prefer
+      quantity: 1
     }))
   );
 
   setIsEditingMenu(false);
   setShowAddMenuModal(true);
 }
+
 
 async function handleUpdateMenuItem() {
   if (!selectedMenuItem) {
@@ -1346,7 +1360,7 @@ useEffect(() => {
 
           {/* === TOP FORM BOX (narrower) === */}
           <div className={styles.topBox}>
-            <h2>Add Menu Item</h2>
+            <h2>{isEditingMenu ? "Update Menu Item" : "Add Menu Item"}</h2>
 
             <div className={styles.modalField}>
               <label>Name</label>
