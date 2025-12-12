@@ -512,11 +512,22 @@ export default function KioskPage() {
     if (!detailsItem) return null;
 
     const toggleTopping = (topping) => {
-      setSelectedToppings((prev) =>
-        prev.some((t) => t.id === topping.id)
+      setSelectedToppings((prev) => {
+        const exists = prev.some((t) => t.id === topping.id);
+
+        if (narrationOn) {
+          speak(
+            exists
+              ? `Removed ${topping.name}`
+              : `Added ${topping.name}`,
+            language
+          );
+        }
+
+        return exists
           ? prev.filter((t) => t.id !== topping.id)
-          : [...prev, topping]
-      );
+          : [...prev, topping];
+      });
     };
 
     const totalPrice =
@@ -713,7 +724,14 @@ export default function KioskPage() {
       <h2 style={{ marginTop: "30px" }}>Sweetness</h2>
       <select
         value={sweetness}
-        onChange={(e) => setSweetness(e.target.value)}
+        onChange={(e) => {
+          const value = e.target.value;
+          setSweetness(value);
+
+          if (narrationOn) {
+            speak(`Sweetness set to ${value}`, language);
+          }
+        }}
         style={{
           padding: "10px",
           fontSize: "20px",
@@ -734,7 +752,14 @@ export default function KioskPage() {
         <h2 style={{ marginTop: "20px" }}>Temperature</h2>
         <select
           value={temperature}
-          onChange={(e) => setTemperature(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            setTemperature(value);
+
+            if (narrationOn) {
+              speak(`Temperature set to ${value}`, language);
+            }
+          }}
           style={{
             padding: "10px",
             fontSize: "20px",
@@ -752,9 +777,14 @@ export default function KioskPage() {
             <h2>Ice Level</h2>
             <select
               value={iceLevel}
-              onChange={(e) =>
-                setIceLevel(e.target.value)
-              }
+              onChange={(e) => {
+                const value = e.target.value;
+                setIceLevel(value);
+
+                if (narrationOn) {
+                  speak(`Ice level set to ${value}`, language);
+                }
+              }}
               style={{
                 padding: "10px",
                 fontSize: "20px",
@@ -774,7 +804,14 @@ export default function KioskPage() {
         <h2 style={{ marginTop: "20px" }}>Size</h2>
         <select
           value={size}
-          onChange={(e) => setSize(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            setSize(value);
+
+            if (narrationOn) {
+              speak(`Size set to ${value}`, language);
+            }
+          }}
           style={{
             padding: "10px",
             fontSize: "20px",
@@ -2296,7 +2333,13 @@ const AllergyFilterPanel = ({ accessibilityMode }) => {
         {categories.map((cat) => (
           <button
             key={cat}
-            onClick={() => setActiveCategory(cat)}
+            onClick={() => {
+              setActiveCategory(cat);
+
+              if (narrationOn) {
+                speak(`Category ${cat}`, language);
+              }
+            }}
             style={{
               padding: "12px 20px",
               borderRadius: "8px",
@@ -2397,11 +2440,21 @@ const AllergyFilterPanel = ({ accessibilityMode }) => {
             return (
               <div key={cat}>
                 <button
-                  onClick={() =>
-                    setActiveCategory(
-                      activeCategory === cat ? null : cat
-                    )
-                  }
+                  onClick={() => {
+                    const next =
+                      activeCategory === cat ? null : cat;
+
+                    setActiveCategory(next);
+
+                    if (narrationOn) {
+                      speak(
+                        next
+                          ? `Showing ${cat} drinks`
+                          : `Hiding ${cat} drinks`,
+                        language
+                      );
+                    }
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
