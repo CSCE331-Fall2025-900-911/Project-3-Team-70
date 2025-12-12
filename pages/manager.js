@@ -392,17 +392,32 @@ const [inventory, setInventory] = useState([]);
 
 // Event Handlers ===================================================
 function handleAddMenuItem() {
-  // Pre-load auto-included ingredients
+  // ---- CLEAR EDITING STATE ----
+  setIsEditingMenu(false);
+  setSelectedMenuItem(null);
+  setSelectedMenuId(null);
+
+  // ---- CLEAR FORM FIELDS ----
+  setNewMenuName("");
+  setNewMenuCategory("");
+  setNewCategoryInput("");
+  setNewMenuPrice("");
+  setNewMenuDescription("");
+  setNewMenuStart("2025-01-01");
+  setNewMenuEnd("2025-12-31");
+
+  // ---- RESET INGREDIENTS (auto-included only) ----
   setNewMenuIngredients(
     ALWAYS_INCLUDED_INGREDIENTS.map(id => ({
       inventoryID: id,
-      quantity: 1    // or 0 if you prefer
+      quantity: 1
     }))
   );
 
-  setIsEditingMenu(false);
+  // ---- OPEN MODAL ----
   setShowAddMenuModal(true);
 }
+
 
 async function handleUpdateMenuItem() {
   if (!selectedMenuItem) {
@@ -624,7 +639,7 @@ async function handleUpdateMenuItem() {
         // If editing, send update instead of create
         if (isEditingMenu) {
           const updatePayload = {
-            id: selectedMenuId,
+            id: selectedMenuItem.id,
             name: newMenuName,
             category: categoryToSave,
             price: parseFloat(newMenuPrice),
@@ -1353,7 +1368,9 @@ useEffect(() => {
               setShowAddMenuModal(false);
               setIsEditingMenu(false);
             }}>Cancel</button>
-            <button className={styles.primary} onClick={submitNewMenuItem}>Add Item</button>
+            <button className={styles.primary} onClick={submitNewMenuItem}>
+              {isEditingMenu ? "Update Item" : "Add Item"}
+            </button>
           </div>
 
         </div>
