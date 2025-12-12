@@ -47,7 +47,7 @@ export default function MenuBoardView({ menu, weather, clientTime, router }) {
       <div>
         <h1 className={styles.title}>Sharetea Digital Menu</h1>
         <div className={styles.subtitle}>
-          Full menu • Weather-aware recommendations available on rotation
+          Full menu
         </div>
       </div>
 
