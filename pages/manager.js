@@ -1346,7 +1346,9 @@ useEffect(() => {
             <div className={styles.ingredientGrid}>
               {inventory
                   .filter(inv => inv.unit !== "mod")
+                  .filter(inv => inv.unit !== "archived")
                   .filter(inv => inv.id !== 33) 
+                  .filter(inv => inv.id !== 27) 
                   .filter(inv => !ALWAYS_INCLUDED_INGREDIENTS.includes(inv.id))
                 .map(inv => {
                 const selected = newMenuIngredients.find(i => i.inventoryID === inv.id);
