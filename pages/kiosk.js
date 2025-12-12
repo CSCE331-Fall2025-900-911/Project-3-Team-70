@@ -1579,6 +1579,12 @@ export default function KioskPage() {
 
     const now = new Date();
 
+    const getToppingsTotal = (item) =>
+      (item.toppings || []).reduce(
+        (sum, t) => sum + Number(t.price || 0),
+        0
+      ) * (item.quantity || 1);
+
     return (
       <div
         style={{
@@ -1681,12 +1687,20 @@ export default function KioskPage() {
               overflowY: "auto",
             }}
           >
-            {cart.map((item, idx) => {
-              const lineTotal =
-                Number(item.finalPrice || item.price || 0) *
-                Number(item.quantity || 1);
+          {cart.map((item, idx) => {
+            const quantity = Number(item.quantity || 1);
 
-              return (
+            const lineTotal =
+              Number(item.finalPrice || item.price || 0) * quantity;
+
+            const addOnsTotal = getToppingsTotal(item);
+
+            const basePrice = Math.max(
+              lineTotal - addOnsTotal,
+              0
+            );
+
+            return (
                 <div
                   key={`${item.id}-${idx}`}
                   style={{
@@ -1704,7 +1718,7 @@ export default function KioskPage() {
                       {item.name} (x{item.quantity || 1})
                     </span>
                     <span>
-                      ${lineTotal.toFixed(2)}
+                      ${basePrice.toFixed(2)}
                     </span>
                   </div>
                   {item.size && (
@@ -1712,20 +1726,42 @@ export default function KioskPage() {
                       Size: {item.size}
                     </div>
                   )}
-                  {item.toppings &&
-                    item.toppings.length > 0 && (
+                  {item.toppings && item.toppings.length > 0 && (
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        opacity: 0.85,
+                        marginLeft: "10px",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {item.toppings.map((t, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>+ {t.name}</span>
+                          <span>${Number(t.price).toFixed(2)}</span>
+                        </div>
+                      ))}
+
                       <div
                         style={{
-                          fontSize: "13px",
-                          opacity: 0.8,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontWeight: "bold",
+                          marginTop: "2px",
                         }}
                       >
-                        Toppings:{" "}
-                        {item.toppings
-                          .map((t) => t.name)
-                          .join(", ")}
+                        <span>Add-ons</span>
+                        <span>${getToppingsTotal(item).toFixed(2)}</span>
                       </div>
-                    )}
+                    </div>
+                  )}
+
                 </div>
               );
             })}

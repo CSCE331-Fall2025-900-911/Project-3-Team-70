@@ -97,23 +97,6 @@ export default function KitchenPage() {
 
         {orders.map((o) => {
           // --- Recompute total from items + modifiers ---
-          const computedTotal = Array.isArray(o.items)
-            ? o.items.reduce((orderSum, item) => {
-                const basePrice = Number(item.priceatpurchase ?? item.price ?? 0);
-                const qty = Number(item.quantitypurchased ?? item.quantity ?? 0);
-
-                const modsTotal = Array.isArray(item.modifications)
-                  ? item.modifications.reduce((modSum, mod) => {
-                      const modCost = Number(mod.cost ?? 0);
-                      const modQty = Number(mod.modificationquantity ?? 1);
-                      return modSum + modCost * modQty;
-                    }, 0)
-                  : 0;
-
-                // assume modifier cost is per drink; multiply whole line by qty
-                return orderSum + (basePrice + modsTotal) * qty;
-              }, 0)
-            : 0;
 
           return (
             <div key={o.orderid} className="order-card">
@@ -126,8 +109,7 @@ export default function KitchenPage() {
 
               <div className="order-body">
                 <p>
-                  <strong>Total:</strong>{" "}
-                  ${computedTotal.toFixed(2)}
+                  <strong>Total:</strong> ${Number(o.ordertotal).toFixed(2)}
                 </p>
                 <p>
                   <strong>Placed:</strong>{" "}
