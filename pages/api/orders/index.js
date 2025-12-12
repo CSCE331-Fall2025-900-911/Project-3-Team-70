@@ -45,7 +45,9 @@ async function handleCreateOrder(req, res) {
 
     // Compute order total
     // Compute total from base item price + modifications, identical to Kitchen logic
-    const orderTotal = Number(finalTotal);
+    const rawTotal = Number(finalTotal);
+    const orderTotal = Number.isFinite(rawTotal) ? rawTotal : 0;
+
 
     const nextOrderResult = await query(
       "SELECT COALESCE(MAX(orderID), 0) + 1 AS nextId FROM ordertest"

@@ -12,49 +12,78 @@ export default async function handler(req, res) {
 
   try {
 
-    const summarySQL = useRange
-      ? `
-        SELECT 
-          COALESCE(SUM(orderTotal), 0) AS totalSales,
-          COUNT(orderID) AS totalOrders,
-          MIN(orderDate) AS firstOrder,
-          MAX(orderDate) AS lastOrder
-        FROM ordertest
-        WHERE orderDate >= $1 AND orderDate < $2;
-      `
-      : `
-        SELECT 
-          COALESCE(SUM(orderTotal), 0) AS totalSales,
-          COUNT(orderID) AS totalOrders,
-          MIN(orderDate) AS firstOrder,
-          MAX(orderDate) AS lastOrder
-        FROM ordertest;
-      `;
+  const summarySQL = useRange
+    ? `
+      SELECT 
+        COALESCE(SUM(
+                  CASE
+                    WHEN orderTotal IS NULL THEN 0
+                    WHEN orderTotal::text = 'NaN' THEN 0
+                    ELSE orderTotal
+                  END
+                ), 0) AS totalSales,
+        COUNT(orderID) AS totalOrders,
+        MIN(orderDate) AS firstOrder,
+        MAX(orderDate) AS lastOrder
+      FROM ordertest
+      WHERE orderTotal = orderTotal
+        AND orderDate >= $1
+        AND orderDate < $2;
+    `
+    : `
+      SELECT 
+        COALESCE(SUM(
+  CASE
+    WHEN orderTotal IS NULL THEN 0
+    WHEN orderTotal::text = 'NaN' THEN 0
+    ELSE orderTotal
+  END
+    ), 0) AS totalSales,
+        COUNT(orderID) AS totalOrders,
+        MIN(orderDate) AS firstOrder,
+        MAX(orderDate) AS lastOrder
+      FROM ordertest
+      WHERE orderTotal = orderTotal;
+    `;
 
     const summary = (
       await query(summarySQL, useRange ? [start, end] : [])
     ).rows[0];
 
 
-    const hourlySQL = useRange
-      ? `
-        SELECT 
-          EXTRACT(HOUR FROM orderDate) AS hour,
-          SUM(orderTotal) AS totalSales
-        FROM ordertest
-        WHERE orderDate >= $1 AND orderDate < $2
-        GROUP BY hour
-        ORDER BY hour;
-      `
-      : `
-        SELECT 
-          EXTRACT(HOUR FROM orderDate) AS hour,
-          SUM(orderTotal) AS totalSales
-        FROM ordertest
-        GROUP BY hour
-        ORDER BY hour;
-      `;
-
+  const hourlySQL = useRange
+    ? `
+      SELECT 
+        EXTRACT(HOUR FROM orderDate) AS hour,
+        SUM(
+  CASE
+    WHEN orderTotal IS NULL THEN 0
+    WHEN orderTotal::text = 'NaN' THEN 0
+    ELSE orderTotal
+  END
+) AS totalSales
+      FROM ordertest
+      WHERE orderTotal = orderTotal
+        AND orderDate >= $1
+        AND orderDate < $2
+      GROUP BY hour
+      ORDER BY hour;
+    `
+    : `
+      SELECT 
+        EXTRACT(HOUR FROM orderDate) AS hour,
+        SUM(
+  CASE
+    WHEN orderTotal IS NULL THEN 0
+    WHEN orderTotal::text = 'NaN' THEN 0
+    ELSE orderTotal
+  END
+) AS totalSales
+      FROM ordertest
+      WHERE orderTotal = orderTotal
+      GROUP BY hour
+      ORDER BY hour;
+    `;
     const hourly = (
       await query(hourlySQL, useRange ? [start, end] : [])
     ).rows;
@@ -69,7 +98,7 @@ export default async function handler(req, res) {
           orderDate,
           orderTotal
         FROM ordertest
-        WHERE orderDate >= $1 AND orderDate < $2
+        WHERE orderDate >= $1 AND orderDate < $2 AND orderTotal = orderTotal
         ORDER BY orderDate DESC
         LIMIT 200;
       `
